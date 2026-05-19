@@ -1,4 +1,4 @@
-import { getBudgets, getCurrentBudget, createBudget, updateBudget, deleteBudget, getCategories } from '../../api.js';
+import { getBudgets, getCurrentBudget, createBudget, updateBudget, deleteBudget, getCategories, formatCurrency } from '../../api.js';
 
 export async function initBudgets(container) {
     container.innerHTML = `
@@ -105,8 +105,8 @@ function renderBudgets(budgets) {
                 </div>
                 <div class="mb-2">
                     <div class="flex justify-between text-sm mb-1">
-                        <span class="text-gray-600">${budget.gasto_actual?.toFixed(2) || '0.00'} € gastado</span>
-                        <span class="font-medium">${budget.quantitat_limit?.toFixed(2) || '0.00'} € límite</span>
+                        <span class="text-gray-600">${formatCurrency(budget.gasto_actual)} gastado</span>
+                        <span class="font-medium">${formatCurrency(budget.quantitat_limit)} límite</span>
                     </div>
                     <div class="h-2 bg-gray-200 rounded-full overflow-hidden">
                         <div class="h-full bg-${color}-500 transition-all" style="width: ${percent}%"></div>

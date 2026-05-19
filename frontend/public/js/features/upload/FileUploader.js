@@ -1,4 +1,4 @@
-import { uploadCsv, confirmTransactions, getCategories } from '../../api.js';
+import { uploadCsv, confirmTransactions, getCategories, formatCurrency } from '../../api.js';
 
 export async function initUpload(container) {
     container.innerHTML = `
@@ -118,7 +118,7 @@ export async function initUpload(container) {
                         ${options}
                     </select>
                 </td>
-                <td class="text-right">${parseFloat(t.cost).toFixed(2)}€</td>
+                <td class="text-right">${formatCurrency(parseFloat(t.cost))}</td>
             </tr>
             `;
         }).join('');

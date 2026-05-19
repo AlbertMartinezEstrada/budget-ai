@@ -1,4 +1,4 @@
-import { getRecurringTransactions, createRecurringTransaction, updateRecurringTransaction, deleteRecurringTransaction, processRecurring, getCategories, getCompanies } from '../../api.js';
+import { getRecurringTransactions, createRecurringTransaction, updateRecurringTransaction, deleteRecurringTransaction, processRecurring, getCategories, getCompanies, formatCurrency } from '../../api.js';
 
 export async function initRecurring(container) {
     container.innerHTML = `
@@ -138,7 +138,7 @@ function renderRecurrings(recurrings) {
             </div>
             <div class="flex justify-between items-center">
                 <span class="text-xl font-bold ${item.tipus === 'INCOME' ? 'text-green-600' : 'text-red-600'}">
-                    ${item.tipus === 'INCOME' ? '+' : '-'}${item.import?.toFixed(2) || '0.00'} €
+                    ${item.tipus === 'INCOME' ? '+' : '-'}${formatCurrency(item.import)}
                 </span>
                 <span class="text-xs ${item.activa ? 'text-green-600' : 'text-gray-400'}">${item.activa ? 'Activa' : 'Inactiva'}</span>
             </div>
