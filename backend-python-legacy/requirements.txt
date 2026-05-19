@@ -1,0 +1,6 @@
+fastapi
+uvicorn
+pandas
+google-generativeai
+psycopg2-binary
+python-multipart

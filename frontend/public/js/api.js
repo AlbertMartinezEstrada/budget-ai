@@ -1,0 +1,291 @@
+const API_URL = `${window.location.protocol}//${window.location.hostname}:8000`;
+
+// Helper function for handling API responses
+async function handleResponse(response) {
+    if (!response.ok) {
+        const error = await response.json().catch(() => ({ detail: 'Error desconegut' }));
+        throw new Error(error.detail);
+    }
+    return response.json();
+}
+
+// Fetch all transactions
+export async function getTransactions(filters = {}) {
+    const params = new URLSearchParams(filters);
+    const response = await fetch(`${API_URL}/gastos?${params.toString()}`);
+    return handleResponse(response);
+}
+
+// Fetch all categories
+export async function getCategories() {
+    const response = await fetch(`${API_URL}/categories`);
+    return handleResponse(response);
+}
+
+// Fetch all companies
+export async function getCompanies() {
+    const response = await fetch(`${API_URL}/companies`);
+    return handleResponse(response);
+}
+
+// Upload a CSV file for processing
+export async function uploadCsv(file) {
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    const response = await fetch(`${API_URL}/upload-csv`, {
+        method: 'POST',
+        body: formData,
+    });
+    return handleResponse(response);
+}
+
+// Confirm the reviewed transactions
+export async function confirmTransactions(data) {
+    const response = await fetch(`${API_URL}/confirm-upload`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+    });
+    return handleResponse(response);
+}
+
+// ============ ACCOUNTS ============
+export async function getAccounts() {
+    const response = await fetch(`${API_URL}/accounts`);
+    return handleResponse(response);
+}
+
+export async function getAccount(id) {
+    const response = await fetch(`${API_URL}/accounts/${id}`);
+    return handleResponse(response);
+}
+
+export async function createAccount(data) {
+    const response = await fetch(`${API_URL}/accounts`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+    });
+    return handleResponse(response);
+}
+
+export async function updateAccount(id, data) {
+    const response = await fetch(`${API_URL}/accounts/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+    });
+    return handleResponse(response);
+}
+
+export async function deleteAccount(id) {
+    const response = await fetch(`${API_URL}/accounts/${id}`, {
+        method: 'DELETE',
+    });
+    return handleResponse(response);
+}
+
+export async function adjustBalance(id, amount) {
+    const response = await fetch(`${API_URL}/accounts/${id}/adjust-balance`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ amount }),
+    });
+    return handleResponse(response);
+}
+
+// ============ BUDGETS ============
+export async function getBudgets() {
+    const response = await fetch(`${API_URL}/budgets`);
+    return handleResponse(response);
+}
+
+export async function getCurrentBudget() {
+    const response = await fetch(`${API_URL}/budgets/current`);
+    return handleResponse(response);
+}
+
+export async function getBudget(id) {
+    const response = await fetch(`${API_URL}/budgets/${id}`);
+    return handleResponse(response);
+}
+
+export async function createBudget(data) {
+    const response = await fetch(`${API_URL}/budgets`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+    });
+    return handleResponse(response);
+}
+
+export async function updateBudget(id, data) {
+    const response = await fetch(`${API_URL}/budgets/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+    });
+    return handleResponse(response);
+}
+
+export async function deleteBudget(id) {
+    const response = await fetch(`${API_URL}/budgets/${id}`, {
+        method: 'DELETE',
+    });
+    return handleResponse(response);
+}
+
+// ============ TRANSFERS ============
+export async function getTransfers() {
+    const response = await fetch(`${API_URL}/transfers`);
+    return handleResponse(response);
+}
+
+export async function getTransfer(id) {
+    const response = await fetch(`${API_URL}/transfers/${id}`);
+    return handleResponse(response);
+}
+
+export async function createTransfer(data) {
+    const response = await fetch(`${API_URL}/transfers`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+    });
+    return handleResponse(response);
+}
+
+export async function deleteTransfer(id) {
+    const response = await fetch(`${API_URL}/transfers/${id}`, {
+        method: 'DELETE',
+    });
+    return handleResponse(response);
+}
+
+// ============ RECURRING TRANSACTIONS ============
+export async function getRecurringTransactions() {
+    const response = await fetch(`${API_URL}/recurring`);
+    return handleResponse(response);
+}
+
+export async function getRecurringTransaction(id) {
+    const response = await fetch(`${API_URL}/recurring/${id}`);
+    return handleResponse(response);
+}
+
+export async function createRecurringTransaction(data) {
+    const response = await fetch(`${API_URL}/recurring`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+    });
+    return handleResponse(response);
+}
+
+export async function updateRecurringTransaction(id, data) {
+    const response = await fetch(`${API_URL}/recurring/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+    });
+    return handleResponse(response);
+}
+
+export async function deleteRecurringTransaction(id) {
+    const response = await fetch(`${API_URL}/recurring/${id}`, {
+        method: 'DELETE',
+    });
+    return handleResponse(response);
+}
+
+export async function processRecurring() {
+    const response = await fetch(`${API_URL}/recurring/process`, {
+        method: 'POST',
+    });
+    return handleResponse(response);
+}
+
+// ============ FINANCIAL GOALS ============
+export async function getGoals() {
+    const response = await fetch(`${API_URL}/goals`);
+    return handleResponse(response);
+}
+
+export async function getGoal(id) {
+    const response = await fetch(`${API_URL}/goals/${id}`);
+    return handleResponse(response);
+}
+
+export async function createGoal(data) {
+    const response = await fetch(`${API_URL}/goals`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+    });
+    return handleResponse(response);
+}
+
+export async function updateGoal(id, data) {
+    const response = await fetch(`${API_URL}/goals/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+    });
+    return handleResponse(response);
+}
+
+export async function deleteGoal(id) {
+    const response = await fetch(`${API_URL}/goals/${id}`, {
+        method: 'DELETE',
+    });
+    return handleResponse(response);
+}
+
+export async function addAmountToGoal(id, amount) {
+    const response = await fetch(`${API_URL}/goals/${id}/add-amount`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ amount }),
+    });
+    return handleResponse(response);
+}
+
+// ============ ANALYTICS ============
+export async function getMonthlySummary(year, month) {
+    const params = new URLSearchParams({ year, month });
+    const response = await fetch(`${API_URL}/analytics/monthly-summary?${params.toString()}`);
+    return handleResponse(response);
+}
+
+export async function getCategoryBreakdown(year, month) {
+    const params = new URLSearchParams({ year, month });
+    const response = await fetch(`${API_URL}/analytics/category-breakdown?${params.toString()}`);
+    return handleResponse(response);
+}
+
+export async function getYearlySummary(year) {
+    const params = new URLSearchParams({ year });
+    const response = await fetch(`${API_URL}/analytics/yearly-summary?${params.toString()}`);
+    return handleResponse(response);
+}
+
+export async function getMonthlyTrend() {
+    const response = await fetch(`${API_URL}/analytics/monthly-trend`);
+    return handleResponse(response);
+}
+
+// ============ SETTINGS ============
+export async function getSettings() {
+    const response = await fetch(`${API_URL}/settings`);
+    return handleResponse(response);
+}
+
+export async function updateSettings(data) {
+    const response = await fetch(`${API_URL}/settings`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+    });
+    return handleResponse(response);
+}
