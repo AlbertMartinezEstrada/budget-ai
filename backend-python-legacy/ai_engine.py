@@ -3,7 +3,7 @@ import json
 import pandas as pd
 
 # 1. Configura la teva clau aquí
-API_KEY = "AIzaSyAJg3i0KT23blt0FxW_4av_GCyYtNuk-8w"
+API_KEY = "xxxxx"
 genai.configure(api_key=API_KEY)
 
 def classificar_gastos_amb_ia(df_gastos):
