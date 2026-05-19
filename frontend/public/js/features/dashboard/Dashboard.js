@@ -1,4 +1,4 @@
-import { getTransactions } from '../../api.js';
+import { getTransactions, formatCurrency } from '../../api.js';
 
 export async function initDashboard(container) {
     container.innerHTML = `
@@ -8,7 +8,7 @@ export async function initDashboard(container) {
                     <h3 class="card-title">Ingressos</h3>
                     <i class="ph ph-arrow-circle-down-right" style="font-size: 1.5rem; color: var(--secondary-color);"></i>
                 </div>
-                <div class="stat-value text-success" id="total-ingressos">0.00€</div>
+                <div class="stat-value text-success" id="total-ingressos">${formatCurrency(0)}</div>
                 <div class="stat-label">Total rebut</div>
             </div>
             <div class="card">
@@ -16,7 +16,7 @@ export async function initDashboard(container) {
                     <h3 class="card-title">Despeses</h3>
                     <i class="ph ph-arrow-circle-up-right" style="font-size: 1.5rem; color: #ef4444;"></i>
                 </div>
-                <div class="stat-value text-error" id="total-despeses">0.00€</div>
+                <div class="stat-value text-error" id="total-despeses">${formatCurrency(0)}</div>
                 <div class="stat-label">Total gastat</div>
             </div>
             <div class="card">
@@ -24,7 +24,7 @@ export async function initDashboard(container) {
                     <h3 class="card-title">Balanç Net</h3>
                     <i class="ph ph-scales" style="font-size: 1.5rem; color: var(--primary-color);"></i>
                 </div>
-                <div class="stat-value" id="balanc-net">0.00€</div>
+                <div class="stat-value" id="balanc-net">${formatCurrency(0)}</div>
                 <div class="stat-label">Ingressos - Despeses</div>
             </div>
         </div>
@@ -94,11 +94,11 @@ function updateStats(transactions) {
 
     const balance = income - expense;
 
-    document.getElementById('total-ingressos').textContent = `${income.toFixed(2)}€`;
-    document.getElementById('total-despeses').textContent = `${expense.toFixed(2)}€`;
+    document.getElementById('total-ingressos').textContent = formatCurrency(income);
+    document.getElementById('total-despeses').textContent = formatCurrency(expense);
     
     const balanceEl = document.getElementById('balanc-net');
-    balanceEl.textContent = `${balance.toFixed(2)}€`;
+    balanceEl.textContent = formatCurrency(balance);
     
     if (balance >= 0) {
         balanceEl.classList.add('text-success');
@@ -135,7 +135,7 @@ function renderTopCategories(transactions) {
     container.innerHTML = sortedCats.map(([name, value]) => `
         <div class="flex items-center justify-between text-sm">
             <span class="font-medium text-gray-700">${name}</span>
-            <span class="font-bold text-gray-900">${value.toFixed(2)}€</span>
+            <span class="font-bold text-gray-900">${formatCurrency(value)}</span>
         </div>
         <div class="w-full bg-gray-200 rounded-full h-2.5">
             <div class="bg-indigo-600 h-2.5 rounded-full" style="width: ${(value / maxVal) * 100}%"></div>
@@ -161,7 +161,7 @@ function renderRecentTransactions(transactions) {
         <tr>
             <td class="text-sm text-gray-500">${new Date(t.data).toLocaleDateString()}</td>
             <td class="font-medium text-gray-900">${t.empresa || 'Desconegut'}</td>
-            <td class="text-right font-bold ${amountClass}">${sign}${parseFloat(t.cost).toFixed(2)}€</td>
+            <td class="text-right font-bold ${amountClass}">${sign}${formatCurrency(parseFloat(t.cost))}</td>
         </tr>
     `}).join('');
 }

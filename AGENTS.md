@@ -18,4 +18,4 @@ Multi-component budget management application with:
 
 ## Commands
 - Backend: `./gradlew bootRun` (in backend-java directory)
-- Frontend: `npm start` (in frontend directory)
+- Frontend: `pnpm start` (in frontend directory)

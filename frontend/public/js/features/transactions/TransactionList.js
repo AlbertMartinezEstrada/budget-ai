@@ -1,4 +1,4 @@
-import { getTransactions, getCategories, getCompanies } from '../../api.js';
+import { getTransactions, getCategories, getCompanies, formatCurrency } from '../../api.js';
 
 const MONTH_FORMATTER = new Intl.DateTimeFormat('ca-ES', {
     month: 'long',
@@ -304,5 +304,5 @@ function createMonthDate(monthKey) {
 
 function formatAmount(amount) {
     const numericAmount = Number.parseFloat(amount);
-    return `${Number.isFinite(numericAmount) ? numericAmount.toFixed(2) : '0.00'}€`;
+    return formatCurrency(Number.isFinite(numericAmount) ? numericAmount : 0);
 }

@@ -1,5 +1,6 @@
 // Main Application Entry Point
 import { initDashboard } from './features/dashboard/Dashboard.js';
+import { loadAppState } from './api.js';
 import { initTransactions } from './features/transactions/TransactionList.js';
 import { initUpload } from './features/upload/FileUploader.js';
 import { initAccounts } from './features/accounts/Accounts.js';
@@ -11,8 +12,10 @@ import { initRecurring } from './features/recurring/RecurringTransactions.js';
 import { initAnalytics } from './features/analytics/Analytics.js';
 import { initSettings } from './features/settings/Settings.js';
 
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
     console.log('Budget AI Frontend Initialized');
+
+    await loadAppState();
 
     const mainContentArea = document.getElementById('main-content');
     // Select all navigation links, including the header button

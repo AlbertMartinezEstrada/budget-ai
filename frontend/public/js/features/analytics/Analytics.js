@@ -1,4 +1,4 @@
-import { getMonthlySummary, getCategoryBreakdown, getYearlySummary, getMonthlyTrend } from '../../api.js';
+import { getMonthlySummary, getCategoryBreakdown, getYearlySummary, getMonthlyTrend, formatCurrency } from '../../api.js';
 
 export async function initAnalytics(container) {
     const currentDate = new Date();
@@ -33,15 +33,15 @@ export async function initAnalytics(container) {
         <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
             <div class="bg-white rounded-xl p-4 shadow-sm border border-slate-200">
                 <div class="text-sm text-gray-500 mb-1">Ingresos</div>
-                <div class="text-2xl font-bold text-green-600" id="total-income">0.00 €</div>
+                <div class="text-2xl font-bold text-green-600" id="total-income">${formatCurrency(0)}</div>
             </div>
             <div class="bg-white rounded-xl p-4 shadow-sm border border-slate-200">
                 <div class="text-sm text-gray-500 mb-1">Gastos</div>
-                <div class="text-2xl font-bold text-red-600" id="total-expenses">0.00 €</div>
+                <div class="text-2xl font-bold text-red-600" id="total-expenses">${formatCurrency(0)}</div>
             </div>
             <div class="bg-white rounded-xl p-4 shadow-sm border border-slate-200">
                 <div class="text-sm text-gray-500 mb-1">Balance</div>
-                <div class="text-2xl font-bold" id="total-balance">0.00 €</div>
+                <div class="text-2xl font-bold" id="total-balance">${formatCurrency(0)}</div>
             </div>
             <div class="bg-white rounded-xl p-4 shadow-sm border border-slate-200">
                 <div class="text-sm text-gray-500 mb-1">Ahorro</div>
@@ -103,9 +103,9 @@ function renderSummary(summary) {
     const balance = income - expenses;
     const savingsRate = income > 0 ? ((balance / income) * 100) : 0;
 
-    document.getElementById('total-income').textContent = income.toFixed(2) + ' €';
-    document.getElementById('total-expenses').textContent = expenses.toFixed(2) + ' €';
-    document.getElementById('total-balance').textContent = balance.toFixed(2) + ' €';
+    document.getElementById('total-income').textContent = formatCurrency(income);
+    document.getElementById('total-expenses').textContent = formatCurrency(expenses);
+    document.getElementById('total-balance').textContent = formatCurrency(balance);
     document.getElementById('total-balance').className = `text-2xl font-bold ${balance >= 0 ? 'text-green-600' : 'text-red-600'}`;
     document.getElementById('savings-rate').textContent = savingsRate.toFixed(1) + '%';
 }
@@ -130,7 +130,7 @@ function renderCategories(categories) {
                 <div class="flex-1">
                     <div class="flex justify-between text-sm">
                         <span class="font-medium">${cat.category?.nom || 'Sin categoría'}</span>
-                        <span class="text-gray-600">${cat.total?.toFixed(2) || '0.00'} € (${percent.toFixed(0)}%)</span>
+                        <span class="text-gray-600">${formatCurrency(cat.total)} (${percent.toFixed(0)}%)</span>
                     </div>
                     <div class="h-2 bg-gray-200 rounded-full mt-1">
                         <div class="h-full rounded-full transition-all" style="width: ${percent}%; background-color: ${color}"></div>
@@ -162,7 +162,7 @@ function renderTrend(trend) {
                     <div class="h-full bg-red-400 rounded" style="width: ${expenseWidth}%"></div>
                 </div>
                 <span class="text-xs text-gray-600 w-20 text-right">
-                    ${((item.income || 0) - (item.expenses || 0)).toFixed(0)} €
+                    ${formatCurrency((item.income || 0) - (item.expenses || 0))}
                 </span>
             </div>
         `;

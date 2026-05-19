@@ -1,5 +1,75 @@
 const API_URL = `${window.location.protocol}//${window.location.hostname}:8000`;
 
+export const appState = {
+    currency: 'EUR',
+    theme: 'light',
+    userName: '',
+    userEmail: '',
+    notifications: {
+        expenses: true,
+        budget: true,
+        monthly: false
+    }
+};
+
+function applyTheme(theme) {
+    const html = document.documentElement;
+    if (theme === 'dark') {
+        html.classList.add('dark');
+    } else if (theme === 'light') {
+        html.classList.remove('dark');
+    } else if (theme === 'system') {
+        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        if (prefersDark) {
+            html.classList.add('dark');
+        } else {
+            html.classList.remove('dark');
+        }
+    }
+    appState.theme = theme;
+}
+
+function applyCurrency(currency) {
+    appState.currency = currency;
+    document.dispatchEvent(new CustomEvent('currencyChanged', { detail: { currency } }));
+}
+
+export async function loadAppState() {
+    try {
+        const settings = await getSettings();
+        appState.userName = settings.user_name || 'Usuario';
+        appState.userEmail = settings.user_email || '';
+        appState.currency = settings.currency || 'EUR';
+        appState.notifications = {
+            expenses: settings.notifications_expenses !== false,
+            budget: settings.notifications_budget !== false,
+            monthly: settings.notifications_monthly === true
+        };
+        
+        applyTheme(settings.theme || 'light');
+        applyCurrency(settings.currency || 'EUR');
+        
+        return settings;
+    } catch (error) {
+        console.error('Error loading app state:', error);
+        return null;
+    }
+}
+
+export function setTheme(theme) {
+    applyTheme(theme);
+}
+
+export function setCurrency(currency) {
+    applyCurrency(currency);
+}
+
+export function formatCurrency(amount) {
+    const symbols = { EUR: '€', USD: '$', GBP: '£' };
+    const symbol = symbols[appState.currency] || '€';
+    return `${amount.toFixed(2)} ${symbol}`;
+}
+
 // Helper function for handling API responses
 async function handleResponse(response) {
     if (!response.ok) {

@@ -1,4 +1,4 @@
-import { getTransfers, createTransfer, deleteTransfer, getAccounts } from '../../api.js';
+import { getTransfers, createTransfer, deleteTransfer, getAccounts, formatCurrency } from '../../api.js';
 
 export async function initTransfers(container) {
     container.innerHTML = `
@@ -63,7 +63,7 @@ async function loadAccountsSelect() {
         accounts = await getAccounts();
         const sourceSelect = document.getElementById('transfer-source');
         const destSelect = document.getElementById('transfer-destination');
-        const options = accounts.map(acc => `<option value="${acc.id}">${acc.nom} (${acc.saldo_actual?.toFixed(2) || '0.00'} €)</option>`).join('');
+        const options = accounts.map(acc => `<option value="${acc.id}">${acc.nom} (${formatCurrency(acc.saldo_actual)})</option>`).join('');
         sourceSelect.innerHTML = options;
         destSelect.innerHTML = options;
     } catch (error) {
@@ -100,7 +100,7 @@ function renderTransfers(transfers) {
                 </div>
             </div>
             <div class="flex items-center gap-3">
-                <span class="text-lg font-bold text-slate-800">${transfer.import?.toFixed(2) || '0.00'} €</span>
+                <span class="text-lg font-bold text-slate-800">${formatCurrency(transfer.import)}</span>
                 <button onclick="deleteTransferById(${transfer.id})" class="p-1 hover:bg-red-50 text-red-500 rounded" title="Eliminar">
                     <span class="material-symbols-outlined text-sm">delete</span>
                 </button>

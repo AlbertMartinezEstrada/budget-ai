@@ -1,4 +1,4 @@
-import { getAccounts, createAccount, updateAccount, deleteAccount, adjustBalance } from '../../api.js';
+import { getAccounts, createAccount, updateAccount, deleteAccount, adjustBalance, formatCurrency } from '../../api.js';
 
 export async function initAccounts(container) {
     container.innerHTML = `
@@ -118,7 +118,7 @@ function renderAccounts(accounts) {
                 </div>
             </div>
             <div class="text-2xl font-bold text-slate-800">
-                ${account.saldo_actual?.toFixed(2) || '0.00'} €
+                ${formatCurrency(account.saldo_actual)}
             </div>
             <div class="text-xs text-gray-500 mt-1">${account.moneda || 'EUR'}</div>
         </div>

@@ -1,4 +1,4 @@
-import { getGoals, createGoal, updateGoal, deleteGoal, addAmountToGoal } from '../../api.js';
+import { getGoals, createGoal, updateGoal, deleteGoal, addAmountToGoal, formatCurrency } from '../../api.js';
 
 export async function initGoals(container) {
     container.innerHTML = `
@@ -79,7 +79,7 @@ function renderGoals(goals) {
                         <span class="material-symbols-outlined">delete</span>
                     </button>
                 </div>
-                <div class="text-2xl font-bold text-primary mb-2">${goal.current_amount}€ / ${goal.target_amount}€</div>
+                <div class="text-2xl font-bold text-primary mb-2">${formatCurrency(goal.current_amount)} / ${formatCurrency(goal.target_amount)}</div>
                 <div class="w-full bg-gray-200 rounded-full h-2 mb-2">
                     <div class="bg-primary h-2 rounded-full" style="width: ${Math.min(progress, 100)}%"></div>
                 </div>

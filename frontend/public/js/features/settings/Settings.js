@@ -1,4 +1,4 @@
-import { getSettings, updateSettings } from '../../api.js';
+import { getSettings, updateSettings, setTheme, setCurrency, appState } from '../../api.js';
 
 export async function initSettings(container) {
     container.innerHTML = `
@@ -144,11 +144,17 @@ async function saveAllSettings() {
     const statusEl = document.getElementById('save-status');
     statusEl.textContent = 'Guardando...';
     
+    const theme = document.querySelector('input[name="theme"]:checked')?.value || 'light';
+    const currency = document.getElementById('setting-currency').value;
+    
+    setTheme(theme);
+    setCurrency(currency);
+    
     const data = {
         userName: document.getElementById('setting-name').value,
         userEmail: document.getElementById('setting-email').value,
-        currency: document.getElementById('setting-currency').value,
-        theme: document.querySelector('input[name="theme"]:checked')?.value || 'light',
+        currency: currency,
+        theme: theme,
         notificationsExpenses: document.getElementById('notif-expenses').checked,
         notificationsBudget: document.getElementById('notif-budget').checked,
         notificationsMonthly: document.getElementById('notif-monthly').checked
