@@ -1,0 +1,65 @@
+# RESUMEN EJECUTIVO - Budget AI
+
+## ✅ TU PROYECTO YA GUARDA EN POSTGRESQL
+
+El proyecto budget-ai está completamente configurado para almacenar datos en PostgreSQL.
+
+## 🔄 FLUJO COMPLETO
+
+```
+CSV → Frontend (puerto 3000) → API FastAPI (puerto 8000)
+                                      ↓
+                               bank_reader.py (limpia datos)
+                                      ↓
+                               ai_engine.py (Gemini clasifica)
+                                      ↓
+                               PostgreSQL (guarda en tabla despeses)
+                                      ↓
+                               GET /gastos → Frontend muestra datos
+```
+
+## 📁 DOS PROYECTOS EN EL REPO
+
+1. **budget-ai** (CON BD PostgreSQL)
+   - Backend: FastAPI + PostgreSQL
+   - Frontend: HTML simple
+   - Puerto: 3000
+
+2. **assistent-financer-personal** (SIN BD)
+   - Solo React + Vite + Gemini directo
+   - Puerto: 3000
+   - NO conectado con budget-ai
+
+## 🚀 PARA USAR BUDGET-AI
+
+```powershell
+docker-compose up --build
+```
+
+Accede: http://localhost:3000
+
+## 🔍 CAMBIOS REALIZADOS
+
+✅ backend/main.py - Ahora usa bank_reader.py y guarda en BD correctamente
+✅ backend/ai_engine.py - API Key en variable de entorno
+✅ docker-compose.yml - Variables de entorno configuradas
+✅ frontend/index.html - UI mejorada con estadísticas
+✅ .env.example - Plantilla de configuración
+✅ GUIA_RAPIDA.md - Documentación de uso
+
+## 🗄️ TABLA POSTGRESQL
+
+```sql
+despeses (
+  id, data, empresa, categoria,
+  descripcio_curta, cost, concepte_original
+)
+```
+
+Ver datos:
+```powershell
+docker exec -it budget_db psql -U albert -d budget_db
+SELECT * FROM despeses;
+```
+
+¡Sistema listo para usar!
