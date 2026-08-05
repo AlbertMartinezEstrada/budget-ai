@@ -13,7 +13,6 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/budgets")
-@CrossOrigin(origins = "*")
 public class BudgetController {
 
     @Autowired

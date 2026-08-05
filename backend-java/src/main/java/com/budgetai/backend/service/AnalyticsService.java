@@ -5,6 +5,8 @@ import com.budgetai.backend.repository.TransactionRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.*;
@@ -24,17 +26,9 @@ public class AnalyticsService {
                 .filter(t -> !t.getDate().isBefore(startDate) && !t.getDate().isAfter(endDate))
                 .toList();
 
-        Double totalIncome = transactions.stream()
-                .filter(t -> "INCOME".equals(t.getType()))
-                .mapToDouble(Transaction::getAmount)
-                .sum();
-
-        Double totalExpense = transactions.stream()
-                .filter(t -> "EXPENSE".equals(t.getType()))
-                .mapToDouble(Transaction::getAmount)
-                .sum();
-
-        Double balance = totalIncome - totalExpense;
+        BigDecimal totalIncome = sumByType(transactions, "INCOME");
+        BigDecimal totalExpense = sumByType(transactions, "EXPENSE");
+        BigDecimal balance = totalIncome.subtract(totalExpense);
 
         Map<String, Object> summary = new HashMap<>();
         summary.put("period", YearMonth.of(year, month).toString());
@@ -55,23 +49,28 @@ public class AnalyticsService {
                 .filter(t -> !t.getDate().isBefore(startDate) && !t.getDate().isAfter(endDate))
                 .toList();
 
-        Map<String, Double> categoryTotals = expenses.stream()
+        Map<String, BigDecimal> categoryTotals = expenses.stream()
                 .collect(Collectors.groupingBy(
                         t -> t.getCategory() != null ? t.getCategory().getName() : "Sin categoría",
-                        Collectors.summingDouble(Transaction::getAmount)
+                        Collectors.reducing(BigDecimal.ZERO, AnalyticsService::amountOf, BigDecimal::add)
                 ));
 
-        Double totalExpense = categoryTotals.values().stream().mapToDouble(Double::doubleValue).sum();
+        BigDecimal totalExpense = categoryTotals.values().stream()
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
 
         return categoryTotals.entrySet().stream()
                 .map(entry -> {
                     Map<String, Object> item = new HashMap<>();
                     item.put("category", entry.getKey());
                     item.put("total", entry.getValue());
-                    item.put("percentage", totalExpense > 0 ? (entry.getValue() / totalExpense) * 100 : 0);
+                    item.put("percentage", totalExpense.signum() > 0
+                            ? entry.getValue()
+                                .multiply(BigDecimal.valueOf(100))
+                                .divide(totalExpense, 2, RoundingMode.HALF_UP)
+                            : BigDecimal.ZERO);
                     return item;
                 })
-                .sorted((a, b) -> Double.compare((Double) b.get("total"), (Double) a.get("total")))
+                .sorted((a, b) -> ((BigDecimal) b.get("total")).compareTo((BigDecimal) a.get("total")))
                 .toList();
     }
 
@@ -83,25 +82,30 @@ public class AnalyticsService {
                 .filter(t -> !t.getDate().isBefore(startDate) && !t.getDate().isAfter(endDate))
                 .toList();
 
-        Double totalIncome = transactions.stream()
-                .filter(t -> "INCOME".equals(t.getType()))
-                .mapToDouble(Transaction::getAmount)
-                .sum();
-
-        Double totalExpense = transactions.stream()
-                .filter(t -> "EXPENSE".equals(t.getType()))
-                .mapToDouble(Transaction::getAmount)
-                .sum();
+        BigDecimal totalIncome = sumByType(transactions, "INCOME");
+        BigDecimal totalExpense = sumByType(transactions, "EXPENSE");
+        BigDecimal twelve = BigDecimal.valueOf(12);
 
         Map<String, Object> summary = new HashMap<>();
         summary.put("year", year);
         summary.put("total_income", totalIncome);
         summary.put("total_expense", totalExpense);
-        summary.put("balance", totalIncome - totalExpense);
-        summary.put("average_monthly_expense", totalExpense / 12);
-        summary.put("average_monthly_income", totalIncome / 12);
+        summary.put("balance", totalIncome.subtract(totalExpense));
+        summary.put("average_monthly_expense", totalExpense.divide(twelve, 2, RoundingMode.HALF_UP));
+        summary.put("average_monthly_income", totalIncome.divide(twelve, 2, RoundingMode.HALF_UP));
 
         return summary;
+    }
+
+    private static BigDecimal sumByType(List<Transaction> transactions, String type) {
+        return transactions.stream()
+                .filter(t -> type.equals(t.getType()))
+                .map(AnalyticsService::amountOf)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
+    private static BigDecimal amountOf(Transaction t) {
+        return t.getAmount() != null ? t.getAmount() : BigDecimal.ZERO;
     }
 
     public List<Map<String, Object>> getMonthlyTrend(int year) {

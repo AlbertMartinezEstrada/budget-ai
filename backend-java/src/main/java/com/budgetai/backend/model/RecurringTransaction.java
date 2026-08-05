@@ -7,6 +7,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
@@ -33,9 +34,9 @@ public class RecurringTransaction {
     @JoinColumn(name = "company_id")
     private Company company;
 
-    @Column(name = "import", nullable = false)
+    @Column(name = "import", nullable = false, precision = 15, scale = 2)
     @JsonProperty("import")
-    private Double amount;
+    private BigDecimal amount;
 
     @Column(name = "tipus", nullable = false)
     @JsonProperty("tipus")

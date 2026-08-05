@@ -1,4 +1,4 @@
-import { getTransactions, getCategories, getCompanies, formatCurrency } from '../../api.js';
+import { getTransactions, getCategories, getCompanies, formatCurrency, escapeHtml } from '../../api.js';
 
 const MONTH_FORMATTER = new Intl.DateTimeFormat('ca-ES', {
     month: 'long',
@@ -211,10 +211,10 @@ function buildMonthRow(date) {
 function buildTransactionRow(transaction) {
     return `
         <tr>
-            <td>${formatTransactionDate(transaction.data)}</td>
-            <td>${transaction.empresa || '-'}</td>
-            <td><span class="badge badge-outline">${transaction.categoria || '-'}</span></td>
-            <td class="text-muted text-sm">${transaction.descripcio_curta || '-'}</td>
+            <td>${escapeHtml(formatTransactionDate(transaction.data))}</td>
+            <td>${escapeHtml(transaction.empresa || '-')}</td>
+            <td><span class="badge badge-outline">${escapeHtml(transaction.categoria || '-')}</span></td>
+            <td class="text-muted text-sm">${escapeHtml(transaction.descripcio_curta || '-')}</td>
             <td class="text-right font-bold">${formatAmount(transaction.cost)}</td>
         </tr>
     `;

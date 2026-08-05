@@ -1,9 +1,9 @@
-import { getTransfers, createTransfer, deleteTransfer, getAccounts, formatCurrency } from '../../api.js';
+import { getTransfers, createTransfer, deleteTransfer, getAccounts, formatCurrency, escapeHtml } from '../../api.js';
 
 export async function initTransfers(container) {
     container.innerHTML = `
         <div class="page-header flex justify-between items-center mb-6">
-            <h2 class="text-2xl font-bold text-slate-800">Transferencias</h2>
+            <h2 class="text-2xl font-bold text-slate-800 dark:text-slate-100">Transferencias</h2>
             <button id="add-transfer-btn" class="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/90 flex items-center gap-2">
                 <span class="material-symbols-outlined">add</span>
                 Nueva Transferencia
@@ -13,7 +13,7 @@ export async function initTransfers(container) {
 
         <!-- Modal -->
         <div id="transfer-modal" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-50">
-            <div class="bg-white rounded-xl p-6 w-full max-w-md">
+            <div class="bg-white dark:bg-slate-800 rounded-xl p-6 w-full max-w-md">
                 <h3 class="text-xl font-bold mb-4">Nueva Transferencia</h3>
                 <form id="transfer-form" class="space-y-4">
                     <div>
@@ -37,7 +37,7 @@ export async function initTransfers(container) {
                         <input type="text" id="transfer-description" class="w-full px-3 py-2 border rounded-lg">
                     </div>
                     <div class="flex gap-2 justify-end">
-                        <button type="button" id="cancel-btn" class="px-4 py-2 border rounded-lg hover:bg-gray-50">Cancelar</button>
+                        <button type="button" id="cancel-btn" class="px-4 py-2 border rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700">Cancelar</button>
                         <button type="submit" class="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/90">Guardar</button>
                     </div>
                 </form>
@@ -54,6 +54,7 @@ export async function initTransfers(container) {
     document.getElementById('add-transfer-btn').addEventListener('click', () => openModal());
     document.getElementById('cancel-btn').addEventListener('click', () => closeModal());
     document.getElementById('transfer-form').addEventListener('submit', handleSubmit);
+    document.getElementById('transfers-list').addEventListener('click', handleListClick);
 }
 
 let accounts = [];
@@ -63,7 +64,7 @@ async function loadAccountsSelect() {
         accounts = await getAccounts();
         const sourceSelect = document.getElementById('transfer-source');
         const destSelect = document.getElementById('transfer-destination');
-        const options = accounts.map(acc => `<option value="${acc.id}">${acc.nom} (${formatCurrency(acc.saldo_actual)})</option>`).join('');
+        const options = accounts.map(acc => `<option value="${acc.id}">${escapeHtml(acc.nom)} (${formatCurrency(acc.saldo_actual)})</option>`).join('');
         sourceSelect.innerHTML = options;
         destSelect.innerHTML = options;
     } catch (error) {
@@ -84,24 +85,24 @@ async function loadTransfers() {
 function renderTransfers(transfers) {
     const container = document.getElementById('transfers-list');
     if (!transfers || transfers.length === 0) {
-        container.innerHTML = '<p class="text-gray-500 text-center py-8">No hay transferencias</p>';
+        container.innerHTML = '<p class="text-gray-500 dark:text-slate-400 text-center py-8">No hay transferencias</p>';
         return;
     }
 
     container.innerHTML = transfers.map(transfer => `
-        <div class="bg-white rounded-xl p-4 shadow-sm border border-slate-200 flex items-center justify-between">
+        <div class="bg-white dark:bg-slate-800 rounded-xl p-4 shadow-sm border border-slate-200 dark:border-slate-700 flex items-center justify-between">
             <div class="flex items-center gap-4">
                 <div class="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
                     <span class="material-symbols-outlined text-blue-600">swap_horiz</span>
                 </div>
                 <div>
-                    <div class="font-medium">${transfer.account_origen_id?.nom || 'Origen'} → ${transfer.account_desti_id?.nom || 'Destino'}</div>
-                    <div class="text-sm text-gray-500">${transfer.data} ${transfer.descripcio ? '- ' + transfer.descripcio : ''}</div>
+                    <div class="font-medium">${escapeHtml(transfer.sourceAccount?.nom || 'Origen')} → ${escapeHtml(transfer.destinationAccount?.nom || 'Destino')}</div>
+                    <div class="text-sm text-gray-500 dark:text-slate-400">${escapeHtml(transfer.data)} ${transfer.descripcio ? '- ' + escapeHtml(transfer.descripcio) : ''}</div>
                 </div>
             </div>
             <div class="flex items-center gap-3">
-                <span class="text-lg font-bold text-slate-800">${formatCurrency(transfer.import)}</span>
-                <button onclick="deleteTransferById(${transfer.id})" class="p-1 hover:bg-red-50 text-red-500 rounded" title="Eliminar">
+                <span class="text-lg font-bold text-slate-800 dark:text-slate-100">${formatCurrency(transfer.import)}</span>
+                <button data-action="delete" data-id="${transfer.id}" class="p-1 hover:bg-red-50 text-red-500 rounded" title="Eliminar">
                     <span class="material-symbols-outlined text-sm">delete</span>
                 </button>
             </div>
@@ -123,23 +124,33 @@ function closeModal() {
     document.getElementById('transfer-date').value = new Date().toISOString().split('T')[0];
 }
 
-window.deleteTransferById = async function(id) {
-    if (confirm('¿Eliminar esta transferencia?')) {
-        try {
-            await deleteTransfer(id);
-            await loadTransfers();
-            await loadAccountsSelect();
-        } catch (error) {
-            alert('Error al eliminar transferencia');
-        }
+async function handleListClick(event) {
+    const button = event.target.closest('button[data-action="delete"]');
+    if (!button) return;
+
+    const id = Number.parseInt(button.dataset.id, 10);
+    if (!Number.isInteger(id)) return;
+    if (!confirm('¿Eliminar esta transferencia? Se devolverán los saldos.')) return;
+
+    try {
+        await deleteTransfer(id);
+        await loadTransfers();
+        await loadAccountsSelect();
+    } catch (error) {
+        alert(error.message || 'Error al eliminar transferencia');
     }
-};
+}
 
 async function handleSubmit(e) {
     e.preventDefault();
+    // Els comptes van com a "sourceAccount"/"destinationAccount": són els noms
+    // de camp del model Transfer, que no porta @JsonProperty. Abans s'enviaven
+    // "account_origen_id"/"account_desti_id", que són els noms de les columnes
+    // de la base de dades; Jackson els descartava i el backend responia que
+    // faltaven els comptes, o sigui que crear una transferència no funcionava.
     const data = {
-        account_origen_id: { id: parseInt(document.getElementById('transfer-source').value) },
-        account_desti_id: { id: parseInt(document.getElementById('transfer-destination').value) },
+        sourceAccount: { id: parseInt(document.getElementById('transfer-source').value) },
+        destinationAccount: { id: parseInt(document.getElementById('transfer-destination').value) },
         import: parseFloat(document.getElementById('transfer-amount').value),
         data: document.getElementById('transfer-date').value,
         descripcio: document.getElementById('transfer-description').value
@@ -151,6 +162,6 @@ async function handleSubmit(e) {
         await loadTransfers();
         await loadAccountsSelect();
     } catch (error) {
-        alert('Error al crear transferencia');
+        alert(error.message || 'Error al crear transferencia');
     }
 }

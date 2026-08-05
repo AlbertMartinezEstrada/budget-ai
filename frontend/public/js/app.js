@@ -12,14 +12,17 @@ import { initRecurring } from './features/recurring/RecurringTransactions.js';
 import { initAnalytics } from './features/analytics/Analytics.js';
 import { initSettings } from './features/settings/Settings.js';
 
+const VIEWS = [
+    'dashboard', 'transactions', 'upload', 'accounts', 'budgets',
+    'categories', 'goals', 'transfers', 'recurring', 'analytics', 'settings'
+];
+
 document.addEventListener('DOMContentLoaded', async () => {
     console.log('Budget AI Frontend Initialized');
 
     await loadAppState();
 
     const mainContentArea = document.getElementById('main-content');
-    // Select all navigation links, including the header button
-    const navLinks = document.querySelectorAll('.nav-link[data-view]');
 
     function navigate(view) {
         // Update Active Link in the sidebar
@@ -79,17 +82,36 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 
-    // Event Listeners for all navigation elements
-    navLinks.forEach(link => {
-        link.addEventListener('click', (e) => {
-            e.preventDefault();
-            const view = e.currentTarget.dataset.view;
-            if (view) {
-                navigate(view);
-            }
-        });
+    // Delegació a tot el document: abans només s'enganxaven els listeners als
+    // enllaços que existien en carregar la pàgina, així que qualsevol botó
+    // creat després dins d'una vista (com el "Veure tot" del tauler) no feia
+    // res en clicar-lo.
+    document.addEventListener('click', (e) => {
+        const trigger = e.target.closest('[data-view]');
+        if (!trigger) return;
+
+        e.preventDefault();
+        const view = trigger.dataset.view;
+        if (!VIEWS.includes(view)) return;
+
+        // Canviar el hash dispara hashchange, que és qui navega de debò.
+        if (currentView() === view) {
+            navigate(view);
+        } else {
+            window.location.hash = view;
+        }
     });
 
+    // Routing per hash: la URL passa a reflectir la vista, de manera que
+    // recarregar manté la pantalla, el botó d'enrere funciona i els enllaços
+    // es poden compartir. Abans tot això es perdia a cada recàrrega.
+    window.addEventListener('hashchange', () => navigate(currentView()));
+
     // Initial Load
-    navigate('dashboard');
+    navigate(currentView());
 });
+
+function currentView() {
+    const view = window.location.hash.replace(/^#/, '');
+    return VIEWS.includes(view) ? view : 'dashboard';
+}

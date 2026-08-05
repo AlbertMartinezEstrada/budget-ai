@@ -15,7 +15,7 @@ CREATE TABLE IF NOT EXISTS accounts (
     id SERIAL PRIMARY KEY,
     nom VARCHAR(100) NOT NULL,
     tipus VARCHAR(50) CHECK (tipus IN ('CORRIENTE', 'AHORRO', 'EFECTIVO', 'TARJETA', 'INVERSIONES')) DEFAULT 'CORRIENTE',
-    saldo_actual DECIMAL(10, 2) DEFAULT 0.00,
+    saldo_actual DECIMAL(15, 2) DEFAULT 0.00,
     moneda VARCHAR(5) DEFAULT 'EUR',
     activa BOOLEAN DEFAULT TRUE,
     color VARCHAR(7), -- Per al frontend (hex color)
@@ -30,8 +30,8 @@ CREATE TABLE IF NOT EXISTS transactions (
     company_id INTEGER REFERENCES companies(id),
     account_id INTEGER REFERENCES accounts(id) ON DELETE SET NULL,
     descripcio_curta TEXT,
-    import DECIMAL(10, 2) NOT NULL,
-    saldo_resultant DECIMAL(10, 2), -- El 'Saldo' del CSV
+    import DECIMAL(15, 2) NOT NULL,
+    saldo_resultant DECIMAL(15, 2), -- El 'Saldo' del CSV
     tipus VARCHAR(20) CHECK (tipus IN ('EXPENSE', 'INCOME', 'TRANSFER')),
     concepte_original TEXT,
     compte_nom VARCHAR(100) DEFAULT 'Principal', -- Per si tens diversos comptes
@@ -48,7 +48,7 @@ CREATE TABLE IF NOT EXISTS transactions (
 CREATE TABLE IF NOT EXISTS budgets (
     id SERIAL PRIMARY KEY,
     category_id INTEGER REFERENCES categories(id) ON DELETE CASCADE,
-    quantitat_limit DECIMAL(10, 2) NOT NULL,
+    quantitat_limit DECIMAL(15, 2) NOT NULL,
     periode_inici DATE NOT NULL,
     periode_fi DATE NOT NULL,
     actiu BOOLEAN DEFAULT TRUE,
@@ -60,8 +60,8 @@ CREATE TABLE IF NOT EXISTS financial_goals (
     id SERIAL PRIMARY KEY,
     nom VARCHAR(150) NOT NULL,
     descripcio TEXT,
-    quantitat_objectiu DECIMAL(10, 2) NOT NULL,
-    quantitat_actual DECIMAL(10, 2) DEFAULT 0.00,
+    quantitat_objectiu DECIMAL(15, 2) NOT NULL,
+    quantitat_actual DECIMAL(15, 2) DEFAULT 0.00,
     data_objectiu DATE,
     completat BOOLEAN DEFAULT FALSE,
     account_id INTEGER REFERENCES accounts(id) ON DELETE SET NULL,
@@ -74,7 +74,7 @@ CREATE TABLE IF NOT EXISTS recurring_transactions (
     nom VARCHAR(150) NOT NULL,
     category_id INTEGER REFERENCES categories(id),
     company_id INTEGER REFERENCES companies(id),
-    import DECIMAL(10, 2) NOT NULL,
+    import DECIMAL(15, 2) NOT NULL,
     tipus VARCHAR(20) CHECK (tipus IN ('EXPENSE', 'INCOME')) NOT NULL,
     frequencia VARCHAR(50) CHECK (frequencia IN ('DIARIA', 'SETMANAL', 'MENSUAL', 'TRIMESTRAL', 'ANUAL')) NOT NULL,
     proxima_data DATE NOT NULL,
@@ -89,7 +89,7 @@ CREATE TABLE IF NOT EXISTS transfers (
     id SERIAL PRIMARY KEY,
     account_origen_id INTEGER REFERENCES accounts(id) ON DELETE CASCADE,
     account_desti_id INTEGER REFERENCES accounts(id) ON DELETE CASCADE,
-    import DECIMAL(10, 2) NOT NULL,
+    import DECIMAL(15, 2) NOT NULL,
     data DATE NOT NULL,
     descripcio TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
