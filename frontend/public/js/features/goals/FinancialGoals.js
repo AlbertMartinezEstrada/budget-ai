@@ -1,4 +1,4 @@
-import { getGoals, createGoal, updateGoal, deleteGoal, addAmountToGoal, formatCurrency } from '../../api.js';
+import { getGoals, createGoal, updateGoal, deleteGoal, addAmountToGoal, formatCurrency, escapeHtml } from '../../api.js';
 
 export async function initGoals(container) {
     container.innerHTML = `
@@ -70,21 +70,23 @@ function renderGoals(goals) {
     }
 
     container.innerHTML = goals.map(goal => {
-        const progress = goal.target_amount > 0 ? (goal.current_amount / goal.target_amount * 100) : 0;
+        const target = goal.quantitat_objectiu || 0;
+        const current = goal.quantitat_actual || 0;
+        const progress = target > 0 ? (current / target * 100) : 0;
         return `
             <div class="bg-white rounded-xl p-4 shadow-sm border">
                 <div class="flex justify-between items-start mb-2">
-                    <h3 class="font-semibold">${goal.name}</h3>
+                    <h3 class="font-semibold">${escapeHtml(goal.nom)}</h3>
                     <button onclick="deleteGoal(${goal.id})" class="text-red-500 hover:text-red-700">
                         <span class="material-symbols-outlined">delete</span>
                     </button>
                 </div>
-                <div class="text-2xl font-bold text-primary mb-2">${formatCurrency(goal.current_amount)} / ${formatCurrency(goal.target_amount)}</div>
+                <div class="text-2xl font-bold text-primary mb-2">${formatCurrency(current)} / ${formatCurrency(target)}</div>
                 <div class="w-full bg-gray-200 rounded-full h-2 mb-2">
                     <div class="bg-primary h-2 rounded-full" style="width: ${Math.min(progress, 100)}%"></div>
                 </div>
                 <div class="text-sm text-slate-500">${progress.toFixed(1)}% completat</div>
-                ${goal.deadline ? `<div class="text-xs text-slate-400 mt-1">Data: ${goal.deadline}</div>` : ''}
+                ${goal.data_objectiu ? `<div class="text-xs text-slate-400 mt-1">Data: ${escapeHtml(goal.data_objectiu)}</div>` : ''}
                 <button onclick="openAddAmountModal(${goal.id})" class="mt-2 text-sm text-primary hover:underline">Afegir quantitat</button>
             </div>
         `;
@@ -94,9 +96,9 @@ function renderGoals(goals) {
 function openModal(goal = null) {
     document.getElementById('modal-title').textContent = goal ? 'Editar Objectiu' : 'Nou Objectiu';
     document.getElementById('goal-id').value = goal?.id || '';
-    document.getElementById('goal-name').value = goal?.name || '';
-    document.getElementById('goal-target').value = goal?.target_amount || '';
-    document.getElementById('goal-deadline').value = goal?.deadline || '';
+    document.getElementById('goal-name').value = goal?.nom || '';
+    document.getElementById('goal-target').value = goal?.quantitat_objectiu || '';
+    document.getElementById('goal-deadline').value = goal?.data_objectiu || '';
     document.getElementById('goal-modal').classList.remove('hidden');
     document.getElementById('goal-modal').classList.add('flex');
 }
@@ -109,10 +111,12 @@ function closeModal() {
 async function handleSubmit(e) {
     e.preventDefault();
     const id = document.getElementById('goal-id').value;
+    // Els noms han de coincidir amb els @JsonProperty de FinancialGoal:
+    // "nom" i "quantitat_objectiu" són NOT NULL a la base de dades.
     const data = {
-        name: document.getElementById('goal-name').value,
-        target_amount: parseFloat(document.getElementById('goal-target').value),
-        deadline: document.getElementById('goal-deadline').value || null
+        nom: document.getElementById('goal-name').value,
+        quantitat_objectiu: parseFloat(document.getElementById('goal-target').value),
+        data_objectiu: document.getElementById('goal-deadline').value || null
     };
 
     try {

@@ -37,13 +37,15 @@ function applyCurrency(currency) {
 export async function loadAppState() {
     try {
         const settings = await getSettings();
-        appState.userName = settings.user_name || 'Usuario';
-        appState.userEmail = settings.user_email || '';
+        // El backend serialitza Settings en camelCase (sense @JsonProperty),
+        // a diferència de la resta de models.
+        appState.userName = settings.userName || 'Usuario';
+        appState.userEmail = settings.userEmail || '';
         appState.currency = settings.currency || 'EUR';
         appState.notifications = {
-            expenses: settings.notifications_expenses !== false,
-            budget: settings.notifications_budget !== false,
-            monthly: settings.notifications_monthly === true
+            expenses: settings.notificationsExpenses !== false,
+            budget: settings.notificationsBudget !== false,
+            monthly: settings.notificationsMonthly === true
         };
         
         applyTheme(settings.theme || 'light');
@@ -67,16 +69,50 @@ export function setCurrency(currency) {
 export function formatCurrency(amount) {
     const symbols = { EUR: '€', USD: '$', GBP: '£' };
     const symbol = symbols[appState.currency] || '€';
-    return `${amount.toFixed(2)} ${symbol}`;
+    const numericAmount = Number.parseFloat(amount);
+    const safeAmount = Number.isFinite(numericAmount) ? numericAmount : 0;
+    return `${safeAmount.toFixed(2)} ${symbol}`;
+}
+
+// Escapa text abans d'interpolar-lo dins d'HTML.
+// Les dades venen del CSV del banc i de la resposta de la IA, així que
+// no es poden considerar segures.
+export function escapeHtml(value) {
+    if (value === null || value === undefined) return '';
+    return String(value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
 }
 
 // Helper function for handling API responses
 async function handleResponse(response) {
     if (!response.ok) {
-        const error = await response.json().catch(() => ({ detail: 'Error desconegut' }));
-        throw new Error(error.detail);
+        throw new Error(await extractErrorMessage(response));
     }
     return response.json();
+}
+
+// El backend respon els errors com a text pla en uns endpoints i com a JSON
+// en d'altres; sense això tot arribava a la UI com a "Error desconegut".
+async function extractErrorMessage(response) {
+    const fallback = `Error ${response.status}`;
+    let body;
+    try {
+        body = await response.text();
+    } catch {
+        return fallback;
+    }
+    if (!body) return fallback;
+
+    try {
+        const parsed = JSON.parse(body);
+        return parsed.detail || parsed.error || parsed.message || body;
+    } catch {
+        return body;
+    }
 }
 
 // Fetch all transactions
@@ -340,8 +376,9 @@ export async function getYearlySummary(year) {
     return handleResponse(response);
 }
 
-export async function getMonthlyTrend() {
-    const response = await fetch(`${API_URL}/analytics/monthly-trend`);
+export async function getMonthlyTrend(year) {
+    const params = new URLSearchParams(year ? { year } : {});
+    const response = await fetch(`${API_URL}/analytics/monthly-trend?${params.toString()}`);
     return handleResponse(response);
 }
 
