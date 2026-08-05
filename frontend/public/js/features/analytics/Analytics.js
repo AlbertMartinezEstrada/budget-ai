@@ -1,4 +1,4 @@
-import { getMonthlySummary, getCategoryBreakdown, getYearlySummary, getMonthlyTrend, formatCurrency } from '../../api.js';
+import { getMonthlySummary, getCategoryBreakdown, getMonthlyTrend, formatCurrency, escapeHtml } from '../../api.js';
 
 export async function initAnalytics(container) {
     const currentDate = new Date();
@@ -62,15 +62,16 @@ export async function initAnalytics(container) {
         </div>
     `;
 
-    document.getElementById('year-select').value = currentYear;
-    document.getElementById('month-select').value = currentMonth;
-
+    const yearSelect = document.getElementById('year-select');
     for (let y = currentYear; y >= currentYear - 5; y--) {
         const option = document.createElement('option');
         option.value = y;
         option.textContent = y;
-        document.getElementById('year-select').appendChild(option);
+        yearSelect.appendChild(option);
     }
+    // El valor s'ha d'assignar després de crear les opcions, no abans.
+    yearSelect.value = currentYear;
+    document.getElementById('month-select').value = currentMonth;
 
     document.getElementById('year-select').addEventListener('change', loadAllData);
     document.getElementById('month-select').addEventListener('change', loadAllData);
@@ -86,7 +87,7 @@ async function loadAllData() {
         const [summary, categories, trend] = await Promise.all([
             getMonthlySummary(year, month),
             getCategoryBreakdown(year, month),
-            getMonthlyTrend()
+            getMonthlyTrend(year)
         ]);
 
         renderSummary(summary);
@@ -98,8 +99,9 @@ async function loadAllData() {
 }
 
 function renderSummary(summary) {
+    // AnalyticsService retorna "total_expense" en singular.
     const income = summary?.total_income || 0;
-    const expenses = summary?.total_expenses || 0;
+    const expenses = summary?.total_expense || 0;
     const balance = income - expenses;
     const savingsRate = income > 0 ? ((balance / income) * 100) : 0;
 
@@ -129,7 +131,7 @@ function renderCategories(categories) {
                 <div class="w-3 h-3 rounded-full" style="background-color: ${color}"></div>
                 <div class="flex-1">
                     <div class="flex justify-between text-sm">
-                        <span class="font-medium">${cat.category?.nom || 'Sin categoría'}</span>
+                        <span class="font-medium">${escapeHtml(cat.category || 'Sin categoría')}</span>
                         <span class="text-gray-600">${formatCurrency(cat.total)} (${percent.toFixed(0)}%)</span>
                     </div>
                     <div class="h-2 bg-gray-200 rounded-full mt-1">
@@ -148,23 +150,40 @@ function renderTrend(trend) {
         return;
     }
 
-    const maxExp = Math.max(...trend.map(t => t.expenses || 0), 1);
+    // L'escala ha de contemplar ingressos i despeses: si només mira les
+    // despeses, les barres d'ingressos se'n surten quan són més grans.
+    const maxValue = Math.max(
+        ...trend.map(t => Math.max(t.total_income || 0, t.total_expense || 0)),
+        1
+    );
 
     container.innerHTML = trend.map(item => {
-        const incomeWidth = (item.income || 0) / maxExp * 100;
-        const expenseWidth = (item.expenses || 0) / maxExp * 100;
+        const income = item.total_income || 0;
+        const expense = item.total_expense || 0;
+        const incomeWidth = income / maxValue * 100;
+        const expenseWidth = expense / maxValue * 100;
 
         return `
             <div class="flex items-center gap-2">
-                <span class="text-xs text-gray-500 w-16">${item.month}</span>
+                <span class="text-xs text-gray-500 w-16">${escapeHtml(formatPeriod(item.period))}</span>
                 <div class="flex-1 flex gap-1 h-6">
                     <div class="h-full bg-green-400 rounded" style="width: ${incomeWidth}%"></div>
                     <div class="h-full bg-red-400 rounded" style="width: ${expenseWidth}%"></div>
                 </div>
                 <span class="text-xs text-gray-600 w-20 text-right">
-                    ${formatCurrency((item.income || 0) - (item.expenses || 0))}
+                    ${formatCurrency(income - expense)}
                 </span>
             </div>
         `;
     }).join('');
+}
+
+const MONTH_NAMES = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+
+// El backend retorna el període com a "2026-01".
+function formatPeriod(period) {
+    if (!period) return '';
+    const [, month] = String(period).split('-');
+    const index = Number.parseInt(month, 10) - 1;
+    return MONTH_NAMES[index] || period;
 }
