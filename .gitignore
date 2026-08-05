@@ -4,32 +4,54 @@
 *.iml
 *.ipr
 *.iws
+.settings/
+.classpath
+.project
 
 # Java / Gradle
 .gradle/
 build/
+bin/
 out/
-!gradle/wrapper/gradle-wrapper.jar
-!gradle/wrapper/gradle-wrapper.properties
+*.class
+!**/gradle/wrapper/gradle-wrapper.jar
+!**/gradle/wrapper/gradle-wrapper.properties
 gradlew
 gradlew.bat
 
 # Python
 venv/
+.venv/
 __pycache__/
 *.pyc
+*.pyo
+.pytest_cache/
+
+# Node.js
+node_modules/
+package-lock.json
+
+# Logs
+*.log
+logs/
+npm-debug.log*
+
+# Secrets i configuració local
+.env
+.env.*
+*.env
+!.env.example
+
+# Dades bancàries i financeres (no pujar extractes reals)
+uploads/
+temp_banco.csv
+Presupost 2026.xlsx
+*.ofx
+*.qif
 
 # macOS
 .DS_Store
 
 # Windows
 Thumbs.db
-
-# Node.js
-node_modules/
-package-lock.json
-
-# Temporary files
-temp_banco.csv
-Presupost 2026.xlsx
-*.env
+desktop.ini
