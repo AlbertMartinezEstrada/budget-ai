@@ -1,4 +1,4 @@
-import { uploadCsv, confirmTransactions, getCategories, formatCurrency } from '../../api.js';
+import { uploadCsv, confirmTransactions, getCategories, formatCurrency, escapeHtml } from '../../api.js';
 
 export async function initUpload(container) {
     container.innerHTML = `
@@ -42,6 +42,7 @@ export async function initUpload(container) {
         </div>
     `;
 
+    const dropZone = document.getElementById('drop-zone');
     const fileInput = document.getElementById('file-input');
     const uploadBtn = document.getElementById('upload-btn');
     const statusDiv = document.getElementById('upload-status');
@@ -99,26 +100,31 @@ export async function initUpload(container) {
 
     function renderReviewTable(data) {
         reviewBody.innerHTML = data.map((t, index) => {
-            // Generate options for select
+            // Si la categoria que proposa la IA no és a la llista oficial, el
+            // navegador seleccionava la primera opció sense dir res i el
+            // moviment s'acabava desant com a "Menjar i supermercat". Ara es
+            // marca explícitament perquè es vegi que cal revisar-la.
+            const known = categoriesList.some(c => c.nom === t.categoria);
+
             const options = categoriesList.map(c => {
-                const isSelected = t.categoria === c.nom;
-                return `<option value="${c.nom}" ${isSelected ? 'selected' : ''}>${c.nom}</option>`;
+                const isSelected = known && t.categoria === c.nom;
+                return `<option value="${escapeHtml(c.nom)}" ${isSelected ? 'selected' : ''}>${escapeHtml(c.nom)}</option>`;
             }).join('');
 
-            // Add "Other" or "Unknown" if the AI category isn't in the list?
-            // For now, we assume the list covers it, or we prepend a default if needed.
-            // If t.categoria is not in the list, it won't be selected, so we might want to add it or have a placeholder.
-            
+            const unknownOption = known
+                ? ''
+                : `<option value="" selected>— Tria una categoria —</option>`;
+
             return `
-            <tr data-index="${index}">
-                <td>${t.data}</td>
-                <td><input type="text" class="input input-sm w-full" value="${t.empresa || ''}" name="empresa"></td>
+            <tr data-index="${index}" class="${known ? '' : 'row-needs-review'}">
+                <td>${escapeHtml(t.data)}</td>
+                <td><input type="text" class="input input-sm w-full" value="${escapeHtml(t.empresa || '')}" name="empresa"></td>
                 <td>
-                    <select class="input input-sm w-full" name="categoria">
-                        ${options}
+                    <select class="input input-sm w-full" name="categoria" ${known ? '' : 'required'}>
+                        ${unknownOption}${options}
                     </select>
                 </td>
-                <td class="text-right">${formatCurrency(parseFloat(t.cost))}</td>
+                <td class="text-right">${formatCurrency(t.cost)}</td>
             </tr>
             `;
         }).join('');
@@ -137,20 +143,31 @@ export async function initUpload(container) {
             };
         });
 
+        const missingCategory = confirmedData.some(t => !t.categoria);
+        if (missingCategory) {
+            statusDiv.textContent = '⚠️ Hi ha moviments sense categoria. Revisa les files marcades.';
+            statusDiv.classList.remove('hidden');
+            return;
+        }
+
         confirmBtn.disabled = true;
         statusDiv.textContent = 'Guardant...';
 
         try {
-            await confirmTransactions(confirmedData);
-            statusDiv.textContent = '✅ Transaccions guardades correctament!';
+            const result = await confirmTransactions(confirmedData);
+            statusDiv.textContent = `✅ ${result.message || 'Transaccions guardades correctament!'}`;
             reviewSection.classList.add('hidden');
+            currentReviewData = [];
+            reviewBody.innerHTML = '';
             fileInput.value = '';
             uploadBtn.disabled = true;
             setTimeout(() => {
                 statusDiv.classList.add('hidden');
-            }, 3000);
+            }, 4000);
         } catch (error) {
             statusDiv.textContent = `❌ Error guardant: ${error.message}`;
+        } finally {
+            // Es rehabilita sempre: si fallava, el botó quedava bloquejat.
             confirmBtn.disabled = false;
         }
     });
@@ -158,7 +175,40 @@ export async function initUpload(container) {
     cancelBtn.addEventListener('click', () => {
         reviewSection.classList.add('hidden');
         currentReviewData = [];
+        reviewBody.innerHTML = '';
         statusDiv.textContent = 'Operació cancel·lada.';
-        uploadBtn.disabled = false;
+        statusDiv.classList.remove('hidden');
+        confirmBtn.disabled = false;
+        uploadBtn.disabled = !fileInput.files.length;
+    });
+
+    // Arrossegar i deixar anar: la zona ho anunciava però no estava implementat.
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+        dropZone.addEventListener(eventName, (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+        });
+    });
+
+    ['dragenter', 'dragover'].forEach(eventName => {
+        dropZone.addEventListener(eventName, () => dropZone.classList.add('drag-over'));
+    });
+
+    ['dragleave', 'drop'].forEach(eventName => {
+        dropZone.addEventListener(eventName, () => dropZone.classList.remove('drag-over'));
+    });
+
+    dropZone.addEventListener('drop', (e) => {
+        const file = e.dataTransfer?.files?.[0];
+        if (!file) return;
+
+        if (!file.name.toLowerCase().endsWith('.csv')) {
+            statusDiv.textContent = '❌ Només s\'accepten fitxers CSV.';
+            statusDiv.classList.remove('hidden');
+            return;
+        }
+
+        fileInput.files = e.dataTransfer.files;
+        fileInput.dispatchEvent(new Event('change'));
     });
 }

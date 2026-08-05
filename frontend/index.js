@@ -9,8 +9,17 @@ app.use((req, res, next) => {
     next();
 });
 
-// Servim els fitxers de la carpeta 'public'
-app.use(express.static(path.join(__dirname, 'public')));
+// Servim els fitxers de la carpeta 'public'.
+// Sense capçaleres de memòria cau, el navegador es queda amb la versió antiga
+// del CSS i del JavaScript després de cada canvi. Amb "no-cache" el navegador
+// revalida sempre contra el servidor (segueix aprofitant l'ETag quan no hi ha
+// hagut cap canvi, així que no es descarrega res de més).
+app.use(express.static(path.join(__dirname, 'public'), {
+    etag: true,
+    setHeaders: (res) => {
+        res.setHeader('Cache-Control', 'no-cache');
+    }
+}));
 
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));

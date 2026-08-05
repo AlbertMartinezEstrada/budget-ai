@@ -10,6 +10,8 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -39,22 +41,22 @@ public class BankReaderService {
                 String fechaStr = csvRecord.get("Fecha");
 
                 // Netegem els valors
-                double amount = cleanNumber(importeStr);
-                Double balance = (saldoStr != null) ? cleanNumber(saldoStr) : null;
+                BigDecimal amount = cleanNumber(importeStr);
+                BigDecimal balance = (saldoStr != null) ? cleanNumber(saldoStr) : null;
 
                 Transaction t = new Transaction();
                 t.setOriginalConcept(concepto);
-                
+
                 // Parsejar data DD/MM/YYYY
                 LocalDate date = LocalDate.parse(fechaStr, DateTimeFormatter.ofPattern("dd/MM/yyyy"));
                 t.setDate(date);
-                
+
                 // Mantenim l'import original (podria ser positiu per ingresos)
-                t.setAmount(Math.abs(amount));
+                t.setAmount(amount.abs());
                 t.setBalance(balance);
-                
+
                 // Determinem el tipus
-                if (amount < 0) {
+                if (amount.signum() < 0) {
                     t.setType("EXPENSE");
                 } else {
                     t.setType("INCOME");
@@ -71,16 +73,53 @@ public class BankReaderService {
         return transactions;
     }
 
-    private double cleanNumber(String val) {
-        if (val == null || val.isEmpty()) return 0.0;
-        String cleaned = val.replace("EUR", "")
-                .replace(".", "")
-                .replace(",", ".")
-                .trim();
+    /**
+     * Converteix un import d'extracte bancari a BigDecimal.
+     *
+     * L'antiga versió esborrava tots els punts i després canviava la coma pel
+     * punt decimal. Això va bé per al format europeu ("1.234,56") però
+     * multiplicava per 100 qualsevol import en format anglosaxó ("45.30" es
+     * convertia en 4530). Ara es detecta quin és el separador decimal mirant
+     * quin dels dos apareix més a la dreta.
+     */
+    private BigDecimal cleanNumber(String val) {
+        if (val == null || val.isBlank()) return BigDecimal.ZERO;
+
+        String cleaned = val.replaceAll("[^0-9,.\\-]", "").trim();
+        if (cleaned.isEmpty() || cleaned.equals("-")) return BigDecimal.ZERO;
+
+        int lastComma = cleaned.lastIndexOf(',');
+        int lastDot = cleaned.lastIndexOf('.');
+
+        if (lastComma >= 0 && lastDot >= 0) {
+            // Hi ha els dos: el que va més a la dreta és el decimal.
+            if (lastComma > lastDot) {
+                cleaned = cleaned.replace(".", "").replace(',', '.');
+            } else {
+                cleaned = cleaned.replace(",", "");
+            }
+        } else if (lastComma >= 0) {
+            // Només comes. Si en queden dues o més, o en separa exactament tres
+            // xifres, són separadors de milers ("1,234"); si no, és el decimal.
+            long commaCount = cleaned.chars().filter(c -> c == ',').count();
+            boolean thousandsGroup = cleaned.length() - lastComma - 1 == 3;
+            cleaned = (commaCount > 1 || thousandsGroup)
+                    ? cleaned.replace(",", "")
+                    : cleaned.replace(',', '.');
+        } else if (lastDot >= 0) {
+            long dotCount = cleaned.chars().filter(c -> c == '.').count();
+            boolean thousandsGroup = cleaned.length() - lastDot - 1 == 3;
+            if (dotCount > 1 || thousandsGroup) {
+                cleaned = cleaned.replace(".", "");
+            }
+        }
+
         try {
-            return Double.parseDouble(cleaned);
+            return new BigDecimal(cleaned).setScale(2, RoundingMode.HALF_UP);
         } catch (NumberFormatException e) {
-            return 0.0;
+            // Abans es retornava 0.0 en silenci i el moviment es desava amb
+            // import zero. Millor avortar la importació que corrompre les dades.
+            throw new IllegalArgumentException("Import il·legible al CSV: \"" + val + "\"", e);
         }
     }
 

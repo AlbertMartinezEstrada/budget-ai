@@ -6,6 +6,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
 
@@ -39,27 +40,33 @@ public class FinancialGoalService {
     @Transactional
     public FinancialGoal updateGoal(Long id, FinancialGoal updatedGoal) {
         return financialGoalRepository.findById(id)
+                // Actualització parcial: el formulari no envia "quantitat_actual",
+                // i copiar-ho a cegues esborrava els diners ja estalviats.
                 .map(goal -> {
-                    goal.setName(updatedGoal.getName());
-                    goal.setDescription(updatedGoal.getDescription());
-                    goal.setTargetAmount(updatedGoal.getTargetAmount());
-                    goal.setCurrentAmount(updatedGoal.getCurrentAmount());
-                    goal.setTargetDate(updatedGoal.getTargetDate());
-                    goal.setCompleted(updatedGoal.getCompleted());
-                    goal.setAccount(updatedGoal.getAccount());
+                    if (updatedGoal.getName() != null) goal.setName(updatedGoal.getName());
+                    if (updatedGoal.getDescription() != null) goal.setDescription(updatedGoal.getDescription());
+                    if (updatedGoal.getTargetAmount() != null) goal.setTargetAmount(updatedGoal.getTargetAmount());
+                    if (updatedGoal.getCurrentAmount() != null) goal.setCurrentAmount(updatedGoal.getCurrentAmount());
+                    if (updatedGoal.getTargetDate() != null) goal.setTargetDate(updatedGoal.getTargetDate());
+                    if (updatedGoal.getCompleted() != null) goal.setCompleted(updatedGoal.getCompleted());
+                    if (updatedGoal.getAccount() != null) goal.setAccount(updatedGoal.getAccount());
                     return financialGoalRepository.save(goal);
                 })
                 .orElseThrow(() -> new RuntimeException("Financial goal not found with id: " + id));
     }
 
     @Transactional
-    public FinancialGoal addToGoal(Long id, Double amount) {
+    public FinancialGoal addToGoal(Long id, BigDecimal amount) {
         return financialGoalRepository.findById(id)
                 .map(goal -> {
-                    goal.setCurrentAmount(goal.getCurrentAmount() + amount);
+                    BigDecimal current = goal.getCurrentAmount() != null
+                            ? goal.getCurrentAmount()
+                            : BigDecimal.ZERO;
+                    goal.setCurrentAmount(current.add(amount));
 
                     // Marcar como completado si se alcanzó el objetivo
-                    if (goal.getCurrentAmount() >= goal.getTargetAmount()) {
+                    if (goal.getTargetAmount() != null
+                            && goal.getCurrentAmount().compareTo(goal.getTargetAmount()) >= 0) {
                         goal.setCompleted(true);
                     }
 

@@ -8,7 +8,7 @@ export async function initAnalytics(container) {
     container.innerHTML = `
         <div class="page-header mb-6">
             <div class="flex justify-between items-center">
-                <h2 class="text-2xl font-bold text-slate-800">Análisis</h2>
+                <h2 class="text-2xl font-bold text-slate-800 dark:text-slate-100">Análisis</h2>
                 <div class="flex gap-2">
                     <select id="year-select" class="px-3 py-2 border rounded-lg"></select>
                     <select id="month-select" class="px-3 py-2 border rounded-lg">
@@ -31,32 +31,32 @@ export async function initAnalytics(container) {
 
         <!-- Resumen Mensual -->
         <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-            <div class="bg-white rounded-xl p-4 shadow-sm border border-slate-200">
-                <div class="text-sm text-gray-500 mb-1">Ingresos</div>
+            <div class="bg-white dark:bg-slate-800 rounded-xl p-4 shadow-sm border border-slate-200 dark:border-slate-700">
+                <div class="text-sm text-gray-500 dark:text-slate-400 mb-1">Ingresos</div>
                 <div class="text-2xl font-bold text-green-600" id="total-income">${formatCurrency(0)}</div>
             </div>
-            <div class="bg-white rounded-xl p-4 shadow-sm border border-slate-200">
-                <div class="text-sm text-gray-500 mb-1">Gastos</div>
+            <div class="bg-white dark:bg-slate-800 rounded-xl p-4 shadow-sm border border-slate-200 dark:border-slate-700">
+                <div class="text-sm text-gray-500 dark:text-slate-400 mb-1">Gastos</div>
                 <div class="text-2xl font-bold text-red-600" id="total-expenses">${formatCurrency(0)}</div>
             </div>
-            <div class="bg-white rounded-xl p-4 shadow-sm border border-slate-200">
-                <div class="text-sm text-gray-500 mb-1">Balance</div>
+            <div class="bg-white dark:bg-slate-800 rounded-xl p-4 shadow-sm border border-slate-200 dark:border-slate-700">
+                <div class="text-sm text-gray-500 dark:text-slate-400 mb-1">Balance</div>
                 <div class="text-2xl font-bold" id="total-balance">${formatCurrency(0)}</div>
             </div>
-            <div class="bg-white rounded-xl p-4 shadow-sm border border-slate-200">
-                <div class="text-sm text-gray-500 mb-1">Ahorro</div>
+            <div class="bg-white dark:bg-slate-800 rounded-xl p-4 shadow-sm border border-slate-200 dark:border-slate-700">
+                <div class="text-sm text-gray-500 dark:text-slate-400 mb-1">Ahorro</div>
                 <div class="text-2xl font-bold text-primary" id="savings-rate">0%</div>
             </div>
         </div>
 
         <!-- Gráfico de Categorías -->
-        <div class="bg-white rounded-xl p-6 shadow-sm border border-slate-200 mb-6">
+        <div class="bg-white dark:bg-slate-800 rounded-xl p-6 shadow-sm border border-slate-200 dark:border-slate-700 mb-6">
             <h3 class="text-lg font-semibold mb-4">Gastos por Categoría</h3>
             <div id="category-chart" class="space-y-3"></div>
         </div>
 
         <!-- Tendencia Mensual -->
-        <div class="bg-white rounded-xl p-6 shadow-sm border border-slate-200">
+        <div class="bg-white dark:bg-slate-800 rounded-xl p-6 shadow-sm border border-slate-200 dark:border-slate-700">
             <h3 class="text-lg font-semibold mb-4">Tendencia Mensual</h3>
             <div id="trend-chart" class="space-y-2"></div>
         </div>
@@ -115,7 +115,7 @@ function renderSummary(summary) {
 function renderCategories(categories) {
     const container = document.getElementById('category-chart');
     if (!categories || categories.length === 0) {
-        container.innerHTML = '<p class="text-gray-500">Sin datos</p>';
+        container.innerHTML = '<p class="text-gray-500 dark:text-slate-400">Sin datos</p>';
         return;
     }
 
@@ -132,9 +132,9 @@ function renderCategories(categories) {
                 <div class="flex-1">
                     <div class="flex justify-between text-sm">
                         <span class="font-medium">${escapeHtml(cat.category || 'Sin categoría')}</span>
-                        <span class="text-gray-600">${formatCurrency(cat.total)} (${percent.toFixed(0)}%)</span>
+                        <span class="text-gray-600 dark:text-slate-300">${formatCurrency(cat.total)} (${percent.toFixed(0)}%)</span>
                     </div>
-                    <div class="h-2 bg-gray-200 rounded-full mt-1">
+                    <div class="h-2 bg-gray-200 dark:bg-slate-700 rounded-full mt-1">
                         <div class="h-full rounded-full transition-all" style="width: ${percent}%; background-color: ${color}"></div>
                     </div>
                 </div>
@@ -146,7 +146,7 @@ function renderCategories(categories) {
 function renderTrend(trend) {
     const container = document.getElementById('trend-chart');
     if (!trend || trend.length === 0) {
-        container.innerHTML = '<p class="text-gray-500">Sin datos</p>';
+        container.innerHTML = '<p class="text-gray-500 dark:text-slate-400">Sin datos</p>';
         return;
     }
 
@@ -165,12 +165,12 @@ function renderTrend(trend) {
 
         return `
             <div class="flex items-center gap-2">
-                <span class="text-xs text-gray-500 w-16">${escapeHtml(formatPeriod(item.period))}</span>
+                <span class="text-xs text-gray-500 dark:text-slate-400 w-16">${escapeHtml(formatPeriod(item.period))}</span>
                 <div class="flex-1 flex gap-1 h-6">
                     <div class="h-full bg-green-400 rounded" style="width: ${incomeWidth}%"></div>
                     <div class="h-full bg-red-400 rounded" style="width: ${expenseWidth}%"></div>
                 </div>
-                <span class="text-xs text-gray-600 w-20 text-right">
+                <span class="text-xs text-gray-600 dark:text-slate-300 w-20 text-right">
                     ${formatCurrency(income - expense)}
                 </span>
             </div>

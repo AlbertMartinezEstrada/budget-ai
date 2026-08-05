@@ -7,6 +7,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
@@ -25,9 +26,9 @@ public class Budget {
     @JoinColumn(name = "category_id")
     private Category category;
 
-    @Column(name = "quantitat_limit", nullable = false)
+    @Column(name = "quantitat_limit", nullable = false, precision = 15, scale = 2)
     @JsonProperty("quantitat_limit")
-    private Double limitAmount;
+    private BigDecimal limitAmount;
 
     @Column(name = "periode_inici", nullable = false)
     @JsonFormat(pattern = "yyyy-MM-dd")
@@ -49,5 +50,5 @@ public class Budget {
 
     @Transient
     @JsonProperty("gasto_actual")
-    private Double currentSpent; // Se calculará dinámicamente
+    private BigDecimal currentSpent; // Se calculará dinámicamente
 }
