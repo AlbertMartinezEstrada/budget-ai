@@ -28,17 +28,23 @@ public class Account {
     @JsonProperty("tipus")
     private String type; // CORRIENTE, AHORRO, EFECTIVO, TARJETA, INVERSIONES
 
+    // Els valors per defecte s'apliquen en desar (@PrePersist), no com a
+    // inicialitzadors de camp. Amb inicialitzadors, un objecte construït per
+    // Jackson a partir d'un cos parcial arriba amb el valor per defecte i no
+    // amb null, així que és impossible distingir "no m'han enviat aquest camp"
+    // de "me'l volen posar a zero": una actualització parcial acabava pisant
+    // el saldo i la divisa que ja hi havia desats.
     @Column(name = "saldo_actual", precision = 15, scale = 2)
     @JsonProperty("saldo_actual")
-    private BigDecimal currentBalance = BigDecimal.ZERO;
+    private BigDecimal currentBalance;
 
     @Column(name = "moneda")
     @JsonProperty("moneda")
-    private String currency = "EUR";
+    private String currency;
 
     @Column(name = "activa")
     @JsonProperty("activa")
-    private Boolean active = true;
+    private Boolean active;
 
     @Column(name = "color")
     @JsonProperty("color")
@@ -46,5 +52,13 @@ public class Account {
 
     @Column(name = "created_at", updatable = false)
     @JsonProperty("created_at")
-    private LocalDateTime createdAt = LocalDateTime.now();
+    private LocalDateTime createdAt;
+
+    @PrePersist
+    void applyDefaults() {
+        if (currentBalance == null) currentBalance = BigDecimal.ZERO;
+        if (currency == null) currency = "EUR";
+        if (active == null) active = Boolean.TRUE;
+        if (createdAt == null) createdAt = LocalDateTime.now();
+    }
 }

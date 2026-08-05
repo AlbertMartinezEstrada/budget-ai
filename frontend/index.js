@@ -1,5 +1,10 @@
-const express = require('express');
-const path = require('path');
+// Mòduls ES, igual que el codi del navegador: així el paquet té un sol
+// sistema de mòduls i els tests poden importar public/js/api.js directament.
+import express from 'express';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
 const PORT = 3000;
 
