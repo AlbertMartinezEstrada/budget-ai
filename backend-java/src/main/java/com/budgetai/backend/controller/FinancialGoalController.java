@@ -6,12 +6,12 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 
 @RestController
 @RequestMapping("/goals")
-@CrossOrigin(origins = "*")
 public class FinancialGoalController {
 
     @Autowired
@@ -49,10 +49,10 @@ public class FinancialGoalController {
     }
 
     @PostMapping("/{id}/add-amount")
-    public ResponseEntity<FinancialGoal> addToGoal(@PathVariable Long id, @RequestBody Map<String, Double> payload) {
+    public ResponseEntity<FinancialGoal> addToGoal(@PathVariable Long id, @RequestBody Map<String, BigDecimal> payload) {
         try {
-            Double amount = payload.get("amount");
-            if (amount == null || amount <= 0) {
+            BigDecimal amount = payload.get("amount");
+            if (amount == null || amount.signum() <= 0) {
                 return ResponseEntity.badRequest().build();
             }
 

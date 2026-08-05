@@ -3,15 +3,16 @@ package com.budgetai.backend.controller;
 import com.budgetai.backend.model.Account;
 import com.budgetai.backend.service.AccountService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 
 @RestController
 @RequestMapping("/accounts")
-@CrossOrigin(origins = "*")
 public class AccountController {
 
     @Autowired
@@ -50,15 +51,26 @@ public class AccountController {
 
     @DeleteMapping("/{id}")
     public ResponseEntity<?> deleteAccount(@PathVariable Long id) {
-        accountService.deleteAccount(id);
-        return ResponseEntity.ok(Map.of("message", "Account deleted successfully"));
+        try {
+            accountService.deleteAccount(id);
+            return ResponseEntity.ok(Map.of("message", "Account deleted successfully"));
+        } catch (IllegalStateException e) {
+            // El compte té moviments o transferències: abans això petava com a
+            // violació de clau forana i arribava com un 500 sense explicació.
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("error", e.getMessage()));
+        }
     }
 
     @PostMapping("/{id}/adjust-balance")
     public ResponseEntity<Account> adjustBalance(@PathVariable Long id,
                                                    @RequestBody Map<String, Object> payload) {
         try {
-            Double amount = ((Number) payload.get("amount")).doubleValue();
+            Object rawAmount = payload.get("amount");
+            if (!(rawAmount instanceof Number)) {
+                return ResponseEntity.badRequest().build();
+            }
+            // new BigDecimal(double) arrossega el soroll del binari; via String no.
+            BigDecimal amount = new BigDecimal(rawAmount.toString());
             String operation = (String) payload.getOrDefault("operation", "ADD"); // ADD or SUBTRACT
 
             accountService.updateAccountBalance(id, amount, operation);

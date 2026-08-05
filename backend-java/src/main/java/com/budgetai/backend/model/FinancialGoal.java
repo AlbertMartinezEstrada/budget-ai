@@ -7,6 +7,8 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
@@ -29,13 +31,13 @@ public class FinancialGoal {
     @JsonProperty("descripcio")
     private String description;
 
-    @Column(name = "quantitat_objectiu", nullable = false)
+    @Column(name = "quantitat_objectiu", nullable = false, precision = 15, scale = 2)
     @JsonProperty("quantitat_objectiu")
-    private Double targetAmount;
+    private BigDecimal targetAmount;
 
-    @Column(name = "quantitat_actual")
+    @Column(name = "quantitat_actual", precision = 15, scale = 2)
     @JsonProperty("quantitat_actual")
-    private Double currentAmount = 0.0;
+    private BigDecimal currentAmount = BigDecimal.ZERO;
 
     @Column(name = "data_objectiu")
     @JsonFormat(pattern = "yyyy-MM-dd")
@@ -56,8 +58,12 @@ public class FinancialGoal {
 
     @Transient
     @JsonProperty("progres_percentatge")
-    public Double getProgressPercentage() {
-        if (targetAmount == null || targetAmount == 0) return 0.0;
-        return (currentAmount / targetAmount) * 100;
+    public BigDecimal getProgressPercentage() {
+        if (targetAmount == null || targetAmount.signum() == 0 || currentAmount == null) {
+            return BigDecimal.ZERO;
+        }
+        return currentAmount
+                .multiply(BigDecimal.valueOf(100))
+                .divide(targetAmount, 2, RoundingMode.HALF_UP);
     }
 }

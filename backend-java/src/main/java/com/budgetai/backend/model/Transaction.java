@@ -8,6 +8,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
@@ -49,13 +50,13 @@ public class Transaction {
     @JsonProperty("descripcio_curta")
     private String shortDescription;
 
-    @Column(name = "import")
-    @JsonProperty("cost") 
-    private Double amount;
+    @Column(name = "import", precision = 15, scale = 2)
+    @JsonProperty("cost")
+    private BigDecimal amount;
 
-    @Column(name = "saldo_resultant")
+    @Column(name = "saldo_resultant", precision = 15, scale = 2)
     @JsonProperty("saldo")
-    private Double balance;
+    private BigDecimal balance;
 
     @Column(name = "tipus")
     private String type; // EXPENSE, INCOME, TRANSFER

@@ -1,4 +1,4 @@
-import { getTransactions, formatCurrency } from '../../api.js';
+import { getTransactions, formatCurrency, escapeHtml } from '../../api.js';
 
 export async function initDashboard(container) {
     container.innerHTML = `
@@ -134,7 +134,7 @@ function renderTopCategories(transactions) {
 
     container.innerHTML = sortedCats.map(([name, value]) => `
         <div class="flex items-center justify-between text-sm">
-            <span class="font-medium text-gray-700">${name}</span>
+            <span class="font-medium text-gray-700">${escapeHtml(name)}</span>
             <span class="font-bold text-gray-900">${formatCurrency(value)}</span>
         </div>
         <div class="w-full bg-gray-200 rounded-full h-2.5">
@@ -160,7 +160,7 @@ function renderRecentTransactions(transactions) {
         return `
         <tr>
             <td class="text-sm text-gray-500">${new Date(t.data).toLocaleDateString()}</td>
-            <td class="font-medium text-gray-900">${t.empresa || 'Desconegut'}</td>
+            <td class="font-medium text-gray-900">${escapeHtml(t.empresa || 'Desconegut')}</td>
             <td class="text-right font-bold ${amountClass}">${sign}${formatCurrency(parseFloat(t.cost))}</td>
         </tr>
     `}).join('');

@@ -204,6 +204,21 @@
     background-color: #eff6ff;
 }
 
+/* Estat mentre s'arrossega un fitxer per damunt de la zona */
+.upload-area.drag-over {
+    border-color: var(--primary-color);
+    background-color: #dbeafe;
+}
+
+/* Fila de revisió on la IA ha proposat una categoria desconeguda */
+.row-needs-review {
+    background-color: #fffbeb;
+}
+
+.row-needs-review select {
+    border-color: #f59e0b;
+}
+
 .file-input {
     display: none;
 }

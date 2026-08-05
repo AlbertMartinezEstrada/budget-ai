@@ -3,13 +3,13 @@ import { getSettings, updateSettings, setTheme, setCurrency, appState } from '..
 export async function initSettings(container) {
     container.innerHTML = `
         <div class="page-header mb-6">
-            <h2 class="text-2xl font-bold text-slate-800">Configuración</h2>
-            <p class="text-slate-500 text-sm mt-1">Gestiona la configuración de tu aplicación</p>
+            <h2 class="text-2xl font-bold text-slate-800 dark:text-slate-100">Configuración</h2>
+            <p class="text-slate-500 dark:text-slate-400 text-sm mt-1">Gestiona la configuración de tu aplicación</p>
         </div>
-        <div id="settings-loading" class="text-center py-8 text-slate-500">Cargando...</div>
+        <div id="settings-loading" class="text-center py-8 text-slate-500 dark:text-slate-400">Cargando...</div>
         <div id="settings-content" class="grid grid-cols-1 lg:grid-cols-2 gap-6" style="display: none;">
             <!-- Perfil -->
-            <div class="bg-white rounded-xl p-6 shadow-sm border">
+            <div class="bg-white dark:bg-slate-800 rounded-xl p-6 shadow-sm border">
                 <div class="flex items-center gap-3 mb-4">
                     <span class="material-symbols-outlined text-primary">person</span>
                     <h3 class="text-lg font-semibold">Perfil</h3>
@@ -30,7 +30,7 @@ export async function initSettings(container) {
             </div>
 
             <!-- Moneda -->
-            <div class="bg-white rounded-xl p-6 shadow-sm border">
+            <div class="bg-white dark:bg-slate-800 rounded-xl p-6 shadow-sm border">
                 <div class="flex items-center gap-3 mb-4">
                     <span class="material-symbols-outlined text-primary">attach_money</span>
                     <h3 class="text-lg font-semibold">Moneda</h3>
@@ -46,7 +46,7 @@ export async function initSettings(container) {
             </div>
 
             <!-- Tema -->
-            <div class="bg-white rounded-xl p-6 shadow-sm border">
+            <div class="bg-white dark:bg-slate-800 rounded-xl p-6 shadow-sm border">
                 <div class="flex items-center gap-3 mb-4">
                     <span class="material-symbols-outlined text-primary">palette</span>
                     <h3 class="text-lg font-semibold">Apariencia</h3>
@@ -71,7 +71,7 @@ export async function initSettings(container) {
             </div>
 
             <!-- Notificaciones -->
-            <div class="bg-white rounded-xl p-6 shadow-sm border">
+            <div class="bg-white dark:bg-slate-800 rounded-xl p-6 shadow-sm border">
                 <div class="flex items-center gap-3 mb-4">
                     <span class="material-symbols-outlined text-primary">notifications</span>
                     <h3 class="text-lg font-semibold">Notificaciones</h3>
@@ -96,11 +96,11 @@ export async function initSettings(container) {
             </div>
 
             <!-- Guardar botón principal -->
-            <div class="bg-white rounded-xl p-6 shadow-sm border lg:col-span-2">
+            <div class="bg-white dark:bg-slate-800 rounded-xl p-6 shadow-sm border lg:col-span-2">
                 <button id="save-all-btn" class="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 font-medium">
                     Guardar todos los cambios
                 </button>
-                <span id="save-status" class="ml-4 text-sm text-slate-500"></span>
+                <span id="save-status" class="ml-4 text-sm text-slate-500 dark:text-slate-400"></span>
             </div>
         </div>
     `;

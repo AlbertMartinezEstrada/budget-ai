@@ -6,6 +6,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Entity
@@ -27,9 +28,9 @@ public class Account {
     @JsonProperty("tipus")
     private String type; // CORRIENTE, AHORRO, EFECTIVO, TARJETA, INVERSIONES
 
-    @Column(name = "saldo_actual")
+    @Column(name = "saldo_actual", precision = 15, scale = 2)
     @JsonProperty("saldo_actual")
-    private Double currentBalance = 0.0;
+    private BigDecimal currentBalance = BigDecimal.ZERO;
 
     @Column(name = "moneda")
     @JsonProperty("moneda")
