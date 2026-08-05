@@ -30,6 +30,13 @@ public class AiEngineService {
             return new ArrayList<>();
         }
 
+        // Sense clau no es pot classificar, però la importació ha de continuar:
+        // l'usuari sempre pot assignar les categories a mà a la pantalla de revisió.
+        if (apiKey == null || apiKey.isBlank()) {
+            System.err.println("AiEngineService: falta GEMINI_API_KEY; s'omet la classificació automàtica.");
+            return transactions;
+        }
+
         // 1. Prepare prompt
         String transactionsListString = formatTransactionsForPrompt(transactions);
         String prompt = createPrompt(transactionsListString);
@@ -50,10 +57,13 @@ public class AiEngineService {
         // Header
         sb.append("concepte_original, data, Cost\n");
         for (Transaction t : transactions) {
-            sb.append(String.format("%s, %s, %.2f\n", 
-                t.getOriginalConcept().replace(",", " "), 
-                t.getDate().toString(), 
-                t.getAmount()));
+            String concept = t.getOriginalConcept() != null
+                    ? t.getOriginalConcept().replace(",", " ")
+                    : "";
+            sb.append(String.format("%s, %s, %s\n",
+                concept,
+                t.getDate(),
+                t.getAmount() != null ? t.getAmount().toPlainString() : "0.00"));
         }
         return sb.toString();
     }
@@ -120,37 +130,36 @@ public class AiEngineService {
             JsonNode rootNode = objectMapper.readTree(cleanJson);
             
             if (rootNode.isArray()) {
+                // Si la IA no retorna exactament una fila per moviment, l'aparellament
+                // per posició deixa de ser fiable. Abans, en aquest cas es retornaven
+                // les transaccions de la IA sense hash, sense tipus i amb l'import que
+                // ella hagués dit: es desaven dades corruptes i es perdia la protecció
+                // contra duplicats. Ara es descarta la classificació i es conserven
+                // els moviments originals, que són els bons.
+                if (rootNode.size() != originalTransactions.size()) {
+                    System.err.println("AiEngineService: la IA ha retornat " + rootNode.size()
+                            + " files per a " + originalTransactions.size()
+                            + " moviments; es descarta la classificació.");
+                    return originalTransactions;
+                }
+
                 List<Transaction> classifiedTransactions = new ArrayList<>();
-                
-                for (JsonNode node : rootNode) {
-                    Transaction t = new Transaction();
+
+                for (int i = 0; i < originalTransactions.size(); i++) {
+                    JsonNode node = rootNode.get(i);
+                    Transaction original = originalTransactions.get(i);
+
+                    // Es parteix de l'original i només s'hi apliquen els camps
+                    // que la IA pot decidir: empresa, categoria i descripció.
+                    // L'import, la data, el tipus i el hash no es toquen mai.
+                    Transaction t = original;
                     t.setCompanyName(node.has("companyName") ? node.get("companyName").asText() : "Desconegut");
                     t.setCategoryName(node.has("category") ? node.get("category").asText() : "Altres");
                     t.setShortDescription(node.has("description_curta") ? node.get("description_curta").asText() : "");
-                    t.setAmount(node.has("cost") ? node.get("cost").asDouble() : 0.0);
-                    
-                    if (node.has("date")) {
-                        try {
-                           t.setDate(LocalDate.parse(node.get("date").asText()));
-                        } catch (Exception ex) { /* fall back a original si falla */ }
-                    }
+
                     classifiedTransactions.add(t);
                 }
-                
-                // Merging original data back if sizes match
-                if (classifiedTransactions.size() == originalTransactions.size()) {
-                    for (int i = 0; i < classifiedTransactions.size(); i++) {
-                        Transaction classified = classifiedTransactions.get(i);
-                        Transaction original = originalTransactions.get(i);
-                        
-                        classified.setOriginalConcept(original.getOriginalConcept());
-                        classified.setDate(original.getDate());
-                        classified.setAmount(original.getAmount());
-                        classified.setBalance(original.getBalance());
-                        classified.setType(original.getType());
-                        classified.setVerificationHash(original.getVerificationHash());
-                    }
-                }
+
                 return classifiedTransactions;
             }
         } catch (JsonProcessingException e) {

@@ -21,15 +21,18 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
+import org.springframework.transaction.annotation.Transactional;
+
 import java.util.ArrayList;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/")
-@CrossOrigin(origins = "*")
 public class TransactionController {
 
     @Autowired
@@ -96,14 +99,48 @@ public class TransactionController {
         }
     }
 
+    // @Transactional: desar els moviments i ajustar els saldos ha de ser una
+    // sola operació. Abans els saldos es tocaven dins del bucle i el saveAll
+    // era l'últim pas, així que un error deixava saldos moguts sense moviments.
     @PostMapping("/confirm-upload")
+    @Transactional
     public ResponseEntity<?> confirmUpload(@RequestBody List<Transaction> confirmedTransactions) {
         try {
             // Obtener la cuenta principal por defecto
             Account defaultAccount = accountRepository.findByName("Compte Principal")
                     .orElseGet(() -> accountRepository.findAll().stream().findFirst().orElse(null));
 
-            for (Transaction t : confirmedTransactions) {
+            // El hash només es comprovava en pujar el fitxer. Entre la pujada i
+            // la confirmació el mateix lot es pot enviar dues vegades (doble
+            // clic, reintent), així que cal tornar-ho a mirar aquí.
+            Set<String> incomingHashes = confirmedTransactions.stream()
+                    .map(Transaction::getVerificationHash)
+                    .filter(Objects::nonNull)
+                    .collect(Collectors.toSet());
+
+            Set<String> alreadyStored = incomingHashes.isEmpty()
+                    ? Set.of()
+                    : transactionRepository.findByVerificationHashIn(incomingHashes).stream()
+                            .map(Transaction::getVerificationHash)
+                            .collect(Collectors.toSet());
+
+            List<Transaction> toPersist = confirmedTransactions.stream()
+                    .filter(t -> t.getVerificationHash() == null
+                            || !alreadyStored.contains(t.getVerificationHash()))
+                    .collect(Collectors.toList());
+
+            int skipped = confirmedTransactions.size() - toPersist.size();
+
+            if (toPersist.isEmpty()) {
+                return ResponseEntity.ok(Map.of(
+                        "status", "info",
+                        "message", "Tots els moviments ja existien a la BBDD",
+                        "saved", 0,
+                        "skipped", skipped
+                ));
+            }
+
+            for (Transaction t : toPersist) {
                 // Category (Sempre n'ha d'haver una de les oficials)
                 String catName = t.getCategoryName();
                 if (catName == null || catName.isEmpty()) catName = "Altres";
@@ -142,14 +179,29 @@ public class TransactionController {
                 }
             }
 
-            transactionRepository.saveAll(confirmedTransactions);
+            transactionRepository.saveAll(toPersist);
+
+            String message = skipped > 0
+                    ? toPersist.size() + " moviments guardats (" + skipped + " ja existien)"
+                    : toPersist.size() + " moviments guardats correctament";
+
             return ResponseEntity.ok(Map.of(
                     "status", "success",
-                    "message", confirmedTransactions.size() + " moviments guardats correctament"
+                    "message", message,
+                    "saved", toPersist.size(),
+                    "skipped", skipped
             ));
         } catch (Exception e) {
-            e.printStackTrace();
-            return ResponseEntity.internalServerError().body("Error guardant: " + e.getMessage());
+            // Es rellança perquè la transacció faci rollback: capturar-la i
+            // retornar un ResponseEntity deixaria els saldos ja modificats.
+            throw new ConfirmUploadException("Error guardant: " + e.getMessage(), e);
+        }
+    }
+
+    @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
+    private static class ConfirmUploadException extends RuntimeException {
+        ConfirmUploadException(String message, Throwable cause) {
+            super(message, cause);
         }
     }
 

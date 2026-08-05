@@ -1,9 +1,9 @@
-import { getRecurringTransactions, createRecurringTransaction, updateRecurringTransaction, deleteRecurringTransaction, processRecurring, getCategories, getCompanies, formatCurrency } from '../../api.js';
+import { getRecurringTransactions, getRecurringTransaction, createRecurringTransaction, updateRecurringTransaction, deleteRecurringTransaction, processRecurring, getCategories, formatCurrency, escapeHtml } from '../../api.js';
 
 export async function initRecurring(container) {
     container.innerHTML = `
         <div class="page-header flex justify-between items-center mb-6">
-            <h2 class="text-2xl font-bold text-slate-800">Transacciones Recurrentes</h2>
+            <h2 class="text-2xl font-bold text-slate-800 dark:text-slate-100">Transacciones Recurrentes</h2>
             <div class="flex gap-2">
                 <button id="process-btn" class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-600/90 flex items-center gap-2">
                     <span class="material-symbols-outlined">play_arrow</span>
@@ -19,7 +19,7 @@ export async function initRecurring(container) {
 
         <!-- Modal -->
         <div id="recurring-modal" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-50">
-            <div class="bg-white rounded-xl p-6 w-full max-w-md">
+            <div class="bg-white dark:bg-slate-800 rounded-xl p-6 w-full max-w-md">
                 <h3 class="text-xl font-bold mb-4" id="modal-title">Nueva Transacción Recurrente</h3>
                 <form id="recurring-form" class="space-y-4">
                     <input type="hidden" id="recurring-id">
@@ -61,7 +61,7 @@ export async function initRecurring(container) {
                         <textarea id="recurring-description" class="w-full px-3 py-2 border rounded-lg" rows="2"></textarea>
                     </div>
                     <div class="flex gap-2 justify-end">
-                        <button type="button" id="cancel-btn" class="px-4 py-2 border rounded-lg hover:bg-gray-50">Cancelar</button>
+                        <button type="button" id="cancel-btn" class="px-4 py-2 border rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700">Cancelar</button>
                         <button type="submit" class="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/90">Guardar</button>
                     </div>
                 </form>
@@ -76,6 +76,7 @@ export async function initRecurring(container) {
     document.getElementById('cancel-btn').addEventListener('click', () => closeModal());
     document.getElementById('recurring-form').addEventListener('submit', handleSubmit);
     document.getElementById('process-btn').addEventListener('click', handleProcess);
+    document.getElementById('recurring-list').addEventListener('click', handleListClick);
 }
 
 let categories = [];
@@ -84,7 +85,7 @@ async function loadCategoriesSelect() {
     try {
         categories = await getCategories();
         const select = document.getElementById('recurring-category');
-        select.innerHTML = '<option value="">Sin categoría</option>' + categories.map(cat => `<option value="${cat.id}">${cat.nom}</option>`).join('');
+        select.innerHTML = '<option value="">Sin categoría</option>' + categories.map(cat => `<option value="${cat.id}">${escapeHtml(cat.nom)}</option>`).join('');
     } catch (error) {
         console.error('Error loading categories:', error);
     }
@@ -103,7 +104,7 @@ async function loadRecurrings() {
 function renderRecurrings(recurrings) {
     const container = document.getElementById('recurring-list');
     if (!recurrings || recurrings.length === 0) {
-        container.innerHTML = '<p class="text-gray-500 text-center py-8">No hay transacciones recurrentes</p>';
+        container.innerHTML = '<p class="text-gray-500 dark:text-slate-400 text-center py-8">No hay transacciones recurrentes</p>';
         return;
     }
 
@@ -116,22 +117,22 @@ function renderRecurrings(recurrings) {
     };
 
     container.innerHTML = recurrings.map(item => `
-        <div class="bg-white rounded-xl p-4 shadow-sm border border-slate-200">
+        <div class="bg-white dark:bg-slate-800 rounded-xl p-4 shadow-sm border border-slate-200 dark:border-slate-700">
             <div class="flex items-center justify-between mb-3">
                 <div class="flex items-center gap-3">
                     <div class="w-10 h-10 rounded-lg flex items-center justify-center ${item.tipus === 'INCOME' ? 'bg-green-100' : 'bg-red-100'}">
                         <span class="material-symbols-outlined ${item.tipus === 'INCOME' ? 'text-green-600' : 'text-red-600'}">${item.tipus === 'INCOME' ? 'trending_up' : 'trending_down'}</span>
                     </div>
                     <div>
-                        <h3 class="font-semibold">${item.nom}</h3>
-                        <span class="text-xs text-gray-500">${freqLabels[item.frequencia] || item.frequencia} • ${item.proxima_data}</span>
+                        <h3 class="font-semibold">${escapeHtml(item.nom)}</h3>
+                        <span class="text-xs text-gray-500 dark:text-slate-400">${escapeHtml(freqLabels[item.frequencia] || item.frequencia)} • ${escapeHtml(item.proxima_data)}</span>
                     </div>
                 </div>
                 <div class="flex gap-1">
-                    <button onclick="editRecurring(${item.id})" class="p-1 hover:bg-gray-100 rounded" title="Editar">
+                    <button data-action="edit" data-id="${item.id}" class="p-1 hover:bg-gray-100 dark:hover:bg-slate-700 rounded" title="Editar">
                         <span class="material-symbols-outlined text-sm">edit</span>
                     </button>
-                    <button onclick="deleteRecurringById(${item.id})" class="p-1 hover:bg-red-50 text-red-500 rounded" title="Eliminar">
+                    <button data-action="delete" data-id="${item.id}" class="p-1 hover:bg-red-50 text-red-500 rounded" title="Eliminar">
                         <span class="material-symbols-outlined text-sm">delete</span>
                     </button>
                 </div>
@@ -180,25 +181,33 @@ function closeModal() {
     modal.classList.remove('flex');
 }
 
-window.editRecurring = async function(id) {
-    try {
-        const recurring = await (await fetch(`http://localhost:8000/recurring/${id}`)).json();
-        openModal(recurring);
-    } catch (error) {
-        alert('Error al cargar transacción');
-    }
-};
+async function handleListClick(event) {
+    const button = event.target.closest('button[data-action]');
+    if (!button) return;
 
-window.deleteRecurringById = async function(id) {
-    if (confirm('¿Eliminar esta transacción recurrente?')) {
+    const id = Number.parseInt(button.dataset.id, 10);
+    if (!Number.isInteger(id)) return;
+
+    if (button.dataset.action === 'edit') {
+        try {
+            // Abans es cridava http://localhost:8000 a pèl.
+            openModal(await getRecurringTransaction(id));
+        } catch (error) {
+            alert(error.message || 'Error al cargar transacción');
+        }
+        return;
+    }
+
+    if (button.dataset.action === 'delete') {
+        if (!confirm('¿Eliminar esta transacción recurrente?')) return;
         try {
             await deleteRecurringTransaction(id);
             await loadRecurrings();
         } catch (error) {
-            alert('Error al eliminar');
+            alert(error.message || 'Error al eliminar');
         }
     }
-};
+}
 
 async function handleSubmit(e) {
     e.preventDefault();

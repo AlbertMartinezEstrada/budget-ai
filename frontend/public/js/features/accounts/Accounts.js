@@ -1,9 +1,12 @@
-import { getAccounts, createAccount, updateAccount, deleteAccount, adjustBalance, formatCurrency } from '../../api.js';
+import { getAccounts, createAccount, updateAccount, deleteAccount, adjustBalance, formatCurrency, escapeHtml } from '../../api.js';
+
+// Guardem els comptes carregats per no haver de passar-ne les dades pel DOM.
+let loadedAccounts = [];
 
 export async function initAccounts(container) {
     container.innerHTML = `
         <div class="page-header flex justify-between items-center mb-6">
-            <h2 class="text-2xl font-bold text-slate-800">Cuentas</h2>
+            <h2 class="text-2xl font-bold text-slate-800 dark:text-slate-100">Cuentas</h2>
             <button id="add-account-btn" class="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/90 flex items-center gap-2">
                 <span class="material-symbols-outlined">add</span>
                 Nueva Cuenta
@@ -13,7 +16,7 @@ export async function initAccounts(container) {
 
         <!-- Modal -->
         <div id="account-modal" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-50">
-            <div class="bg-white rounded-xl p-6 w-full max-w-md">
+            <div class="bg-white dark:bg-slate-800 rounded-xl p-6 w-full max-w-md">
                 <h3 class="text-xl font-bold mb-4" id="modal-title">Nueva Cuenta</h3>
                 <form id="account-form" class="space-y-4">
                     <input type="hidden" id="account-id">
@@ -40,7 +43,7 @@ export async function initAccounts(container) {
                         <input type="color" id="account-color" value="#4f46e5" class="w-full h-10 border rounded-lg">
                     </div>
                     <div class="flex gap-2 justify-end">
-                        <button type="button" id="cancel-btn" class="px-4 py-2 border rounded-lg hover:bg-gray-50">Cancelar</button>
+                        <button type="button" id="cancel-btn" class="px-4 py-2 border rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700">Cancelar</button>
                         <button type="submit" class="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/90">Guardar</button>
                     </div>
                 </form>
@@ -49,7 +52,7 @@ export async function initAccounts(container) {
 
         <!-- Adjust Balance Modal -->
         <div id="adjust-modal" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-50">
-            <div class="bg-white rounded-xl p-6 w-full max-w-md">
+            <div class="bg-white dark:bg-slate-800 rounded-xl p-6 w-full max-w-md">
                 <h3 class="text-xl font-bold mb-4">Ajustar Saldo</h3>
                 <form id="adjust-form" class="space-y-4">
                     <input type="hidden" id="adjust-account-id">
@@ -57,9 +60,9 @@ export async function initAccounts(container) {
                         <label class="block text-sm font-medium mb-1">Cantidad</label>
                         <input type="number" id="adjust-amount" step="0.01" class="w-full px-3 py-2 border rounded-lg">
                     </div>
-                    <p class="text-sm text-gray-500">Usa valores positivos para aumentar o negativos para reducir.</p>
+                    <p class="text-sm text-gray-500 dark:text-slate-400">Usa valores positivos para aumentar o negativos para reducir.</p>
                     <div class="flex gap-2 justify-end">
-                        <button type="button" id="cancel-adjust-btn" class="px-4 py-2 border rounded-lg hover:bg-gray-50">Cancelar</button>
+                        <button type="button" id="cancel-adjust-btn" class="px-4 py-2 border rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700">Cancelar</button>
                         <button type="submit" class="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/90">Ajustar</button>
                     </div>
                 </form>
@@ -74,11 +77,21 @@ export async function initAccounts(container) {
     document.getElementById('account-form').addEventListener('submit', handleSubmit);
     document.getElementById('cancel-adjust-btn').addEventListener('click', () => closeAdjustModal());
     document.getElementById('adjust-form').addEventListener('submit', handleAdjustSubmit);
+    document.getElementById('accounts-list').addEventListener('click', handleListClick);
+
+    // Tancar els modals fent clic al fons.
+    document.getElementById('account-modal').addEventListener('click', (e) => {
+        if (e.target.id === 'account-modal') closeModal();
+    });
+    document.getElementById('adjust-modal').addEventListener('click', (e) => {
+        if (e.target.id === 'adjust-modal') closeAdjustModal();
+    });
 }
 
 async function loadAccounts() {
     try {
         const accounts = await getAccounts();
+        loadedAccounts = accounts || [];
         renderAccounts(accounts);
     } catch (error) {
         console.error('Error loading accounts:', error);
@@ -89,40 +102,49 @@ async function loadAccounts() {
 function renderAccounts(accounts) {
     const container = document.getElementById('accounts-list');
     if (!accounts || accounts.length === 0) {
-        container.innerHTML = '<p class="text-gray-500 col-span-3 text-center py-8">No hay cuentas</p>';
+        container.innerHTML = '<p class="text-gray-500 dark:text-slate-400 col-span-3 text-center py-8">No hay cuentas</p>';
         return;
     }
 
-    container.innerHTML = accounts.map(account => `
-        <div class="bg-white rounded-xl p-4 shadow-sm border border-slate-200">
+    container.innerHTML = accounts.map(account => {
+        const color = sanitizeColor(account.color);
+        return `
+        <div class="bg-white dark:bg-slate-800 rounded-xl p-4 shadow-sm border border-slate-200 dark:border-slate-700">
             <div class="flex items-center justify-between mb-3">
                 <div class="flex items-center gap-3">
-                    <div class="w-10 h-10 rounded-lg flex items-center justify-center" style="background-color: ${account.color || '#4f46e5'}20">
-                        <span class="material-symbols-outlined" style="color: ${account.color || '#4f46e5'}">account_balance_wallet</span>
+                    <div class="w-10 h-10 rounded-lg flex items-center justify-center" style="background-color: ${color}20">
+                        <span class="material-symbols-outlined" style="color: ${color}">account_balance_wallet</span>
                     </div>
                     <div>
-                        <h3 class="font-semibold">${account.nom}</h3>
-                        <span class="text-xs text-gray-500">${account.tipus}</span>
+                        <h3 class="font-semibold">${escapeHtml(account.nom)}</h3>
+                        <span class="text-xs text-gray-500 dark:text-slate-400">${escapeHtml(account.tipus)}</span>
                     </div>
                 </div>
                 <div class="flex gap-1">
-                    <button onclick="openAdjustModal(${account.id})" class="p-1 hover:bg-gray-100 rounded" title="Ajustar saldo">
+                    <button data-action="adjust" data-id="${account.id}" class="p-1 hover:bg-gray-100 dark:hover:bg-slate-700 rounded" title="Ajustar saldo">
                         <span class="material-symbols-outlined text-sm">edit</span>
                     </button>
-                    <button onclick="editAccount(${account.id}, '${account.nom}', '${account.tipus}', ${account.saldo_actual}, '${account.color || '#4f46e5'}')" class="p-1 hover:bg-gray-100 rounded" title="Editar">
+                    <button data-action="edit" data-id="${account.id}" class="p-1 hover:bg-gray-100 dark:hover:bg-slate-700 rounded" title="Editar">
                         <span class="material-symbols-outlined text-sm">settings</span>
                     </button>
-                    <button onclick="deleteAccountById(${account.id})" class="p-1 hover:bg-red-50 text-red-500 rounded" title="Eliminar">
+                    <button data-action="delete" data-id="${account.id}" class="p-1 hover:bg-red-50 text-red-500 rounded" title="Eliminar">
                         <span class="material-symbols-outlined text-sm">delete</span>
                     </button>
                 </div>
             </div>
-            <div class="text-2xl font-bold text-slate-800">
+            <div class="text-2xl font-bold text-slate-800 dark:text-slate-100">
                 ${formatCurrency(account.saldo_actual)}
             </div>
-            <div class="text-xs text-gray-500 mt-1">${account.moneda || 'EUR'}</div>
+            <div class="text-xs text-gray-500 dark:text-slate-400 mt-1">${escapeHtml(account.moneda || 'EUR')}</div>
         </div>
-    `).join('');
+    `;
+    }).join('');
+}
+
+// El color va a parar a un atribut style, on escapar no n'hi ha prou:
+// només s'accepta un codi hexadecimal.
+function sanitizeColor(color) {
+    return /^#[0-9a-fA-F]{6}$/.test(color || '') ? color : '#4f46e5';
 }
 
 function openModal(account = null) {
@@ -153,13 +175,13 @@ function closeModal() {
     modal.classList.remove('flex');
 }
 
-window.openAdjustModal = function(id) {
+function openAdjustModal(id) {
     document.getElementById('adjust-account-id').value = id;
     document.getElementById('adjust-amount').value = 0;
     const modal = document.getElementById('adjust-modal');
     modal.classList.remove('hidden');
     modal.classList.add('flex');
-};
+}
 
 function closeAdjustModal() {
     const modal = document.getElementById('adjust-modal');
@@ -167,20 +189,42 @@ function closeAdjustModal() {
     modal.classList.remove('flex');
 }
 
-window.editAccount = function(id, name, type, balance, color) {
-    openModal({ id, nom: name, tipus: type, saldo_actual: balance, color });
-};
+// Delegació d'esdeveniments en comptes d'onclick amb dades interpolades.
+// Abans el nom del compte s'incrustava dins d'una crida JavaScript entre
+// cometes simples: un compte anomenat "O'Brien" trencava el botó, i un nom
+// preparat a posta podia executar codi.
+async function handleListClick(event) {
+    const button = event.target.closest('button[data-action]');
+    if (!button) return;
 
-window.deleteAccountById = async function(id) {
-    if (confirm('¿Eliminar esta cuenta?')) {
-        try {
-            await deleteAccount(id);
-            await loadAccounts();
-        } catch (error) {
-            alert('Error al eliminar cuenta');
+    const id = Number.parseInt(button.dataset.id, 10);
+    if (!Number.isInteger(id)) return;
+
+    switch (button.dataset.action) {
+        case 'adjust':
+            openAdjustModal(id);
+            break;
+        case 'edit': {
+            const account = loadedAccounts.find(a => a.id === id);
+            if (account) openModal(account);
+            break;
         }
+        case 'delete':
+            await removeAccount(id);
+            break;
     }
-};
+}
+
+async function removeAccount(id) {
+    if (!confirm('¿Eliminar esta cuenta?')) return;
+    try {
+        await deleteAccount(id);
+        await loadAccounts();
+    } catch (error) {
+        // El backend explica per què no es pot esborrar (moviments associats).
+        alert(error.message || 'Error al eliminar cuenta');
+    }
+}
 
 async function handleSubmit(e) {
     e.preventDefault();
@@ -201,7 +245,7 @@ async function handleSubmit(e) {
         closeModal();
         await loadAccounts();
     } catch (error) {
-        alert('Error al guardar cuenta');
+        alert(error.message || 'Error al guardar cuenta');
     }
 }
 
@@ -215,6 +259,6 @@ async function handleAdjustSubmit(e) {
         closeAdjustModal();
         await loadAccounts();
     } catch (error) {
-        alert('Error al ajustar saldo');
+        alert(error.message || 'Error al ajustar saldo');
     }
 }

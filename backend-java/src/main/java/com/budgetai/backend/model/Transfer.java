@@ -7,6 +7,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
@@ -29,9 +30,9 @@ public class Transfer {
     @JoinColumn(name = "account_desti_id")
     private Account destinationAccount;
 
-    @Column(name = "import", nullable = false)
+    @Column(name = "import", nullable = false, precision = 15, scale = 2)
     @JsonProperty("import")
-    private Double amount;
+    private BigDecimal amount;
 
     @Column(name = "data", nullable = false)
     @JsonFormat(pattern = "yyyy-MM-dd")

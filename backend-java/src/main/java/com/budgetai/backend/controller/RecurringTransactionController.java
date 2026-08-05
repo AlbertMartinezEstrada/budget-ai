@@ -11,7 +11,6 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/recurring")
-@CrossOrigin(origins = "*")
 public class RecurringTransactionController {
 
     @Autowired

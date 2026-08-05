@@ -30,6 +30,22 @@
     --radius-lg: 1rem;
 }
 
+/* Tema fosc. El selector de tema ja posava la classe "dark" a <html>, però
+   no hi havia cap regla que hi respongués: el contingut es quedava en clar. */
+html.dark {
+    --bg-body: #0f172a;      /* Slate 900 */
+    --bg-surface: #1e293b;   /* Slate 800 */
+    --bg-sidebar: #020617;   /* Slate 950 */
+
+    --text-main: #f1f5f9;    /* Slate 100 */
+    --text-secondary: #94a3b8; /* Slate 400 */
+    --text-inverse: #0f172a;
+
+    --border-color: #334155;  /* Slate 700 */
+    --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.4);
+    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.5);
+}
+
 * {
     box-sizing: border-box;
     margin: 0;
@@ -38,10 +54,12 @@
 
 body {
     font-family: 'Inter', system-ui, -apple-system, sans-serif;
-    background-color: --bg-body;
+    /* Faltava var(): la declaració era invàlida i el fons mai s'aplicava. */
+    background-color: var(--bg-body);
     color: var(--text-main);
     height: 100vh;
     overflow: hidden; /* Per al layout de dashboard */
+    transition: background-color 0.2s, color 0.2s;
 }
 
 h1, h2, h3, h4 {
