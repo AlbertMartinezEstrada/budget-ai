@@ -42,6 +42,11 @@ npm-debug.log*
 *.env
 !.env.example
 
+# Script d'un sol ús amb el token de Notion escrit al codi. Queda ignorat
+# perquè un "git add ." no el publiqui. Quan llegeixi el token de l'entorn
+# (os.environ["NOTION_TOKEN"]) es pot treure d'aquí i versionar-lo.
+notion_update.py
+
 # Dades bancàries i financeres (no pujar extractes reals)
 uploads/
 temp_banco.csv
