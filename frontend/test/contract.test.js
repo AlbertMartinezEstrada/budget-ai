@@ -82,6 +82,25 @@ test('analytics no tracta la categoria com un objecte', () => {
     );
 });
 
+test('cap crida a l\'API es fa sense la cookie de sessió', () => {
+    // Totes les crides han de passar per apiFetch, que hi posa
+    // credentials: 'include'. Un fetch directe cap al backend no enviaria la
+    // cookie i rebria un 401.
+    const api = files.find(f => f.path.endsWith(path.join('js', 'api.js')));
+    assert.ok(api, 'no s\'ha trobat api.js');
+
+    // L'única línia que pot cridar fetch() amb la URL del backend és la del
+    // propi helper apiFetch, i ha de portar-hi les credencials.
+    const rawFetchLines = api.source
+        .split('\n')
+        .filter(line => /fetch\(`\$\{API_URL\}/.test(line));
+
+    assert.equal(rawFetchLines.length, 1,
+        `hi ha ${rawFetchLines.length} crides directes a fetch; només apiFetch en pot fer`);
+    assert.ok(/credentials:\s*'include'/.test(rawFetchLines[0]),
+        'apiFetch ha d\'enviar credentials: include');
+});
+
 test('només api.js sap on viu el backend', () => {
     // Budgets i Recurring cridaven http://localhost:8000 a pèl, de manera que
     // només funcionaven obrint l'aplicació des de la mateixa màquina.
