@@ -35,9 +35,11 @@ public class FinancialGoal {
     @JsonProperty("quantitat_objectiu")
     private BigDecimal targetAmount;
 
+    // Sense inicialitzador: vegeu el comentari a Account. Amb un valor per
+    // defecte aquí, editar un objectiu esborrava els diners ja estalviats.
     @Column(name = "quantitat_actual", precision = 15, scale = 2)
     @JsonProperty("quantitat_actual")
-    private BigDecimal currentAmount = BigDecimal.ZERO;
+    private BigDecimal currentAmount;
 
     @Column(name = "data_objectiu")
     @JsonFormat(pattern = "yyyy-MM-dd")
@@ -46,7 +48,7 @@ public class FinancialGoal {
 
     @Column(name = "completat")
     @JsonProperty("completat")
-    private Boolean completed = false;
+    private Boolean completed;
 
     @ManyToOne
     @JoinColumn(name = "account_id")
@@ -54,7 +56,14 @@ public class FinancialGoal {
 
     @Column(name = "created_at", updatable = false)
     @JsonProperty("created_at")
-    private LocalDateTime createdAt = LocalDateTime.now();
+    private LocalDateTime createdAt;
+
+    @PrePersist
+    void applyDefaults() {
+        if (currentAmount == null) currentAmount = BigDecimal.ZERO;
+        if (completed == null) completed = Boolean.FALSE;
+        if (createdAt == null) createdAt = LocalDateTime.now();
+    }
 
     @Transient
     @JsonProperty("progres_percentatge")

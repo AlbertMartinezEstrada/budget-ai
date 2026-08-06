@@ -66,10 +66,10 @@ public class Transaction {
     private String originalConcept;
 
     @Column(name = "compte_nom")
-    private String accountName = "Principal";
+    private String accountName;
 
     @Column(name = "moneda")
-    private String currency = "EUR";
+    private String currency;
 
     @Column(name = "hash_verificacio", unique = true)
     @JsonIgnore
@@ -77,7 +77,14 @@ public class Transaction {
 
     @Column(name = "created_at", updatable = false)
     @JsonIgnore
-    private LocalDateTime createdAt = LocalDateTime.now();
+    private LocalDateTime createdAt;
+
+    @PrePersist
+    void applyDefaults() {
+        if (accountName == null) accountName = "Principal";
+        if (currency == null) currency = "EUR";
+        if (createdAt == null) createdAt = LocalDateTime.now();
+    }
 
     // Mètodes per assegurar entrada/sortida correcta del JSON
     @JsonProperty("empresa")
