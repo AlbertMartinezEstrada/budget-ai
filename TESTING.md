@@ -2,11 +2,28 @@
 
 ## Com executar-los
 
-**Backend** (JUnit 5 + Mockito + AssertJ, ja inclosos a `spring-boot-starter-test`):
+**Backend, tests unitaris** (JUnit 5 + Mockito + AssertJ). Ràpids i sense
+dependències externes:
 
 ```bash
 cd backend-java && ./gradlew test
 ```
+
+**Backend, tests d'integració**. Aixequen un PostgreSQL de debò amb
+Testcontainers, o sigui que **necessiten Docker en marxa**:
+
+```bash
+cd backend-java && ./gradlew integrationTest
+```
+
+Tots dos de cop:
+
+```bash
+cd backend-java && ./gradlew check
+```
+
+Estan separats a propòsit: els unitaris han de poder executar-se sempre, també
+en una màquina sense Docker o amb el motor aturat.
 
 **Frontend** (executor de tests integrat de Node, sense cap dependència nova):
 
@@ -99,15 +116,48 @@ No comprova que el codi sigui correcte; comprova que no tornin errors coneguts.
 Analitza el codi amb els comentaris eliminats, perquè uns quants comentaris
 expliquen precisament aquests errors i en citen els noms.
 
+## Tests d'integració
+
+Van a `src/test/java/.../integration/` i porten l'etiqueta `integration`.
+Aixequen PostgreSQL amb Testcontainers, no una base de dades en memòria:
+l'esquema fa servir `NUMERIC` amb escala fixa, `BIGSERIAL` i claus foranes amb
+el comportament de PostgreSQL, i amb H2 comprovarien una cosa diferent de la
+que s'executa en producció.
+
+L'esquema surt del mateix `init.sql` que fa servir `docker-compose`, i el
+context arrenca amb `ddl-auto=validate`. **Això vol dir que aquests tests també
+comproven que `init.sql` quadri amb les entitats**: qualsevol columna que hi
+falti o que tingui un tipus diferent fa que el context no arrenqui i que tots
+els tests fallin de cop.
+
+Aquesta comprovació va trobar dos errors el mateix dia que es va escriure, tots
+dos invisibles a la instal·lació existent perquè les taules les havia creat
+Hibernate quan `ddl-auto` era `update`:
+
+1. `init.sql` **no creava la taula `settings`**.
+2. Totes les claus primàries eren `SERIAL` (enter) quan les entitats fan servir
+   `Long`, i les claus foranes `INTEGER` en comptes de `BIGINT`.
+
+Amb `ddl-auto=validate`, qualsevol dels dos impedia arrencar una instal·lació
+nova.
+
+### Què cobreixen
+
+- `TransferIntegrationTest`: que una transferència mogui els diners, que
+  esborrar-la els retorni, que cinc cicles seguits no deixin residus decimals i
+  que un error a mig camí no mogui ni un cèntim.
+- `ConfirmUploadIntegrationTest`: que confirmar desi els moviments i ajusti el
+  saldo, i que confirmar dues vegades el mateix lot no dupliqui res.
+- `ApiSecurityIntegrationTest`: l'API sencera per HTTP amb la cadena de
+  seguretat de debò. Que cap endpoint retorni dades sense cookie.
+- `PersistenceIntegrationTest`: l'escala de les columnes `NUMERIC` en anar i
+  tornar, els valors per defecte de `@PrePersist`, les actualitzacions parcials
+  i les claus foranes.
+
 ## Què NO cobreixen
 
-- **No hi ha tests d'integració amb base de dades.** El comportament
-  transaccional (que esborrar una transferència reverteixi els saldos, que un
-  error a mig camí faci rollback) s'ha verificat a mà contra l'aplicació en
-  marxa, però no hi ha res que ho protegeixi automàticament. És el buit més
-  gran i el següent que caldria omplir, amb Testcontainers i PostgreSQL de
-  debò: amb H2 no serviria de gaire, perquè l'esquema fa servir tipus i
-  comportaments específics de PostgreSQL.
 - **No hi ha tests d'extrem a extrem** del navegador.
-- **No hi ha res que cobreixi els controllers** com a tals (rutes, codis
-  d'estat, validació dels cossos de petició).
+- **No es comprova la interfície**: que una vista pinti el que toca només està
+  verificat a mà.
+- Els tests d'integració criden els controllers directament o via MockMvc, no
+  contra un servidor amb un port obert.
