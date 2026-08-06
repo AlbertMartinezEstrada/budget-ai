@@ -74,6 +74,14 @@ decidir empresa, categoria i descripció; l'import, la data, el tipus i el hash
 de verificació no es toquen mai. Es cobreix el cas en què retorna un nombre de
 files diferent del que se li ha enviat.
 
+### `JwtServiceTest`, `LoginThrottleTest`, `AuthCookiesTest`, `LocalCredentialsTest`
+
+La sessió. Que un token amb la signatura manipulada, signat amb una altra clau
+o caducat es rebutgi; que la cookie porti sempre `HttpOnly` i `SameSite=Strict`;
+que la contrasenya no es desi mai en clar; que faltar una credencial faci
+fallar l'arrencada en comptes de deixar l'API oberta; i que el límit d'intents
+bloquegi al cinquè error i es desbloquegi sol.
+
 ### `frontend/test/api.test.js`
 
 `formatCurrency` amb valors buits i `escapeHtml`. El primer llançava un

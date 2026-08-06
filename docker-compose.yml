@@ -28,6 +28,10 @@ services:
       - DB_USER=${DB_USER}
       - DB_PASSWORD=${DB_PASSWORD}
       - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - AUTH_USERNAME=${AUTH_USERNAME}
+      - AUTH_PASSWORD=${AUTH_PASSWORD}
+      - AUTH_PASSWORD_HASH=${AUTH_PASSWORD_HASH:-}
+      - JWT_SECRET=${JWT_SECRET}
     depends_on:
       - db
 
