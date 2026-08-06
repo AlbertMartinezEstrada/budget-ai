@@ -87,11 +87,56 @@ export function escapeHtml(value) {
         .replace(/'/g, '&#39;');
 }
 
+// Totes les peticions han de portar la cookie de sessió. Com que el frontend
+// i el backend són a ports diferents, sense "credentials: include" el
+// navegador no l'enviaria.
+export async function apiFetch(path, options = {}) {
+    return fetch(`${API_URL}${path}`, { credentials: 'include', ...options });
+}
+
+// Se n'avisa quan el backend respon 401 perquè app.js pugui tornar a la
+// pantalla d'entrada sense que cada vista ho hagi de comprovar.
+const unauthorizedListeners = [];
+
+export function onUnauthorized(listener) {
+    unauthorizedListeners.push(listener);
+}
+
 // Helper function for handling API responses
 async function handleResponse(response) {
+    if (response.status === 401) {
+        unauthorizedListeners.forEach(listener => listener());
+        throw new Error('Sessió caducada');
+    }
     if (!response.ok) {
         throw new Error(await extractErrorMessage(response));
     }
+    return response.json();
+}
+
+// ============ SESSIÓ ============
+export async function login(username, password) {
+    const response = await apiFetch('/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password })
+    });
+
+    if (!response.ok) {
+        throw new Error(await extractErrorMessage(response));
+    }
+    return response.json();
+}
+
+export async function logout() {
+    await apiFetch('/auth/logout', { method: 'POST' });
+}
+
+/** Retorna l'usuari de la sessió, o null si no n'hi ha cap d'oberta. */
+export async function getCurrentUser() {
+    const response = await apiFetch('/auth/me');
+    if (response.status === 401) return null;
+    if (!response.ok) throw new Error(await extractErrorMessage(response));
     return response.json();
 }
 
@@ -118,19 +163,19 @@ async function extractErrorMessage(response) {
 // Fetch all transactions
 export async function getTransactions(filters = {}) {
     const params = new URLSearchParams(filters);
-    const response = await fetch(`${API_URL}/gastos?${params.toString()}`);
+    const response = await apiFetch(`/gastos?${params.toString()}`);
     return handleResponse(response);
 }
 
 // Fetch all categories
 export async function getCategories() {
-    const response = await fetch(`${API_URL}/categories`);
+    const response = await apiFetch(`/categories`);
     return handleResponse(response);
 }
 
 // Fetch all companies
 export async function getCompanies() {
-    const response = await fetch(`${API_URL}/companies`);
+    const response = await apiFetch(`/companies`);
     return handleResponse(response);
 }
 
@@ -139,7 +184,7 @@ export async function uploadCsv(file) {
     const formData = new FormData();
     formData.append('file', file);
     
-    const response = await fetch(`${API_URL}/upload-csv`, {
+    const response = await apiFetch(`/upload-csv`, {
         method: 'POST',
         body: formData,
     });
@@ -148,7 +193,7 @@ export async function uploadCsv(file) {
 
 // Confirm the reviewed transactions
 export async function confirmTransactions(data) {
-    const response = await fetch(`${API_URL}/confirm-upload`, {
+    const response = await apiFetch(`/confirm-upload`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
@@ -158,17 +203,17 @@ export async function confirmTransactions(data) {
 
 // ============ ACCOUNTS ============
 export async function getAccounts() {
-    const response = await fetch(`${API_URL}/accounts`);
+    const response = await apiFetch(`/accounts`);
     return handleResponse(response);
 }
 
 export async function getAccount(id) {
-    const response = await fetch(`${API_URL}/accounts/${id}`);
+    const response = await apiFetch(`/accounts/${id}`);
     return handleResponse(response);
 }
 
 export async function createAccount(data) {
-    const response = await fetch(`${API_URL}/accounts`, {
+    const response = await apiFetch(`/accounts`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
@@ -177,7 +222,7 @@ export async function createAccount(data) {
 }
 
 export async function updateAccount(id, data) {
-    const response = await fetch(`${API_URL}/accounts/${id}`, {
+    const response = await apiFetch(`/accounts/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
@@ -186,14 +231,14 @@ export async function updateAccount(id, data) {
 }
 
 export async function deleteAccount(id) {
-    const response = await fetch(`${API_URL}/accounts/${id}`, {
+    const response = await apiFetch(`/accounts/${id}`, {
         method: 'DELETE',
     });
     return handleResponse(response);
 }
 
 export async function adjustBalance(id, amount) {
-    const response = await fetch(`${API_URL}/accounts/${id}/adjust-balance`, {
+    const response = await apiFetch(`/accounts/${id}/adjust-balance`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ amount }),
@@ -203,22 +248,22 @@ export async function adjustBalance(id, amount) {
 
 // ============ BUDGETS ============
 export async function getBudgets() {
-    const response = await fetch(`${API_URL}/budgets`);
+    const response = await apiFetch(`/budgets`);
     return handleResponse(response);
 }
 
 export async function getCurrentBudget() {
-    const response = await fetch(`${API_URL}/budgets/current`);
+    const response = await apiFetch(`/budgets/current`);
     return handleResponse(response);
 }
 
 export async function getBudget(id) {
-    const response = await fetch(`${API_URL}/budgets/${id}`);
+    const response = await apiFetch(`/budgets/${id}`);
     return handleResponse(response);
 }
 
 export async function createBudget(data) {
-    const response = await fetch(`${API_URL}/budgets`, {
+    const response = await apiFetch(`/budgets`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
@@ -227,7 +272,7 @@ export async function createBudget(data) {
 }
 
 export async function updateBudget(id, data) {
-    const response = await fetch(`${API_URL}/budgets/${id}`, {
+    const response = await apiFetch(`/budgets/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
@@ -236,7 +281,7 @@ export async function updateBudget(id, data) {
 }
 
 export async function deleteBudget(id) {
-    const response = await fetch(`${API_URL}/budgets/${id}`, {
+    const response = await apiFetch(`/budgets/${id}`, {
         method: 'DELETE',
     });
     return handleResponse(response);
@@ -244,17 +289,17 @@ export async function deleteBudget(id) {
 
 // ============ TRANSFERS ============
 export async function getTransfers() {
-    const response = await fetch(`${API_URL}/transfers`);
+    const response = await apiFetch(`/transfers`);
     return handleResponse(response);
 }
 
 export async function getTransfer(id) {
-    const response = await fetch(`${API_URL}/transfers/${id}`);
+    const response = await apiFetch(`/transfers/${id}`);
     return handleResponse(response);
 }
 
 export async function createTransfer(data) {
-    const response = await fetch(`${API_URL}/transfers`, {
+    const response = await apiFetch(`/transfers`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
@@ -263,7 +308,7 @@ export async function createTransfer(data) {
 }
 
 export async function deleteTransfer(id) {
-    const response = await fetch(`${API_URL}/transfers/${id}`, {
+    const response = await apiFetch(`/transfers/${id}`, {
         method: 'DELETE',
     });
     return handleResponse(response);
@@ -271,17 +316,17 @@ export async function deleteTransfer(id) {
 
 // ============ RECURRING TRANSACTIONS ============
 export async function getRecurringTransactions() {
-    const response = await fetch(`${API_URL}/recurring`);
+    const response = await apiFetch(`/recurring`);
     return handleResponse(response);
 }
 
 export async function getRecurringTransaction(id) {
-    const response = await fetch(`${API_URL}/recurring/${id}`);
+    const response = await apiFetch(`/recurring/${id}`);
     return handleResponse(response);
 }
 
 export async function createRecurringTransaction(data) {
-    const response = await fetch(`${API_URL}/recurring`, {
+    const response = await apiFetch(`/recurring`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
@@ -290,7 +335,7 @@ export async function createRecurringTransaction(data) {
 }
 
 export async function updateRecurringTransaction(id, data) {
-    const response = await fetch(`${API_URL}/recurring/${id}`, {
+    const response = await apiFetch(`/recurring/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
@@ -299,14 +344,14 @@ export async function updateRecurringTransaction(id, data) {
 }
 
 export async function deleteRecurringTransaction(id) {
-    const response = await fetch(`${API_URL}/recurring/${id}`, {
+    const response = await apiFetch(`/recurring/${id}`, {
         method: 'DELETE',
     });
     return handleResponse(response);
 }
 
 export async function processRecurring() {
-    const response = await fetch(`${API_URL}/recurring/process`, {
+    const response = await apiFetch(`/recurring/process`, {
         method: 'POST',
     });
     return handleResponse(response);
@@ -314,17 +359,17 @@ export async function processRecurring() {
 
 // ============ FINANCIAL GOALS ============
 export async function getGoals() {
-    const response = await fetch(`${API_URL}/goals`);
+    const response = await apiFetch(`/goals`);
     return handleResponse(response);
 }
 
 export async function getGoal(id) {
-    const response = await fetch(`${API_URL}/goals/${id}`);
+    const response = await apiFetch(`/goals/${id}`);
     return handleResponse(response);
 }
 
 export async function createGoal(data) {
-    const response = await fetch(`${API_URL}/goals`, {
+    const response = await apiFetch(`/goals`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
@@ -333,7 +378,7 @@ export async function createGoal(data) {
 }
 
 export async function updateGoal(id, data) {
-    const response = await fetch(`${API_URL}/goals/${id}`, {
+    const response = await apiFetch(`/goals/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
@@ -342,14 +387,14 @@ export async function updateGoal(id, data) {
 }
 
 export async function deleteGoal(id) {
-    const response = await fetch(`${API_URL}/goals/${id}`, {
+    const response = await apiFetch(`/goals/${id}`, {
         method: 'DELETE',
     });
     return handleResponse(response);
 }
 
 export async function addAmountToGoal(id, amount) {
-    const response = await fetch(`${API_URL}/goals/${id}/add-amount`, {
+    const response = await apiFetch(`/goals/${id}/add-amount`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ amount }),
@@ -360,36 +405,36 @@ export async function addAmountToGoal(id, amount) {
 // ============ ANALYTICS ============
 export async function getMonthlySummary(year, month) {
     const params = new URLSearchParams({ year, month });
-    const response = await fetch(`${API_URL}/analytics/monthly-summary?${params.toString()}`);
+    const response = await apiFetch(`/analytics/monthly-summary?${params.toString()}`);
     return handleResponse(response);
 }
 
 export async function getCategoryBreakdown(year, month) {
     const params = new URLSearchParams({ year, month });
-    const response = await fetch(`${API_URL}/analytics/category-breakdown?${params.toString()}`);
+    const response = await apiFetch(`/analytics/category-breakdown?${params.toString()}`);
     return handleResponse(response);
 }
 
 export async function getYearlySummary(year) {
     const params = new URLSearchParams({ year });
-    const response = await fetch(`${API_URL}/analytics/yearly-summary?${params.toString()}`);
+    const response = await apiFetch(`/analytics/yearly-summary?${params.toString()}`);
     return handleResponse(response);
 }
 
 export async function getMonthlyTrend(year) {
     const params = new URLSearchParams(year ? { year } : {});
-    const response = await fetch(`${API_URL}/analytics/monthly-trend?${params.toString()}`);
+    const response = await apiFetch(`/analytics/monthly-trend?${params.toString()}`);
     return handleResponse(response);
 }
 
 // ============ SETTINGS ============
 export async function getSettings() {
-    const response = await fetch(`${API_URL}/settings`);
+    const response = await apiFetch(`/settings`);
     return handleResponse(response);
 }
 
 export async function updateSettings(data) {
-    const response = await fetch(`${API_URL}/settings`, {
+    const response = await apiFetch(`/settings`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),

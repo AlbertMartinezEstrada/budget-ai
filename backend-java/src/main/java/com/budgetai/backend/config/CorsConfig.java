@@ -30,6 +30,10 @@ public class CorsConfig {
         config.setAllowedOrigins(allowedOrigins);
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("Content-Type", "Accept", "Origin"));
+        // La sessió viatja en una cookie, i el frontend és a un altre port:
+        // sense això el navegador no l'enviaria. Exigeix una llista d'orígens
+        // concreta —amb "*" el navegador ho rebutja—, cosa que ja es compleix.
+        config.setAllowCredentials(true);
         config.setMaxAge(3600L);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
