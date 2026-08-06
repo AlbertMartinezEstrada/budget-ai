@@ -42,11 +42,17 @@ public class Budget {
 
     @Column(name = "actiu")
     @JsonProperty("actiu")
-    private Boolean active = true;
+    private Boolean active;
 
     @Column(name = "created_at", updatable = false)
     @JsonProperty("created_at")
-    private LocalDateTime createdAt = LocalDateTime.now();
+    private LocalDateTime createdAt;
+
+    @PrePersist
+    void applyDefaults() {
+        if (active == null) active = Boolean.TRUE;
+        if (createdAt == null) createdAt = LocalDateTime.now();
+    }
 
     @Transient
     @JsonProperty("gasto_actual")

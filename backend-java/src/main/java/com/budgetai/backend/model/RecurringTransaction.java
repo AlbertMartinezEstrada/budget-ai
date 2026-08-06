@@ -57,7 +57,7 @@ public class RecurringTransaction {
 
     @Column(name = "activa")
     @JsonProperty("activa")
-    private Boolean active = true;
+    private Boolean active;
 
     @Column(name = "descripcio")
     @JsonProperty("descripcio")
@@ -65,5 +65,11 @@ public class RecurringTransaction {
 
     @Column(name = "created_at", updatable = false)
     @JsonProperty("created_at")
-    private LocalDateTime createdAt = LocalDateTime.now();
+    private LocalDateTime createdAt;
+
+    @PrePersist
+    void applyDefaults() {
+        if (active == null) active = Boolean.TRUE;
+        if (createdAt == null) createdAt = LocalDateTime.now();
+    }
 }

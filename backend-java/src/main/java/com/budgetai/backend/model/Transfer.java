@@ -45,5 +45,10 @@ public class Transfer {
 
     @Column(name = "created_at", updatable = false)
     @JsonProperty("created_at")
-    private LocalDateTime createdAt = LocalDateTime.now();
+    private LocalDateTime createdAt;
+
+    @PrePersist
+    void applyDefaults() {
+        if (createdAt == null) createdAt = LocalDateTime.now();
+    }
 }
