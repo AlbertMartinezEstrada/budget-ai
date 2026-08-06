@@ -37,8 +37,33 @@ dependencies {
     // entitats no veuen els getters i setters generats.
     testCompileOnly 'org.projectlombok:lombok'
     testAnnotationProcessor 'org.projectlombok:lombok'
+    // Les versions les gestiona el BOM de Spring Boot.
+    testImplementation 'org.testcontainers:postgresql'
+    testImplementation 'org.testcontainers:junit-jupiter'
+    testImplementation 'org.springframework.security:spring-security-test'
 }
 
+// Els tests unitaris no necessiten Docker ni base de dades: han de poder
+// executar-se sempre i de pressa, per exemple abans de cada commit.
 tasks.named('test') {
-    useJUnitPlatform()
+    useJUnitPlatform {
+        excludeTags 'integration'
+    }
+}
+
+// Els d'integració aixequen un PostgreSQL de debò amb Testcontainers, així
+// que requereixen Docker en marxa.
+tasks.register('integrationTest', Test) {
+    description = 'Executa els tests d\'integració (requereix Docker)'
+    group = 'verification'
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = sourceSets.test.runtimeClasspath
+    useJUnitPlatform {
+        includeTags 'integration'
+    }
+    shouldRunAfter tasks.named('test')
+}
+
+tasks.named('check') {
+    dependsOn tasks.named('integrationTest')
 }
