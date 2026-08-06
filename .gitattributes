@@ -1,0 +1,18 @@
+# Normalitza els finals de línia al repositori.
+* text=auto
+
+# Els scripts de shell s'han de desar sempre amb finals de línia LF. Si
+# gradlew acabés amb finals de Windows, el runner de Linux fallaria amb
+# "bad interpreter" i la integració contínua no arrencaria.
+*.sh text eol=lf
+gradlew text eol=lf
+
+# Els scripts de Windows, al contrari.
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Binaris: que git no hi toqui res.
+*.jar binary
+*.png binary
+*.jpg binary
+*.xlsx binary
