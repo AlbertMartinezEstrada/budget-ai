@@ -14,10 +14,10 @@ build/
 bin/
 out/
 *.class
-!**/gradle/wrapper/gradle-wrapper.jar
-!**/gradle/wrapper/gradle-wrapper.properties
-gradlew
-gradlew.bat
+# El wrapper de Gradle SÍ que es versiona: sense els scripts, qui cloni el
+# repositori no pot compilar i la integració contínua tampoc. Estaven
+# ignorats, tot i que el .jar i les .properties sí que es pujaven, així que
+# el wrapper quedava a mitges.
 
 # Python
 venv/
@@ -29,7 +29,8 @@ __pycache__/
 
 # Node.js
 node_modules/
-package-lock.json
+# package-lock.json també es versiona: és el que fa que "npm ci" instal·li
+# exactament les mateixes versions a la integració contínua que en local.
 
 # Logs
 *.log
