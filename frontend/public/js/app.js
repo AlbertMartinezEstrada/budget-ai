@@ -1,6 +1,7 @@
 // Main Application Entry Point
 import { initDashboard } from './features/dashboard/Dashboard.js';
-import { loadAppState } from './api.js';
+import { loadAppState, getCurrentUser, logout, onUnauthorized } from './api.js';
+import { showLogin } from './features/auth/Login.js';
 import { initTransactions } from './features/transactions/TransactionList.js';
 import { initUpload } from './features/upload/FileUploader.js';
 import { initAccounts } from './features/accounts/Accounts.js';
@@ -20,7 +21,28 @@ const VIEWS = [
 document.addEventListener('DOMContentLoaded', async () => {
     console.log('Budget AI Frontend Initialized');
 
+    // Res no es carrega fins que hi ha sessió: si no n'hi ha, es mostra la
+    // pantalla d'entrada i l'aplicació ni tan sols demana dades.
+    const user = await getCurrentUser();
+    if (!user) {
+        showLogin({ onSuccess: startApp });
+        return;
+    }
+
+    await startApp();
+});
+
+async function startApp() {
     await loadAppState();
+
+    // Si la sessió caduca a mig ús, qualsevol crida que rebi un 401 fa
+    // tornar a la pantalla d'entrada en comptes de deixar la vista buida.
+    onUnauthorized(() => {
+        showLogin({
+            message: 'La sessió ha caducat. Torna a entrar.',
+            onSuccess: startApp
+        });
+    });
 
     const mainContentArea = document.getElementById('main-content');
 
@@ -82,34 +104,59 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 
-    // Delegació a tot el document: abans només s'enganxaven els listeners als
-    // enllaços que existien en carregar la pàgina, així que qualsevol botó
-    // creat després dins d'una vista (com el "Veure tot" del tauler) no feia
-    // res en clicar-lo.
-    document.addEventListener('click', (e) => {
-        const trigger = e.target.closest('[data-view]');
-        if (!trigger) return;
+    // startApp es torna a executar després de tornar a entrar, i els listeners
+    // globals només s'han d'enganxar una vegada.
+    if (!listenersAttached) {
+        listenersAttached = true;
 
-        e.preventDefault();
-        const view = trigger.dataset.view;
-        if (!VIEWS.includes(view)) return;
+        // Delegació a tot el document: abans només s'enganxaven els listeners
+        // als enllaços que existien en carregar la pàgina, així que qualsevol
+        // botó creat després dins d'una vista (com el "Veure tot" del tauler)
+        // no feia res en clicar-lo.
+        document.addEventListener('click', (e) => {
+            const trigger = e.target.closest('[data-view]');
+            if (trigger) {
+                e.preventDefault();
+                const view = trigger.dataset.view;
+                if (!VIEWS.includes(view)) return;
 
-        // Canviar el hash dispara hashchange, que és qui navega de debò.
-        if (currentView() === view) {
-            navigate(view);
-        } else {
-            window.location.hash = view;
-        }
-    });
+                // Canviar el hash dispara hashchange, que és qui navega de debò.
+                if (currentView() === view) {
+                    navigate(view);
+                } else {
+                    window.location.hash = view;
+                }
+                return;
+            }
 
-    // Routing per hash: la URL passa a reflectir la vista, de manera que
-    // recarregar manté la pantalla, el botó d'enrere funciona i els enllaços
-    // es poden compartir. Abans tot això es perdia a cada recàrrega.
-    window.addEventListener('hashchange', () => navigate(currentView()));
+            if (e.target.closest('#logout-btn')) {
+                e.preventDefault();
+                handleLogout();
+            }
+        });
+
+        // Routing per hash: la URL passa a reflectir la vista, de manera que
+        // recarregar manté la pantalla, el botó d'enrere funciona i els
+        // enllaços es poden compartir.
+        window.addEventListener('hashchange', () => navigate(currentView()));
+    }
 
     // Initial Load
     navigate(currentView());
-});
+}
+
+let listenersAttached = false;
+
+async function handleLogout() {
+    try {
+        await logout();
+    } finally {
+        // Encara que la crida falli, es buida la pantalla: deixar l'aplicació
+        // visible després de prémer "Sortir" seria enganyós.
+        document.getElementById('main-content').innerHTML = '';
+        showLogin({ onSuccess: startApp });
+    }
+}
 
 function currentView() {
     const view = window.location.hash.replace(/^#/, '');
