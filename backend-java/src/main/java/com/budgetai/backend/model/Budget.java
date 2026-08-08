@@ -30,6 +30,22 @@ public class Budget {
     @JsonProperty("quantitat_limit")
     private BigDecimal limitAmount;
 
+    /**
+     * Percentatge del sou que s'assigna a aquesta categoria.
+     *
+     * Si està informat, mana sobre quantitat_limit: el sostre del mes es
+     * calcula com sou × percentatge ÷ 100, de manera que si el sou canvia, el
+     * pressupost s'hi ajusta sol. Si és null, s'aplica quantitat_limit tal com
+     * abans.
+     *
+     * quantitat_limit segueix sent NOT NULL a la base de dades i guarda
+     * l'últim import calculat: així un pressupost per percentatge continua
+     * tenint una xifra llegible per a qui consulti la taula directament.
+     */
+    @Column(name = "percentatge", precision = 5, scale = 2)
+    @JsonProperty("percentatge")
+    private BigDecimal percentage;
+
     @Column(name = "periode_inici", nullable = false)
     @JsonFormat(pattern = "yyyy-MM-dd")
     @JsonProperty("periode_inici")

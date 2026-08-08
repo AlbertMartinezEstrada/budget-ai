@@ -3,6 +3,7 @@ package com.budgetai.backend.integration;
 import com.budgetai.backend.model.*;
 import com.budgetai.backend.repository.*;
 import com.budgetai.backend.service.BudgetService;
+import com.budgetai.backend.service.SettingsService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -32,6 +33,8 @@ class MonthlySummaryIntegrationTest extends AbstractIntegrationTest {
     @Autowired private TransactionRepository transactionRepository;
     @Autowired private RecurringTransactionRepository recurringRepository;
     @Autowired private BudgetRepository budgetRepository;
+    @Autowired private MonthlyIncomeRepository monthlyIncomeRepository;
+    @Autowired private SettingsService settingsService;
 
     private Long groupId;
     private Long fixedLeafId;
@@ -42,6 +45,10 @@ class MonthlySummaryIntegrationTest extends AbstractIntegrationTest {
         transactionRepository.deleteAll();
         recurringRepository.deleteAll();
         budgetRepository.deleteAll();
+        monthlyIncomeRepository.deleteAll();
+        // La fila de settings és única i sobreviu entre tests: si no es
+        // reinicia, el sou que fixa un test s'aplica als següents.
+        settingsService.updateSettings(settingsWithIncome("-1"));
         categoryRepository.deleteAll();
 
         Category group = saveCategory("Cotxe", null, null);
@@ -87,8 +94,13 @@ class MonthlySummaryIntegrationTest extends AbstractIntegrationTest {
         transactionRepository.save(t);
     }
 
+    @SuppressWarnings("unchecked")
+    private List<Map<String, Object>> groupsOf(int year, int month) {
+        return (List<Map<String, Object>>) budgetService.getMonthlySummary(year, month).get("grups");
+    }
+
     private Map<String, Object> groupNode() {
-        return budgetService.getMonthlySummary(2026, 3).stream()
+        return groupsOf(2026, 3).stream()
                 .filter(n -> "Cotxe".equals(((Category) n.get("categoria")).getName()))
                 .findFirst()
                 .orElseThrow();
@@ -148,7 +160,7 @@ class MonthlySummaryIntegrationTest extends AbstractIntegrationTest {
     @DisplayName("Un mes sense el càrrec manté el cost de vida i baixa la caixa")
     void quietMonthKeepsTheProratedCost() {
         // L'abril no cau l'assegurança i no hi ha combustible.
-        Map<String, Object> april = budgetService.getMonthlySummary(2026, 4).stream()
+        Map<String, Object> april = groupsOf(2026, 4).stream()
                 .filter(n -> "Cotxe".equals(((Category) n.get("categoria")).getName()))
                 .findFirst().orElseThrow();
 
@@ -191,5 +203,94 @@ class MonthlySummaryIntegrationTest extends AbstractIntegrationTest {
 
         // 600 + 45: el grup no té moviments propis, els hereta de les fulles.
         assertThat(stored.getCurrentSpent()).isEqualByComparingTo("645.00");
+    }
+
+    @Test
+    @DisplayName("Un pressupost per percentatge calcula el sostre a partir del sou")
+    void percentageBudgetUsesTheSalary() {
+        settingsService.updateSettings(settingsWithIncome("2000.00"));
+
+        Budget budget = new Budget();
+        budget.setCategory(categoryRepository.findById(variableLeafId).orElseThrow());
+        // quantitat_limit és NOT NULL: hi va l'últim import calculat.
+        budget.setLimitAmount(new BigDecimal("200.00"));
+        budget.setPercentage(new BigDecimal("10"));
+        budget.setPeriodStart(LocalDate.of(2026, 3, 1));
+        budget.setPeriodEnd(LocalDate.of(2026, 3, 31));
+        budget.setActive(true);
+        budgetRepository.save(budget);
+
+        Map<String, Object> summary = budgetService.getMonthlySummary(2026, 3);
+
+        assertThat((BigDecimal) summary.get("sou_base")).isEqualByComparingTo("2000.00");
+        assertThat(summary.get("sou_base_origen")).isEqualTo("PER_DEFECTE");
+        // 10% de 2000 = 200, i el fix hi suma els seus 50 prorratejats.
+        assertThat((BigDecimal) groupNode().get("cost_vida_pla")).isEqualByComparingTo("250.00");
+    }
+
+    @Test
+    @DisplayName("El sou d'un mes concret canvia el sostre d'aquell mes")
+    void monthOverrideChangesTheCeiling() {
+        settingsService.updateSettings(settingsWithIncome("2000.00"));
+        monthlyIncomeRepository.save(new MonthlyIncome("2026-03", new BigDecimal("4000.00")));
+
+        Budget budget = new Budget();
+        budget.setCategory(categoryRepository.findById(variableLeafId).orElseThrow());
+        budget.setLimitAmount(new BigDecimal("200.00"));
+        budget.setPercentage(new BigDecimal("10"));
+        budget.setPeriodStart(LocalDate.of(2026, 3, 1));
+        budget.setPeriodEnd(LocalDate.of(2026, 3, 31));
+        budget.setActive(true);
+        budgetRepository.save(budget);
+
+        Map<String, Object> summary = budgetService.getMonthlySummary(2026, 3);
+
+        assertThat(summary.get("sou_base_origen")).isEqualTo("MES");
+        // 10% de 4000 = 400, no els 200 de quantitat_limit.
+        assertThat((BigDecimal) groupNode().get("cost_vida_pla")).isEqualByComparingTo("450.00");
+    }
+
+    @Test
+    @DisplayName("Sense sou configurat, un pressupost per percentatge no posa sostre")
+    void percentageWithoutSalaryIsIgnored() {
+        Budget budget = new Budget();
+        budget.setCategory(categoryRepository.findById(variableLeafId).orElseThrow());
+        budget.setLimitAmount(new BigDecimal("200.00"));
+        budget.setPercentage(new BigDecimal("10"));
+        budget.setPeriodStart(LocalDate.of(2026, 3, 1));
+        budget.setPeriodEnd(LocalDate.of(2026, 3, 31));
+        budget.setActive(true);
+        budgetRepository.save(budget);
+
+        // Només el prorrateig del fix: el percentatge no dona cap xifra, i
+        // ensenyar-ne una d'inventada seria pitjor que no ensenyar-ne cap.
+        assertThat((BigDecimal) groupNode().get("cost_vida_pla")).isEqualByComparingTo("50.00");
+    }
+
+    @Test
+    @DisplayName("El resum diu quant sou s'ha repartit i quins ingressos reals hi ha")
+    void summaryReportsAssignedShareAndRealIncome() {
+        settingsService.updateSettings(settingsWithIncome("2000.00"));
+
+        Budget budget = new Budget();
+        budget.setCategory(categoryRepository.findById(groupId).orElseThrow());
+        budget.setLimitAmount(new BigDecimal("600.00"));
+        budget.setPercentage(new BigDecimal("30"));
+        budget.setPeriodStart(LocalDate.of(2026, 3, 1));
+        budget.setPeriodEnd(LocalDate.of(2026, 3, 31));
+        budget.setActive(true);
+        budgetRepository.save(budget);
+
+        Map<String, Object> summary = budgetService.getMonthlySummary(2026, 3);
+
+        assertThat((BigDecimal) summary.get("percentatge_assignat")).isEqualByComparingTo("30");
+        // Al març només hi ha despeses, cap ingrés.
+        assertThat((BigDecimal) summary.get("ingressos_reals")).isEqualByComparingTo("0");
+    }
+
+    private Settings settingsWithIncome(String amount) {
+        Settings settings = new Settings();
+        settings.setExpectedMonthlyIncome(new BigDecimal(amount));
+        return settings;
     }
 }

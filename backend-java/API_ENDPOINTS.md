@@ -74,6 +74,14 @@ PUT /categories/12
   - Query param: `date` (opcional, formato: yyyy-MM-dd)
 - `GET /budgets/monthly-summary` - **Resumen del mes por grupos y subcategorías**
   - Query params: `year`, `month` (opcionales; por defecto, el mes actual)
+- `GET /budgets/monthly-income` - Sueldos ajustados por mes
+- `PUT /budgets/monthly-income/{YYYY-MM}` - Fija el sueldo de un mes concreto
+- `DELETE /budgets/monthly-income/{YYYY-MM}` - Vuelve al sueldo por defecto
+
+Un presupuesto puede llevar `percentatge` (0-100) en vez de importe fijo: el
+techo se calcula sobre el sueldo del mes. Enviar un `percentatge` negativo al
+actualizar lo elimina. El sueldo por defecto es `expectedMonthlyIncome` en
+`PUT /settings`.
 - `GET /budgets/{id}` - Obtiene un presupuesto específico
 - `POST /budgets` - Crea un nuevo presupuesto
   ```json
