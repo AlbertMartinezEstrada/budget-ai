@@ -11,6 +11,7 @@ import com.budgetai.backend.repository.TransactionRepository;
 import com.budgetai.backend.service.AccountService;
 import com.budgetai.backend.service.AiEngineService;
 import com.budgetai.backend.service.BankReaderService;
+import com.budgetai.backend.service.CategoryHierarchyService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
@@ -55,6 +56,9 @@ public class TransactionController {
 
     @Autowired
     private AccountService accountService;
+
+    @Autowired
+    private CategoryHierarchyService categoryHierarchyService;
 
     @GetMapping("/")
     public Map<String, String> readRoot() {
@@ -148,6 +152,17 @@ public class TransactionController {
                 final String finalCatName = catName;
                 Category category = categoryRepository.findByName(finalCatName)
                         .orElseGet(() -> categoryRepository.findByName("Altres").get());
+
+                // Les transaccions només s'assignen a fulles: un grup existeix
+                // per agregar els seus fills, no per rebre moviments. Si la
+                // categoria triada és un grup, el moviment aniria a parar a un
+                // node que després tornaria a sumar-lo pels fills i es
+                // comptaria dues vegades.
+                if (categoryHierarchyService.isGroup(category.getId())) {
+                    throw new ConfirmUploadException(
+                            "La categoria \"" + category.getName() + "\" és un grup: "
+                                    + "tria'n una de concreta.", null);
+                }
                 t.setCategory(category);
 
                 // Company (Si no existeix la creem)
@@ -243,11 +258,6 @@ public class TransactionController {
             return transactionRepository.findAll(specification, Sort.by(Sort.Direction.DESC, "date"));
         }
         return transactionRepository.findAllByOrderByDateDesc();
-    }
-
-    @GetMapping("/categories")
-    public List<Category> getCategories() {
-        return categoryRepository.findAll();
     }
 
     @GetMapping("/companies")
