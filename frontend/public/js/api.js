@@ -287,6 +287,40 @@ export async function deleteBudget(id) {
     return handleResponse(response);
 }
 
+/**
+ * Resum del mes per grups: cost de vida (fixos prorratejats + variables reals)
+ * i caixa (moviments reals). Vegeu ARQUITECTURA.md.
+ */
+export async function getBudgetMonthlySummary(year, month) {
+    const params = new URLSearchParams({ year, month });
+    const response = await apiFetch(`/budgets/monthly-summary?${params.toString()}`);
+    return handleResponse(response);
+}
+
+// ============ CATEGORIES (escriptura) ============
+export async function createCategory(data) {
+    const response = await apiFetch(`/categories`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+    });
+    return handleResponse(response);
+}
+
+export async function updateCategory(id, data) {
+    const response = await apiFetch(`/categories/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+    });
+    return handleResponse(response);
+}
+
+export async function deleteCategory(id) {
+    const response = await apiFetch(`/categories/${id}`, { method: 'DELETE' });
+    return handleResponse(response);
+}
+
 // ============ TRANSFERS ============
 export async function getTransfers() {
     const response = await apiFetch(`/transfers`);

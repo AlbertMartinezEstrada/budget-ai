@@ -186,6 +186,73 @@ class JsonContractTest {
     }
 
     @Test
+    @DisplayName("Category: parent_id i tipus_cost per a l'arbre de categories")
+    void categoryHierarchyKeys() throws Exception {
+        Category category = new Category();
+        category.setName("Assegurança cotxe");
+        category.setParentId(7L);
+        category.setCostType(Category.FIXED);
+
+        JsonNode json = mapper.valueToTree(category);
+
+        assertThat(json.has("nom")).isTrue();
+        assertThat(json.has("parent_id")).isTrue();
+        assertThat(json.has("tipus_cost")).isTrue();
+        assertThat(json.has("es_fix")).isTrue();
+
+        assertThat(json.get("parent_id").asLong()).isEqualTo(7L);
+        assertThat(json.get("tipus_cost").asText()).isEqualTo("FIXED");
+        assertThat(json.get("es_fix").asBoolean()).isTrue();
+
+        // Els noms en anglès no s'exposen.
+        assertThat(json.has("parentId")).isFalse();
+        assertThat(json.has("costType")).isFalse();
+    }
+
+    @Test
+    @DisplayName("Category: una categoria de primer nivell té parent_id nul")
+    void rootCategoryHasNullParent() throws Exception {
+        Category category = new Category("Gastos passius");
+
+        JsonNode json = mapper.valueToTree(category);
+
+        assertThat(json.get("parent_id").isNull()).isTrue();
+        // Sense naturalesa declarada no és fixa: compta com a variable.
+        assertThat(json.get("es_fix").asBoolean()).isFalse();
+    }
+
+    @Test
+    @DisplayName("Category: es pot crear des del JSON que envia el formulari")
+    void categoryDeserializesFromFormPayload() throws Exception {
+        String payload = """
+            {"nom":"Combustible","parent_id":3,"tipus_cost":"VARIABLE"}
+            """;
+
+        Category category = mapper.readValue(payload, Category.class);
+
+        assertThat(category.getName()).isEqualTo("Combustible");
+        assertThat(category.getParentId()).isEqualTo(3L);
+        assertThat(category.getCostType()).isEqualTo("VARIABLE");
+    }
+
+    @Test
+    @DisplayName("RecurringTransaction exposa el prorrateig mensual")
+    void recurringExposesProratedAmount() throws Exception {
+        RecurringTransaction recurring = new RecurringTransaction();
+        recurring.setName("Assegurança");
+        recurring.setAmount(new BigDecimal("600.00"));
+        recurring.setFrequency("ANUAL");
+        recurring.setType("EXPENSE");
+
+        JsonNode json = mapper.valueToTree(recurring);
+
+        assertThat(json.has("import")).isTrue();
+        assertThat(json.has("frequencia")).isTrue();
+        assertThat(json.has("prorrateig_mensual")).isTrue();
+        assertThat(json.get("prorrateig_mensual").decimalValue()).isEqualByComparingTo("50.00");
+    }
+
+    @Test
     @DisplayName("Settings és l'única entitat en camelCase; queda documentat aquí")
     void settingsKeysAreCamelCase() throws Exception {
         Settings settings = new Settings();

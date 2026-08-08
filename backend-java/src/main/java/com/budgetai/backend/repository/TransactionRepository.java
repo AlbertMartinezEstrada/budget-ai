@@ -20,4 +20,6 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long>,
     List<Transaction> findByVerificationHashIn(Collection<String> hashes);
 
     long countByAccountId(Long accountId);
+
+    long countByCategoryId(Long categoryId);
 }

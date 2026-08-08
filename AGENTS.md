@@ -153,7 +153,20 @@ integración levantan la base de datos desde ese fichero, así que una
 divergencia hace fallar toda la suite. Así se descubrió que faltaba la tabla
 `settings` y que las claves primarias tenían el tipo equivocado.
 
-### 7. La IA no decide sobre el dinero
+### 7. Las categorías son un árbol y las transacciones van a hojas
+
+`Category.parent_id` define grupos y hojas. **Un movimiento asignado a un grupo
+se contaría dos veces**: por sí mismo y al agregar sus hijos. El backend lo
+rechaza al confirmar una importación; el frontend no debe ofrecer grupos donde
+se elige la categoría de un movimiento.
+
+`tipus_cost` (`FIXED`/`VARIABLE`) solo tiene sentido en las hojas. `null` cuenta
+como variable.
+
+En el resumen mensual, un **fijo** entra por su prorrateo y un **variable** por
+su gasto real. Ver [ARQUITECTURA.md](ARQUITECTURA.md).
+
+### 8. La IA no decide sobre el dinero
 
 Gemini solo puede fijar empresa, categoría y descripción. **El importe, la
 fecha, el tipo y el hash de verificación se conservan siempre del CSV.**

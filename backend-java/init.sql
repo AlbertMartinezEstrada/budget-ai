@@ -1,7 +1,16 @@
 -- Taula de Categories
+-- Formen un arbre: una categoria amb fills és un grup i una sense fills és
+-- una fulla. Les transaccions només s'assignen a fulles.
 CREATE TABLE IF NOT EXISTS categories (
     id BIGSERIAL PRIMARY KEY,
-    nom VARCHAR(100) UNIQUE NOT NULL
+    nom VARCHAR(100) UNIQUE NOT NULL,
+    -- Grup al qual pertany. NULL = categoria de primer nivell.
+    -- ON DELETE SET NULL: esborrar un grup no ha d'arrossegar els seus fills
+    -- ni, per tant, les transaccions que hi pengen.
+    parent_id BIGINT REFERENCES categories(id) ON DELETE SET NULL,
+    -- FIXED o VARIABLE. Només té sentit a les fulles; als grups es deixa NULL.
+    -- Una fulla amb NULL es tracta com a VARIABLE.
+    tipus_cost VARCHAR(20) CHECK (tipus_cost IN ('FIXED', 'VARIABLE'))
 );
 
 -- Taula d'Empreses
