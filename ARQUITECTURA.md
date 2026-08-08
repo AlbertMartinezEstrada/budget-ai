@@ -192,6 +192,73 @@ importe que ella dijera.
 
 Sin `GEMINI_API_KEY`, la importación funciona igual pero sin clasificar.
 
+## Presupuestos: coste de vida y caja
+
+### Categorías en árbol
+
+`Category` tiene `parent_id`. Una categoría **con** hijos es un **grupo**
+("Coche personal"); una **sin** hijos es una **hoja** ("Seguro coche").
+
+**Las transacciones solo se asignan a hojas.** Los grupos existen para agregar.
+Si un movimiento colgara de un grupo, se contaría dos veces: una por sí mismo y
+otra al sumar sus hijos. El backend rechaza esa asignación al confirmar una
+importación.
+
+Las hojas llevan además `tipus_cost`: `FIXED` o `VARIABLE`. En los grupos se
+deja a `null`, porque un grupo puede mezclar ambos. **Una hoja con `null` cuenta
+como variable**: es el comportamiento que tenían todas las categorías antes de
+existir el campo, así que los datos antiguos no cambian de significado.
+
+### Las dos preguntas
+
+Son dos lecturas distintas del mismo mes:
+
+| | Qué responde | Cómo trata un fijo anual de 600 € |
+|---|---|---|
+| **Coste de vida** | ¿Cuánto me cuesta vivir? | 50 € **todos los meses** |
+| **Caja** | ¿Cuánto ha salido de la cuenta? | 600 € **el mes que se cobra**, 0 el resto |
+
+La primera sirve para planificar; la segunda, para cuadrar el banco.
+
+### Cómo se calcula
+
+Para un mes y una hoja:
+
+```
+                   FIXED                        VARIABLE
+coste de vida      prorrateo del recurrente     gasto real del mes
+plan               el mismo prorrateo           límite del presupuesto, si hay
+caja               gasto real del mes           gasto real del mes
+```
+
+Un grupo **no mide nada por su cuenta**: suma sus hijos, a cualquier
+profundidad. La excepción es el plan — si el usuario pone un límite
+directamente al grupo, ese límite manda sobre la suma de los hijos, porque es el
+techo que ha decidido para el conjunto.
+
+El **prorrateo** sale de `RecurringTransaction`: se lleva el importe a base
+anual y se divide entre doce, con dos decimales y `HALF_UP`. Las frecuencias
+cortas usan el año real (365 días, 52 semanas) y no aproximaciones como "cuatro
+semanas al mes", que dejarían cuatro semanas fuera al año.
+
+Cada nodo trae `carrec_puntual_aquest_mes`. Sirve para entender los picos: sin
+esa marca, ver 600 € de caja cuando el coste de vida dice 50 € parece un error.
+
+**Las recurrentes no mueven dinero.** Definen cuánto cuesta algo al mes; el
+dinero real lo sigue poniendo la transacción importada del CSV.
+
+### El endpoint
+
+`GET /budgets/monthly-summary?year=&month=` devuelve el árbol con
+`cost_vida_pla`, `cost_vida_real`, `caixa_real`, `prorrateig_mensual`,
+`carrec_puntual_aquest_mes` y `subcategories` en cada nodo.
+
+Los presupuestos siguen usando `periode_inici`/`periode_fi`, sin campo de mes.
+Añadir un `year`/`month` duplicaría estado que ya está en las fechas y abriría
+la puerta a que se contradigan; el endpoint recibe el mes por parámetro y
+considera vigente cualquier presupuesto cuyo periodo lo solape, así que un
+presupuesto trimestral o anual también aparece.
+
 ## La sesión
 
 Resumen; el detalle está en [AUTENTICACION.md](AUTENTICACION.md).

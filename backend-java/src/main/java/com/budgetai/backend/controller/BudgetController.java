@@ -33,6 +33,23 @@ public class BudgetController {
         return budgetService.getActiveBudgetsForDate(targetDate);
     }
 
+    /**
+     * Resum del mes per grups i subcategories, amb cost de vida i caixa.
+     *
+     * Va abans de /{id} a propòsit: si estigués després, Spring intentaria
+     * interpretar "monthly-summary" com un identificador.
+     */
+    @GetMapping("/monthly-summary")
+    public List<Map<String, Object>> getMonthlySummary(
+            @RequestParam(required = false) Integer year,
+            @RequestParam(required = false) Integer month) {
+
+        LocalDate now = LocalDate.now();
+        return budgetService.getMonthlySummary(
+                year != null ? year : now.getYear(),
+                month != null ? month : now.getMonthValue());
+    }
+
     @GetMapping("/{id}")
     public ResponseEntity<Budget> getBudgetById(@PathVariable Long id) {
         return budgetService.getBudgetById(id)

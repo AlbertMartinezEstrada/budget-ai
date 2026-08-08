@@ -10,7 +10,29 @@
 
 ### Categorías y Empresas
 - `GET /categories` - Lista todas las categorías
+- `GET /categories/{id}` - Obtiene una categoría
+- `POST /categories` - Crea una categoría
+- `PUT /categories/{id}` - Actualiza (parcial: un campo ausente no borra)
+- `DELETE /categories/{id}` - Elimina. **409** si tiene movimientos o subcategorías
 - `GET /companies` - Lista todas las empresas
+
+Las categorías forman un árbol. Campos JSON:
+
+| Campo | Qué es |
+|---|---|
+| `parent_id` | Grupo al que pertenece. `null` = primer nivel |
+| `tipus_cost` | `FIXED` o `VARIABLE`. `null` en los grupos; en una hoja cuenta como variable |
+| `es_fix` | Derivado, solo lectura |
+
+**Las transacciones solo se asignan a hojas** (categorías sin hijos).
+`POST /confirm-upload` rechaza un movimiento cuya categoría sea un grupo.
+
+Para sacar una categoría de su grupo, envía `parent_id` negativo:
+
+```json
+PUT /categories/12
+{"parent_id": -1}
+```
 
 ---
 
@@ -50,6 +72,8 @@
   - Query param: `activeOnly=true` para solo activos
 - `GET /budgets/current` - Presupuestos activos en la fecha actual
   - Query param: `date` (opcional, formato: yyyy-MM-dd)
+- `GET /budgets/monthly-summary` - **Resumen del mes por grupos y subcategorías**
+  - Query params: `year`, `month` (opcionales; por defecto, el mes actual)
 - `GET /budgets/{id}` - Obtiene un presupuesto específico
 - `POST /budgets` - Crea un nuevo presupuesto
   ```json
@@ -63,6 +87,54 @@
   ```
 - `PUT /budgets/{id}` - Actualiza un presupuesto
 - `DELETE /budgets/{id}` - Elimina un presupuesto
+
+---
+
+### Resumen mensual: coste de vida vs caja
+
+`GET /budgets/monthly-summary?year=2026&month=3`
+
+Devuelve el árbol de categorías con dos lecturas del mismo mes:
+
+- **Coste de vida**: los gastos fijos entran prorrateados (600 €/año = 50 €/mes),
+  caiga el cargo cuando caiga. Los variables, por su gasto real.
+- **Caja**: lo que ha salido de la cuenta este mes, tal cual.
+
+```json
+[
+  {
+    "categoria": { "id": 1, "nom": "Coche", "parent_id": null, "tipus_cost": null },
+    "es_grup": true,
+    "quantitat_limit": 700.00,
+    "cost_vida_pla": 130.00,
+    "cost_vida_real": 95.00,
+    "caixa_real": 645.00,
+    "carrec_puntual_aquest_mes": true,
+    "subcategories": [
+      {
+        "categoria": { "id": 2, "nom": "Seguro", "parent_id": 1, "tipus_cost": "FIXED" },
+        "prorrateig_mensual": 50.00,
+        "cost_vida_real": 50.00,
+        "caixa_real": 600.00,
+        "carrec_puntual_aquest_mes": true
+      },
+      {
+        "categoria": { "id": 3, "nom": "Combustible", "parent_id": 1, "tipus_cost": "VARIABLE" },
+        "prorrateig_mensual": 0,
+        "cost_vida_real": 45.00,
+        "cost_vida_pla": 80.00,
+        "caixa_real": 45.00,
+        "carrec_puntual_aquest_mes": false
+      }
+    ]
+  }
+]
+```
+
+`carrec_puntual_aquest_mes` avisa de que un fijo se ha cobrado este mes. Sin esa
+marca, ver 645 € de caja cuando el coste de vida dice 95 € parece un error.
+
+Un límite puesto directamente sobre un grupo manda sobre la suma de sus hijos.
 
 ---
 
