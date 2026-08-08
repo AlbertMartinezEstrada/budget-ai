@@ -80,6 +80,7 @@ Se ejecutan solos en cada push y cada pull request. Ver [TESTING.md](TESTING.md)
 
 | Documento | Qué explica |
 |---|---|
+| [AGENTS.md](AGENTS.md) | Contexto y reglas del proyecto para asistentes de IA |
 | [ARQUITECTURA.md](ARQUITECTURA.md) | Cómo funciona todo por dentro |
 | [AUTENTICACION.md](AUTENTICACION.md) | El inicio de sesión, configuración y limitaciones |
 | [TESTING.md](TESTING.md) | Qué cubre cada test y por qué |
