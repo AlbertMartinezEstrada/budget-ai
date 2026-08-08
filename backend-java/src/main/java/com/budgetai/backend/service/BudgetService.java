@@ -32,6 +32,9 @@ public class BudgetService {
     @Autowired
     private CategoryHierarchyService hierarchyService;
 
+    @Autowired
+    private IncomeBaseService incomeBaseService;
+
     // El gasto acumulat es calcula sempre. Abans només s'omplia a
     // getActiveBudgetsForDate, de manera que el llistat general enviava
     // "gasto_actual" a null i la barra de progrés sortia sempre al 0%.
@@ -77,6 +80,12 @@ public class BudgetService {
                 .map(budget -> {
                     if (updatedBudget.getCategory() != null) budget.setCategory(updatedBudget.getCategory());
                     if (updatedBudget.getLimitAmount() != null) budget.setLimitAmount(updatedBudget.getLimitAmount());
+                    // Un percentatge negatiu vol dir "treu-me'l": és el conveni per
+                    // distingir-ho de "no l'he enviat" en una actualització parcial.
+                    if (updatedBudget.getPercentage() != null) {
+                        budget.setPercentage(updatedBudget.getPercentage().signum() < 0
+                                ? null : updatedBudget.getPercentage());
+                    }
                     if (updatedBudget.getPeriodStart() != null) budget.setPeriodStart(updatedBudget.getPeriodStart());
                     if (updatedBudget.getPeriodEnd() != null) budget.setPeriodEnd(updatedBudget.getPeriodEnd());
                     if (updatedBudget.getActive() != null) budget.setActive(updatedBudget.getActive());
@@ -133,25 +142,69 @@ public class BudgetService {
     //
     // La primera serveix per planificar; la segona, per quadrar el compte.
 
-    public List<Map<String, Object>> getMonthlySummary(int year, int month) {
+    /**
+     * Resum del mes: capçalera amb el sou de referència i l'arbre de grups.
+     *
+     * Retorna un objecte i no una llista perquè el repartiment per
+     * percentatges necessita dir sobre quin sou s'ha calculat: una llista de
+     * grups amb sostres, sense la base, no es pot interpretar.
+     */
+    public Map<String, Object> getMonthlySummary(int year, int month) {
         YearMonth period = YearMonth.of(year, month);
         LocalDate from = period.atDay(1);
         LocalDate to = period.atEndOfMonth();
 
+        IncomeBaseService.Base base = incomeBaseService.resolve(period);
+
         CategoryHierarchyService.Tree tree = hierarchyService.loadTree();
-        Map<Long, BigDecimal> limitsByCategory = monthlyLimits(from, to);
+        Map<Long, BigDecimal> limitsByCategory = monthlyLimits(from, to, base);
+        Map<Long, BigDecimal> percentagesByCategory = monthlyPercentages(from, to);
         Map<Long, List<RecurringTransaction>> recurringByCategory = activeRecurringByCategory();
 
-        List<Map<String, Object>> summary = new ArrayList<>();
+        List<Map<String, Object>> groups = new ArrayList<>();
         for (Category root : tree.roots()) {
-            summary.add(buildNode(root, tree, limitsByCategory, recurringByCategory, from, to));
+            groups.add(buildNode(root, tree, limitsByCategory, percentagesByCategory,
+                    recurringByCategory, from, to));
         }
+
+        Map<String, Object> summary = new LinkedHashMap<>();
+        summary.put("periode", period.toString());
+        summary.put("sou_base", base.amount());
+        summary.put("sou_base_origen", base.origin().name());
+        summary.put("ingressos_reals", realIncomeIn(from, to));
+        summary.put("percentatge_assignat", percentagesByCategory.values().stream()
+                .reduce(BigDecimal.ZERO, BigDecimal::add));
+        summary.put("grups", groups);
         return summary;
+    }
+
+    /** Ingressos realment importats del mes, per veure la desviació del sou previst. */
+    private BigDecimal realIncomeIn(LocalDate from, LocalDate to) {
+        return transactionRepository.findAll().stream()
+                .filter(t -> "INCOME".equals(t.getType()))
+                .filter(t -> t.getDate() != null
+                        && !t.getDate().isBefore(from) && !t.getDate().isAfter(to))
+                .map(t -> t.getAmount() != null ? t.getAmount() : BigDecimal.ZERO)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
+    /** Percentatges vigents durant el mes, indexats per categoria. */
+    private Map<Long, BigDecimal> monthlyPercentages(LocalDate from, LocalDate to) {
+        Map<Long, BigDecimal> percentages = new HashMap<>();
+        for (Budget budget : budgetRepository.findByActiveTrue()) {
+            if (budget.getCategory() == null || budget.getPercentage() == null) continue;
+            if (budget.getPeriodStart() == null || budget.getPeriodEnd() == null) continue;
+            if (budget.getPeriodStart().isAfter(to) || budget.getPeriodEnd().isBefore(from)) continue;
+
+            percentages.merge(budget.getCategory().getId(), budget.getPercentage(), BigDecimal::add);
+        }
+        return percentages;
     }
 
     private Map<String, Object> buildNode(Category category,
                                           CategoryHierarchyService.Tree tree,
                                           Map<Long, BigDecimal> limits,
+                                          Map<Long, BigDecimal> percentages,
                                           Map<Long, List<RecurringTransaction>> recurring,
                                           LocalDate from, LocalDate to) {
 
@@ -159,6 +212,7 @@ public class BudgetService {
         node.put("categoria", category);
         node.put("es_grup", tree.isGroup(category.getId()));
         node.put("quantitat_limit", limits.get(category.getId()));
+        node.put("percentatge", percentages.get(category.getId()));
 
         List<Category> children = tree.childrenByParent()
                 .getOrDefault(category.getId(), List.of());
@@ -193,7 +247,7 @@ public class BudgetService {
         boolean anyOneOff = false;
 
         for (Category child : children) {
-            Map<String, Object> sub = buildNode(child, tree, limits, recurring, from, to);
+            Map<String, Object> sub = buildNode(child, tree, limits, percentages, recurring, from, to);
             subNodes.add(sub);
             caixa = caixa.add((BigDecimal) sub.get("caixa_real"));
             costReal = costReal.add((BigDecimal) sub.get("cost_vida_real"));
@@ -236,14 +290,24 @@ public class BudgetService {
      * encavalqui el mes, no només els que hi coincideixin exactament: així un
      * pressupost trimestral o anual també hi surt.
      */
-    private Map<Long, BigDecimal> monthlyLimits(LocalDate from, LocalDate to) {
+    private Map<Long, BigDecimal> monthlyLimits(LocalDate from, LocalDate to,
+                                                IncomeBaseService.Base base) {
         Map<Long, BigDecimal> limits = new HashMap<>();
         for (Budget budget : budgetRepository.findByActiveTrue()) {
-            if (budget.getCategory() == null || budget.getLimitAmount() == null) continue;
+            if (budget.getCategory() == null) continue;
             if (budget.getPeriodStart() == null || budget.getPeriodEnd() == null) continue;
             if (budget.getPeriodStart().isAfter(to) || budget.getPeriodEnd().isBefore(from)) continue;
 
-            limits.merge(budget.getCategory().getId(), budget.getLimitAmount(), BigDecimal::add);
+            // Un percentatge mana sobre l'import fix: el sostre es recalcula a
+            // partir del sou d'aquest mes. Si el sou no està definit, el
+            // percentatge no dona cap xifra i s'ignora el pressupost, en comptes
+            // d'ensenyar un sostre de zero euros que semblaria intencionat.
+            BigDecimal limit = budget.getPercentage() != null
+                    ? incomeBaseService.applyPercentage(base, budget.getPercentage())
+                    : budget.getLimitAmount();
+
+            if (limit == null) continue;
+            limits.merge(budget.getCategory().getId(), limit, BigDecimal::add);
         }
         return limits;
     }

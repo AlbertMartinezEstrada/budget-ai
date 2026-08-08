@@ -259,6 +259,50 @@ la puerta a que se contradigan; el endpoint recibe el mes por parámetro y
 considera vigente cualquier presupuesto cuyo periodo lo solape, así que un
 presupuesto trimestral o anual también aparece.
 
+### Reparto del sueldo por porcentajes
+
+Un presupuesto puede fijar su techo de dos maneras:
+
+- **Importe fijo** (`quantitat_limit`), como siempre.
+- **Porcentaje del sueldo** (`percentatge`). Si está informado, **manda sobre
+  el importe**: el techo se calcula como sueldo × porcentaje ÷ 100 en cada
+  consulta, así que si cambia el sueldo, el presupuesto se ajusta solo.
+
+`quantitat_limit` sigue siendo `NOT NULL` y guarda el último importe calculado,
+para que la tabla se pueda leer por sí sola.
+
+**De dónde sale el sueldo**, por orden:
+
+1. El importe guardado para ese mes concreto en `monthly_income` — la paga
+   extra, un mes con menos horas.
+2. `settings.expected_monthly_income`, el sueldo de referencia.
+3. Si no hay ninguno, los porcentajes **no producen techo**. Se devuelve `null`,
+   no cero: un cero se leería como "presupuesto de 0 €", que es una afirmación
+   distinta de "falta configurar el sueldo".
+
+**Los ingresos reales importados no se usan nunca como base.** Harían bailar el
+plan: un mes con la nómina aún sin importar tendría techos de cero, y una
+devolución inesperada los inflaría todos. Sí se reportan al lado
+(`ingressos_reals`) para ver la desviación.
+
+El resumen mensual devuelve un objeto —no una lista— porque un techo calculado
+por porcentaje no se puede interpretar sin saber sobre qué sueldo se ha
+calculado:
+
+```json
+{
+  "periode": "2026-03",
+  "sou_base": 2000.00,
+  "sou_base_origen": "PER_DEFECTE",
+  "ingressos_reals": 1980.00,
+  "percentatge_assignat": 85.00,
+  "grups": [ ... ]
+}
+```
+
+`percentatge_assignat` es la suma de lo repartido. Pasar del 100% es un error de
+planificación, no del programa: la interfaz lo marca en rojo pero no lo impide.
+
 ## La sesión
 
 Resumen; el detalle está en [AUTENTICACION.md](AUTENTICACION.md).

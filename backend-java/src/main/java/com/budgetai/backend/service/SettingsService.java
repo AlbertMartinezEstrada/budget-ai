@@ -42,6 +42,12 @@ public class SettingsService {
             if (settings.getNotificationsExpenses() != null) s.setNotificationsExpenses(settings.getNotificationsExpenses());
             if (settings.getNotificationsBudget() != null) s.setNotificationsBudget(settings.getNotificationsBudget());
             if (settings.getNotificationsMonthly() != null) s.setNotificationsMonthly(settings.getNotificationsMonthly());
+            // Un import negatiu vol dir "esborra'l", igual que a la resta de
+            // l'API: sense això no hi hauria manera de treure el sou un cop posat.
+            if (settings.getExpectedMonthlyIncome() != null) {
+                s.setExpectedMonthlyIncome(settings.getExpectedMonthlyIncome().signum() < 0
+                        ? null : settings.getExpectedMonthlyIncome());
+            }
             return settingsRepository.save(s);
         }
         return settingsRepository.save(settings);
