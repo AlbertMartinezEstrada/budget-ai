@@ -58,6 +58,9 @@ CREATE TABLE IF NOT EXISTS budgets (
     id BIGSERIAL PRIMARY KEY,
     category_id BIGINT REFERENCES categories(id) ON DELETE CASCADE,
     quantitat_limit DECIMAL(15, 2) NOT NULL,
+    -- Percentatge del sou assignat a la categoria. Si està informat, mana
+    -- sobre quantitat_limit: el sostre es recalcula si canvia el sou.
+    percentatge DECIMAL(5, 2) CHECK (percentatge IS NULL OR (percentatge >= 0 AND percentatge <= 100)),
     periode_inici DATE NOT NULL,
     periode_fi DATE NOT NULL,
     actiu BOOLEAN DEFAULT TRUE,
@@ -117,8 +120,21 @@ CREATE TABLE IF NOT EXISTS settings (
     notifications_expenses BOOLEAN,
     notifications_budget BOOLEAN,
     notifications_monthly BOOLEAN,
+    -- Sou de referència sobre el qual s'apliquen els percentatges.
+    expected_monthly_income DECIMAL(15, 2),
     created_at TIMESTAMP,
     updated_at TIMESTAMP
+);
+
+-- Sou d'un mes concret, quan no és el de sempre (paga extra, mes curt...).
+-- Si un mes no hi surt, s'aplica el de settings.expected_monthly_income.
+-- El període va com a text "YYYY-MM": "any" és paraula reservada de SQL i
+-- dues columnes separades s'han de mantenir sincronitzades a cada consulta.
+CREATE TABLE IF NOT EXISTS monthly_income (
+    id BIGSERIAL PRIMARY KEY,
+    periode VARCHAR(7) UNIQUE NOT NULL,
+    import DECIMAL(15, 2) NOT NULL,
+    notes TEXT
 );
 
 -- Inserció de categories per defecte

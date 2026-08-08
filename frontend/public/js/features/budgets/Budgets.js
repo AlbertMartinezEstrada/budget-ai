@@ -1,6 +1,7 @@
 import {
     getBudgets, getBudget, createBudget, updateBudget, deleteBudget,
-    getBudgetMonthlySummary, getCategories, formatCurrency, escapeHtml
+    getBudgetMonthlySummary, setMonthlyIncome, deleteMonthlyIncome,
+    getCategories, formatCurrency, escapeHtml
 } from '../../api.js';
 
 // Tailwind no pot generar classes construïdes en temps d'execució
@@ -15,6 +16,7 @@ let categories = [];
 // Els grups desplegats es recorden entre recàrregues perquè guardar un
 // pressupost no plegui el que l'usuari estava mirant.
 const expandedGroups = new Set();
+let lastSummary = null;
 
 export async function initBudgets(container) {
     const now = new Date();
@@ -35,6 +37,23 @@ export async function initBudgets(container) {
         </div>
 
         <div class="bg-white dark:bg-slate-800 rounded-xl p-4 shadow-sm border border-slate-200 dark:border-slate-700 mb-6">
+            <div class="flex flex-wrap items-center justify-between gap-3 mb-4 pb-4 border-b border-slate-200 dark:border-slate-700">
+                <div>
+                    <div class="text-xs text-gray-500 dark:text-slate-400">Sueldo de referencia</div>
+                    <div class="text-2xl font-bold" id="sou-base">—</div>
+                    <div class="text-xs text-gray-500 dark:text-slate-400" id="sou-origen"></div>
+                </div>
+                <div class="text-right">
+                    <div class="text-xs text-gray-500 dark:text-slate-400">Ingresos reales del mes</div>
+                    <div class="text-lg font-semibold" id="ingressos-reals">—</div>
+                    <div class="text-xs" id="sou-desviacio"></div>
+                </div>
+                <div class="text-right">
+                    <div class="text-xs text-gray-500 dark:text-slate-400">Repartido</div>
+                    <div class="text-lg font-semibold" id="percentatge-assignat">—</div>
+                    <button id="edit-income-btn" class="text-xs text-primary hover:underline mt-1">Ajustar sueldo de este mes</button>
+                </div>
+            </div>
             <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 text-center">
                 <div>
                     <div class="text-xs text-gray-500 dark:text-slate-400">Coste de vida · plan</div>
@@ -71,8 +90,20 @@ export async function initBudgets(container) {
                         </p>
                     </div>
                     <div>
-                        <label class="block text-sm font-medium mb-1">Límite mensual</label>
-                        <input type="number" id="budget-limit" step="0.01" required class="w-full px-3 py-2 border rounded-lg">
+                        <label class="block text-sm font-medium mb-1" for="budget-mode">Cómo se fija el techo</label>
+                        <select id="budget-mode" class="w-full px-3 py-2 border rounded-lg">
+                            <option value="AMOUNT">Importe fijo</option>
+                            <option value="PERCENT">Porcentaje del sueldo</option>
+                        </select>
+                    </div>
+                    <div id="budget-limit-wrapper">
+                        <label class="block text-sm font-medium mb-1" for="budget-limit">Límite mensual</label>
+                        <input type="number" id="budget-limit" step="0.01" class="w-full px-3 py-2 border rounded-lg">
+                    </div>
+                    <div id="budget-percent-wrapper" style="display: none;">
+                        <label class="block text-sm font-medium mb-1" for="budget-percent">Porcentaje del sueldo</label>
+                        <input type="number" id="budget-percent" step="0.01" min="0" max="100" class="w-full px-3 py-2 border rounded-lg">
+                        <p class="text-xs text-gray-500 dark:text-slate-400 mt-1" id="budget-percent-hint"></p>
                     </div>
                     <div class="grid grid-cols-2 gap-4">
                         <div>
@@ -116,6 +147,9 @@ export async function initBudgets(container) {
     document.getElementById('budget-modal').addEventListener('click', (e) => {
         if (e.target.id === 'budget-modal') closeModal();
     });
+    document.getElementById('budget-mode').addEventListener('change', applyModeToForm);
+    document.getElementById('budget-percent').addEventListener('input', updatePercentHint);
+    document.getElementById('edit-income-btn').addEventListener('click', editMonthlyIncome);
 }
 
 function selectedPeriod() {
@@ -161,7 +195,9 @@ async function loadSummary() {
             getBudgetMonthlySummary(year, month),
             getBudgets()
         ]);
-        renderSummary(summary, budgets);
+        lastSummary = summary;
+        renderHeader(summary);
+        renderSummary(summary.grups, budgets);
     } catch (error) {
         console.error('Error loading budgets:', error);
         container.innerHTML = '<p class="text-red-500">Error al cargar presupuestos</p>';
@@ -191,6 +227,52 @@ function renderSummary(summary, budgets) {
     updateTotals(summary);
 }
 
+/**
+ * Capçalera amb el sou de referència, els ingressos reals i quant s'ha
+ * repartit. Sense la base, un sostre calculat per percentatge no es pot
+ * interpretar.
+ */
+function renderHeader(summary) {
+    const base = Number.parseFloat(summary.sou_base);
+    const real = Number.parseFloat(summary.ingressos_reals) || 0;
+    const assigned = Number.parseFloat(summary.percentatge_assignat) || 0;
+
+    const baseEl = document.getElementById('sou-base');
+    const originEl = document.getElementById('sou-origen');
+
+    if (Number.isFinite(base) && base > 0) {
+        baseEl.textContent = formatCurrency(base);
+        originEl.textContent = summary.sou_base_origen === 'MES'
+            ? 'ajustado para este mes'
+            : 'sueldo por defecto';
+    } else {
+        baseEl.textContent = 'sin definir';
+        originEl.textContent = 'configúralo para usar porcentajes';
+    }
+
+    document.getElementById('ingressos-reals').textContent = formatCurrency(real);
+
+    const deviation = document.getElementById('sou-desviacio');
+    if (Number.isFinite(base) && base > 0 && real > 0) {
+        const diff = real - base;
+        deviation.textContent = diff === 0
+            ? 'coincide con el previsto'
+            : `${diff > 0 ? '+' : ''}${formatCurrency(diff)} sobre el previsto`;
+        deviation.className = `text-xs ${diff < 0 ? 'text-orange-600' : 'text-green-600'}`;
+    } else {
+        deviation.textContent = '';
+        deviation.className = 'text-xs';
+    }
+
+    // Repartir más del 100% del sueldo es un error de planificación, no del
+    // programa: se avisa pero no se impide.
+    const assignedEl = document.getElementById('percentatge-assignat');
+    assignedEl.textContent = `${assigned.toFixed(0)}%`;
+    assignedEl.className = assigned > 100
+        ? 'text-lg font-semibold text-red-600'
+        : 'text-lg font-semibold';
+}
+
 function renderNode(node, budgetByCategory) {
     const category = node.categoria;
     const plan = Number.parseFloat(node.cost_vida_pla) || 0;
@@ -217,6 +299,9 @@ function renderNode(node, budgetByCategory) {
                         <h3 class="font-semibold text-lg">${escapeHtml(category.nom)}</h3>
                         <span class="text-xs text-gray-500 dark:text-slate-400">
                             ${hasChildren ? 'Grupo' : (category.tipus_cost === 'FIXED' ? 'Fijo' : 'Variable')}
+                            ${node.percentatge != null
+                                ? ` · ${Number.parseFloat(node.percentatge).toFixed(0)}% del sueldo`
+                                : ''}
                         </span>
                     </div>
                 </div>
@@ -304,6 +389,61 @@ function updateTotals(summary) {
     document.getElementById('total-caixa').textContent = formatCurrency(sum('caixa_real'));
 }
 
+/** Mostra el camp que toca segons si el sostre és un import o un percentatge. */
+function applyModeToForm() {
+    const percent = document.getElementById('budget-mode').value === 'PERCENT';
+    document.getElementById('budget-limit-wrapper').style.display = percent ? 'none' : '';
+    document.getElementById('budget-percent-wrapper').style.display = percent ? '' : 'none';
+    document.getElementById('budget-limit').required = !percent;
+    document.getElementById('budget-percent').required = percent;
+    updatePercentHint();
+}
+
+/** Tradueix el percentatge a euros mentre s'escriu, per no anar a cegues. */
+function updatePercentHint() {
+    const hint = document.getElementById('budget-percent-hint');
+    const percent = Number.parseFloat(document.getElementById('budget-percent').value);
+    const base = Number.parseFloat(lastSummary?.sou_base);
+
+    if (!Number.isFinite(percent)) { hint.textContent = ''; return; }
+    if (!Number.isFinite(base) || base <= 0) {
+        hint.textContent = 'Configura el sueldo para ver a cuánto equivale.';
+        return;
+    }
+    hint.textContent = `${formatCurrency(base * percent / 100)} con el sueldo de este mes.`;
+}
+
+/** Sou d'aquest mes concret; buit vol dir "torna al sou per defecte". */
+async function editMonthlyIncome() {
+    const { year, month } = selectedPeriod();
+    const period = `${year}-${String(month).padStart(2, '0')}`;
+    const current = lastSummary?.sou_base_origen === 'MES'
+        ? Number.parseFloat(lastSummary.sou_base)
+        : '';
+
+    const input = prompt(
+        `Sueldo para ${period}.
+Déjalo vacío para volver al sueldo por defecto.`,
+        current === '' ? '' : String(current));
+    if (input === null) return;
+
+    try {
+        if (input.trim() === '') {
+            await deleteMonthlyIncome(period);
+        } else {
+            const amount = Number.parseFloat(input.replace(',', '.'));
+            if (!Number.isFinite(amount) || amount < 0) {
+                alert('Introduce un importe positivo.');
+                return;
+            }
+            await setMonthlyIncome(period, { import: amount });
+        }
+        await loadSummary();
+    } catch (error) {
+        alert(error.message || 'Error al guardar el sueldo del mes');
+    }
+}
+
 function openModal(budget = null, presetCategoryId = null) {
     const modal = document.getElementById('budget-modal');
     const title = document.getElementById('modal-title');
@@ -324,15 +464,20 @@ function openModal(budget = null, presetCategoryId = null) {
         document.getElementById('budget-id').value = budget.id;
         document.getElementById('budget-category').value = budget.category?.id;
         document.getElementById('budget-limit').value = budget.quantitat_limit;
+        document.getElementById('budget-percent').value = budget.percentatge ?? '';
+        document.getElementById('budget-mode').value = budget.percentatge != null ? 'PERCENT' : 'AMOUNT';
         document.getElementById('budget-start').value = budget.periode_inici;
         document.getElementById('budget-end').value = budget.periode_fi;
     } else {
         title.textContent = 'Nuevo Presupuesto';
         document.getElementById('budget-id').value = '';
+        document.getElementById('budget-mode').value = 'AMOUNT';
         if (presetCategoryId) {
             document.getElementById('budget-category').value = presetCategoryId;
         }
     }
+
+    applyModeToForm();
 
     modal.classList.remove('hidden');
     modal.classList.add('flex');
@@ -396,13 +541,39 @@ async function handleListClick(event) {
 async function handleSubmit(e) {
     e.preventDefault();
     const id = document.getElementById('budget-id').value;
+    const byPercent = document.getElementById('budget-mode').value === 'PERCENT';
+    const percent = Number.parseFloat(document.getElementById('budget-percent').value);
+    const base = Number.parseFloat(lastSummary?.sou_base);
+
+    if (byPercent && (!Number.isFinite(percent) || percent < 0 || percent > 100)) {
+        alert('El porcentaje debe estar entre 0 y 100.');
+        return;
+    }
+
+    // quantitat_limit es NOT NULL en la base de datos, así que un presupuesto
+    // por porcentaje guarda el importe ya calculado: la tabla sigue siendo
+    // legible por sí sola y el techo real se recalcula en cada consulta.
+    const limit = byPercent
+        ? (Number.isFinite(base) && base > 0 ? Number((base * percent / 100).toFixed(2)) : 0)
+        : parseFloat(document.getElementById('budget-limit').value);
+
     const data = {
         category: { id: parseInt(document.getElementById('budget-category').value) },
-        quantitat_limit: parseFloat(document.getElementById('budget-limit').value),
+        quantitat_limit: limit,
         periode_inici: document.getElementById('budget-start').value,
         periode_fi: document.getElementById('budget-end').value,
         actiu: true
     };
+
+    if (byPercent) {
+        data.percentatge = percent;
+    } else if (id) {
+        // Solo al actualizar: negativo es el convenio de la API para
+        // "quítamelo", que la actualización parcial distingue de "no lo he
+        // enviado". Al crear no aplica, y un negativo violaría el CHECK
+        // de la columna.
+        data.percentatge = -1;
+    }
 
     try {
         if (id) {
