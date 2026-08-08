@@ -1,3 +1,8 @@
+> ⚠️ **Documento histórico, parcialmente desfasado.**
+> Describe el proyecto en un momento anterior y algunas partes ya no son
+> ciertas (por ejemplo, el frontend no usa React: es JavaScript sin framework).
+> Para el estado actual, consulta [ARQUITECTURA.md](ARQUITECTURA.md).
+
 # 📋 Documentación de Implementación - Budget AI
 ## Gestor Financiero Personal Completo
 
@@ -1019,7 +1024,7 @@ Con los endpoints de Analytics, puedes calcular:
 
 2. **Backup de base de datos:**
    ```bash
-   docker exec budget-ai-db-1 pg_dump -U albert budget_db > backup_$(date +%Y%m%d).sql
+   docker exec budget-ai-db-1 pg_dump -U "$DB_USER" "$DB_NAME" > backup_$(date +%Y%m%d).sql
    ```
 
 ### **Monitoreo:**
