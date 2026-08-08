@@ -1,94 +1,107 @@
-# Budget AI - Gestor Financiero Personal Completo
+# Budget AI
 
-Aplicación completa para gestionar tus finanzas personales con Inteligencia Artificial. Controla múltiples cuentas, presupuestos, metas de ahorro y obtén analytics detallados de tus gastos e ingresos.
+Gestor de finanzas personales. Importa extractos bancarios en CSV, los clasifica
+con Google Gemini y lleva el control de cuentas, presupuestos, metas de ahorro,
+transferencias y gastos recurrentes.
 
-## Arquitectura
+Aplicación de **un solo usuario**: toda la API está detrás de un inicio de
+sesión, pero no hay separación de datos entre usuarios.
 
-- **Frontend**: React (Node.js)
-- **Backend**: Java (Spring Boot 3) - *Migrado de Python (FastAPI)*
-- **Base de Datos**: PostgreSQL
-- **IA**: Google Gemini 2.5 Flash
+## Stack
 
-## Cómo ejecutar
+| Capa | Tecnología |
+|---|---|
+| Frontend | JavaScript sin framework (módulos ES), servido por Express |
+| Backend | Java 17 + Spring Boot 3.2 |
+| Base de datos | PostgreSQL 17 |
+| IA | Google Gemini 2.5 Flash |
+| Orquestación | Docker Compose |
 
-Asegúrate de tener Docker y Docker Compose instalados.
+## Puesta en marcha
 
-1.  Crea un archivo `.env` en la raíz con tus variables:
-    ```env
-    POSTGRES_USER=albert
-    POSTGRES_PASSWORD=1234567
-    POSTGRES_DB=budget_db
-    GEMINI_API_KEY=tu_api_key_aqui
-    ```
+Necesitas Docker y Docker Compose.
 
-2.  Ejecuta:
-    ```bash
-    docker-compose up --build
-    ```
+### 1. Crea el fichero `.env` en la raíz
 
-3.  Accede a la aplicación en `http://localhost:3000`.
+```bash
+# Base de datos
+DB_HOST=db
+DB_NAME=budget_db
+DB_USER=tu_usuario
+DB_PASSWORD=tu_contraseña
 
-### Reiniciar solo el backend (Docker)
+# Clasificación automática (opcional: sin clave, la importación
+# funciona igual pero sin categorizar)
+GEMINI_API_KEY=tu_clave
 
-Si has cambiado código Java/Spring en `backend-java/`, reinicia únicamente el servicio `backend`.
+# Autenticación (obligatorio: sin esto el backend no arranca)
+AUTH_USERNAME=tu_usuario
+AUTH_PASSWORD=tu_contraseña
+JWT_SECRET=cadena_aleatoria_de_32_caracteres_minimo
+```
 
-- Reinicio rápido (sin reconstruir imagen):
-  ```bash
-  docker compose restart backend
-  ```
+Para generar el secreto:
 
-- Reinicio aplicando cambios de código (rebuild + recreate):
-  ```bash
-  docker compose up -d --build backend
-  ```
+```bash
+node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"
+```
 
-- Ver logs del backend:
-  ```bash
-  docker compose logs -f backend
-  ```
+El `.env` está en el `.gitignore` y no debe subirse nunca.
 
-## Funcionalidades Principales
+### 2. Levanta todo
 
-### 💰 Gestión de Finanzas Personales
-- ✅ **Múltiples cuentas bancarias** (corriente, ahorro, efectivo, tarjetas)
-- ✅ **Tracking de gastos e ingresos** con categorización automática por IA
-- ✅ **Presupuestos mensuales** por categoría con alertas
-- ✅ **Metas de ahorro** con seguimiento de progreso
-- ✅ **Transacciones recurrentes** (nóminas, suscripciones, etc.)
-- ✅ **Transferencias entre cuentas** propias
-- ✅ **Analytics y reportes** (mensuales, anuales, por categoría)
-- ✅ **Prevención de duplicados** con sistema de hash
+```bash
+docker compose up -d --build
+```
 
-### 📊 Endpoints Principales
+### 3. Abre `http://localhost:3000`
 
-#### Transacciones
-- `POST /upload-csv` - Sube CSV del banco para clasificar con IA
-- `GET /gastos` - Lista transacciones (con filtros)
-- `POST /confirm-upload` - Confirma y guarda transacciones
+El frontend está en el puerto 3000 y la API en el 8000.
 
-#### Cuentas
-- `GET/POST/PUT/DELETE /accounts` - Gestión de cuentas bancarias
-- `POST /accounts/{id}/adjust-balance` - Ajuste manual de saldo
+## Comandos habituales
 
-#### Presupuestos
-- `GET/POST/PUT/DELETE /budgets` - Gestión de presupuestos
-- `GET /budgets/current` - Presupuestos activos del periodo
+```bash
+docker compose up -d --build backend   # aplicar cambios de Java
+docker compose restart backend         # reiniciar sin reconstruir
+docker compose logs -f backend         # ver logs
+```
 
-#### Metas Financieras
-- `GET/POST/PUT/DELETE /goals` - Gestión de metas de ahorro
-- `POST /goals/{id}/add-amount` - Añadir dinero a una meta
+## Tests
 
-#### Transacciones Recurrentes
-- `GET/POST/PUT/DELETE /recurring` - Gestión de recurrentes
-- `POST /recurring/process` - Procesar transacciones vencidas
+```bash
+cd backend-java && ./gradlew test              # 61 unitarios, sin Docker
+cd backend-java && ./gradlew integrationTest   # 26, requieren Docker
+cd frontend && npm test                        # 17
+```
 
-#### Transferencias
-- `GET/POST/DELETE /transfers` - Transferencias entre cuentas
+Se ejecutan solos en cada push y cada pull request. Ver [TESTING.md](TESTING.md).
 
-#### Analytics
-- `GET /analytics/monthly-summary` - Resumen mensual
-- `GET /analytics/category-breakdown` - Gastos por categoría
-- `GET /analytics/yearly-summary` - Resumen anual
-- `GET /analytics/monthly-trend` - Tendencia mes a mes
+## Documentación
 
-📖 **Documentación completa de endpoints:** [API_ENDPOINTS.md](backend-java/API_ENDPOINTS.md)
+| Documento | Qué explica |
+|---|---|
+| [ARQUITECTURA.md](ARQUITECTURA.md) | Cómo funciona todo por dentro |
+| [AUTENTICACION.md](AUTENTICACION.md) | El inicio de sesión, configuración y limitaciones |
+| [TESTING.md](TESTING.md) | Qué cubre cada test y por qué |
+| [HISTORIAL.md](HISTORIAL.md) | Los fallos que se han corregido y cómo |
+| [backend-java/API_ENDPOINTS.md](backend-java/API_ENDPOINTS.md) | Referencia de endpoints |
+
+## Migraciones de esquema
+
+El esquema **no** se genera solo: `spring.jpa.hibernate.ddl-auto` está en
+`validate`, así que Hibernate comprueba que las tablas cuadren con las
+entidades y falla al arrancar si no es así.
+
+- Una instalación nueva parte de [`backend-java/init.sql`](backend-java/init.sql).
+- Una instalación existente aplica los ficheros de
+  [`backend-java/migrations/`](backend-java/migrations/) a mano, en orden.
+
+## Limitaciones conocidas
+
+- **Un solo usuario.** No hay tabla de usuarios ni aislamiento de datos.
+- **No se pueden revocar sesiones** una por una; cambiar `JWT_SECRET` las
+  invalida todas.
+- **Tailwind se carga por CDN**, lo que muestra un aviso en consola y no es
+  adecuado para producción.
+- **La interfaz mezcla catalán y castellano** según la vista.
+- El backend de Python en `backend-python-legacy/` ya no se usa.

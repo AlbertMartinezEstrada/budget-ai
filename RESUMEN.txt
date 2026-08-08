@@ -1,3 +1,5 @@
+*** Documento histórico, parcialmente desfasado. Ver ARQUITECTURA.md ***
+
 # RESUMEN EJECUTIVO - Budget AI
 
 ## ✅ TU PROYECTO YA GUARDA EN POSTGRESQL
@@ -58,7 +60,7 @@ despeses (
 
 Ver datos:
 ```powershell
-docker exec -it budget_db psql -U albert -d budget_db
+docker exec -it budget_db psql -U "$DB_USER" -d "$DB_NAME"
 SELECT * FROM despeses;
 ```
 
