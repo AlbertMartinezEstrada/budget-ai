@@ -61,18 +61,25 @@ Obtiene todos los gastos guardados.
 
 ## 🔧 Configuración
 
-### Variables de entorno (opcional)
+### Variables de entorno (obligatorias)
 
-Crea un archivo `.env` en la raíz:
+Crea un archivo `.env` en la raíz. **Sin las variables de autenticación el
+backend no arranca.** Consulta el [README](README.md) para la lista completa.
+
 ```env
-GEMINI_API_KEY=tu_api_key_aqui
 DB_HOST=db
 DB_NAME=budget_db
-DB_USER=albert
-DB_PASSWORD=1234567
+DB_USER=tu_usuario
+DB_PASSWORD=tu_contraseña
+GEMINI_API_KEY=tu_clave
+AUTH_USERNAME=tu_usuario
+AUTH_PASSWORD=tu_contraseña
+JWT_SECRET=cadena_aleatoria_de_32_caracteres_minimo
 ```
 
-Por defecto, usa la API key configurada en `docker-compose.yml`.
+El `.env` está en el `.gitignore` y no debe subirse nunca. Aquí había un
+usuario y una contraseña reales escritos a mano; si eran los que usabas,
+cámbialos.
 
 ## 📁 Estructura del Proyecto
 
@@ -112,7 +119,7 @@ docker logs -f budget_api
 
 Ver la base de datos:
 ```powershell
-docker exec -it budget_db psql -U albert -d budget_db
+docker exec -it budget_db psql -U "$DB_USER" -d "$DB_NAME"
 ```
 
 Consultar gastos:

@@ -1,3 +1,8 @@
+> ⚠️ **Documento histórico, parcialmente desfasado.**
+> Describe el proyecto en un momento anterior y algunas partes ya no son
+> ciertas (por ejemplo, el frontend no usa React: es JavaScript sin framework).
+> Para el estado actual, consulta [ARQUITECTURA.md](ARQUITECTURA.md).
+
 # 🏗️ ¿Cómo funciona la arquitectura de este Frontend? (SPA vs MPA)
 
 Es normal que te sorprenda ver que no hay archivos `.html` para cada página (como `dashboard.html`, `transacciones.html`, etc.). Lo que hemos implementado es una **Single Page Application (SPA)**.
