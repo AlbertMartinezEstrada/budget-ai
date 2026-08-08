@@ -2,8 +2,10 @@ package com.budgetai.backend.integration;
 
 import com.budgetai.backend.controller.TransactionController;
 import com.budgetai.backend.model.Account;
+import com.budgetai.backend.model.Category;
 import com.budgetai.backend.model.Transaction;
 import com.budgetai.backend.repository.AccountRepository;
+import com.budgetai.backend.repository.CategoryRepository;
 import com.budgetai.backend.repository.TransactionRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -27,6 +29,7 @@ class ConfirmUploadIntegrationTest extends AbstractIntegrationTest {
     @Autowired private TransactionController transactionController;
     @Autowired private TransactionRepository transactionRepository;
     @Autowired private AccountRepository accountRepository;
+    @Autowired private CategoryRepository categoryRepository;
 
     private Long accountId;
 
@@ -34,6 +37,14 @@ class ConfirmUploadIntegrationTest extends AbstractIntegrationTest {
     void setUp() {
         transactionRepository.deleteAll();
         accountRepository.deleteAll();
+
+        // El controlador cau a "Altres" quan no reconeix la categoria. El
+        // contenidor de PostgreSQL es comparteix entre classes de test, i
+        // alguna altra pot haver buidat la taula, així que aquesta classe
+        // s'assegura del que necessita en comptes de confiar-hi.
+        if (categoryRepository.findByName("Altres").isEmpty()) {
+            categoryRepository.save(new Category("Altres"));
+        }
 
         Account account = new Account();
         // El controlador busca aquest compte pel nom com a compte per defecte.

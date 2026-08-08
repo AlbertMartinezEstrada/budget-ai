@@ -1,6 +1,7 @@
 package com.budgetai.backend.model;
 
 import jakarta.persistence.*;
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Entity
@@ -30,6 +31,14 @@ public class Settings {
 
     @Column(name = "notifications_monthly")
     private Boolean notificationsMonthly = false;
+
+    /**
+     * Sou mensual de referència sobre el qual s'apliquen els percentatges
+     * dels pressupostos. És el valor per defecte; un mes concret es pot
+     * sobreescriure a la taula monthly_income.
+     */
+    @Column(name = "expected_monthly_income", precision = 15, scale = 2)
+    private BigDecimal expectedMonthlyIncome;
 
     @Column(name = "created_at")
     private LocalDateTime createdAt;
@@ -71,6 +80,9 @@ public class Settings {
 
     public Boolean getNotificationsMonthly() { return notificationsMonthly; }
     public void setNotificationsMonthly(Boolean notificationsMonthly) { this.notificationsMonthly = notificationsMonthly; }
+
+    public BigDecimal getExpectedMonthlyIncome() { return expectedMonthlyIncome; }
+    public void setExpectedMonthlyIncome(BigDecimal expectedMonthlyIncome) { this.expectedMonthlyIncome = expectedMonthlyIncome; }
 
     public LocalDateTime getCreatedAt() { return createdAt; }
     public LocalDateTime getUpdatedAt() { return updatedAt; }

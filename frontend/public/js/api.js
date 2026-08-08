@@ -297,6 +297,26 @@ export async function getBudgetMonthlySummary(year, month) {
     return handleResponse(response);
 }
 
+// ============ SOU DEL MES ============
+export async function getMonthlyIncomes() {
+    const response = await apiFetch(`/budgets/monthly-income`);
+    return handleResponse(response);
+}
+
+export async function setMonthlyIncome(period, data) {
+    const response = await apiFetch(`/budgets/monthly-income/${period}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+    });
+    return handleResponse(response);
+}
+
+export async function deleteMonthlyIncome(period) {
+    const response = await apiFetch(`/budgets/monthly-income/${period}`, { method: 'DELETE' });
+    return handleResponse(response);
+}
+
 // ============ CATEGORIES (escriptura) ============
 export async function createCategory(data) {
     const response = await apiFetch(`/categories`, {
