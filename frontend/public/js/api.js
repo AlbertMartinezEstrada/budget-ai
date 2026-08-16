@@ -167,6 +167,32 @@ export async function getTransactions(filters = {}) {
     return handleResponse(response);
 }
 
+/**
+ * Alta manual d'un moviment: efectiu, un préstec, el que no surt de l'extracte.
+ *
+ * A diferència dels que venen del CSV, aquest no porta hash de verificació:
+ * no és cap línia d'extracte i dos moviments iguals el mateix dia han de poder
+ * conviure.
+ */
+export async function createTransaction(data) {
+    const response = await apiFetch(`/gastos`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+    });
+    return handleResponse(response);
+}
+
+/**
+ * Esborra un moviment i desfà el que va fer al saldo del compte.
+ *
+ * No n'hi ha prou d'esborrar la fila: el saldo es va moure en desar-lo.
+ */
+export async function deleteTransaction(id) {
+    const response = await apiFetch(`/gastos/${id}`, { method: 'DELETE' });
+    return handleResponse(response);
+}
+
 // Fetch all categories
 export async function getCategories() {
     const response = await apiFetch(`/categories`);

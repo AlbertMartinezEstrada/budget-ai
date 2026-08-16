@@ -1,5 +1,6 @@
 package com.budgetai.backend.security;
 
+import jakarta.servlet.DispatcherType;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -44,6 +45,19 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                     // Les preflight de CORS no porten cookie i han de passar.
                     .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+
+                    // Quan una petició peta, Spring la reenvia internament a
+                    // /error. Aquest reenviament tornava a passar per aquí i,
+                    // com que /error no és a la llista, sortia un 401 en comptes
+                    // del 500 amb el motiu. El frontend tracta qualsevol 401 com
+                    // a sessió caducada, així que un error en desar una
+                    // importació et tirava a la pantalla d'entrada com si
+                    // haguessis perdut la sessió.
+                    //
+                    // Només s'obre el reenviament intern (dispatcher ERROR), no
+                    // /error com a URL: una petició de fora hi segueix necessitant
+                    // sessió.
+                    .dispatcherTypeMatchers(DispatcherType.ERROR).permitAll()
                     // Iniciar i tancar sessió són els únics punts oberts.
                     .requestMatchers("/auth/login", "/auth/logout").permitAll()
                     // Tota la resta de l'API queda tancada. Abans qualsevol
