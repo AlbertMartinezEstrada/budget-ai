@@ -1,5 +1,6 @@
 package com.budgetai.backend.service;
 
+import com.budgetai.backend.model.Category;
 import com.budgetai.backend.model.Transaction;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -25,6 +26,12 @@ public class AiEngineService {
     private final RestTemplate restTemplate = new RestTemplate();
     private final ObjectMapper objectMapper = new ObjectMapper();
 
+    private final CategoryHierarchyService hierarchyService;
+
+    public AiEngineService(CategoryHierarchyService hierarchyService) {
+        this.hierarchyService = hierarchyService;
+    }
+
     public List<Transaction> classifyTransactions(List<Transaction> transactions) {
         if (transactions == null || transactions.isEmpty()) {
             return new ArrayList<>();
@@ -37,9 +44,17 @@ public class AiEngineService {
             return transactions;
         }
 
+        // Sense categories no hi ha res entre què triar, i demanar-li-ho igualment
+        // faria que se les inventés.
+        List<String> categories = leafCategoryNames();
+        if (categories.isEmpty()) {
+            System.err.println("AiEngineService: no hi ha categories; s'omet la classificació automàtica.");
+            return transactions;
+        }
+
         // 1. Prepare prompt
         String transactionsListString = formatTransactionsForPrompt(transactions);
-        String prompt = createPrompt(transactionsListString);
+        String prompt = createPrompt(categories, transactionsListString);
 
         // 2. Call Gemini API
         String responseJson = callGeminiApi(prompt);
@@ -68,14 +83,34 @@ public class AiEngineService {
         return sb.toString();
     }
 
-    private String createPrompt(String transactionsList) {
-        String categoriesText = """
-        1. Menjar i supermercat, 2. Bars i restaurants, 3. Transport, 4. Allotjament, 
-        5. Compres i roba, 6. Higiene i bellesa, 7. Salut i farmàcia, 8. Gimnàs i esport, 
-        9. Cultura, oci i entreteniment, 10. Jocs de taula i videojocs, 11. Festa i alcohol, 
-        12. Tecnologia, 13. Regals i detalls, 14. Casa i mobiliari, 15. Mascotes, 
-        16. Altres, 17. Educació, 18. Inversions, 19. Nòmina, 20. Ingressos Altres.
-        """;
+    /**
+     * Categories que la IA pot triar: les fulles de l'arbre, tal com són ara.
+     *
+     * Abans la llista anava escrita a mà al prompt. Cada categoria nova quedava
+     * fora fins que algú se'n recordava d'editar aquest fitxer, i la IA seguia
+     * proposant noms que ja no existien —que la pantalla de revisió marca com a
+     * desconeguts i obliguen a triar-los un per un—.
+     *
+     * Només fulles: una transacció assignada a un grup es comptaria dues
+     * vegades i el backend ho rebutja en confirmar.
+     */
+    private List<String> leafCategoryNames() {
+        CategoryHierarchyService.Tree tree = hierarchyService.loadTree();
+
+        List<String> names = new ArrayList<>();
+        for (Category root : tree.roots()) {
+            for (Category leaf : tree.leavesOf(root.getId())) {
+                names.add(leaf.getName());
+            }
+        }
+        return names;
+    }
+
+    private String createPrompt(List<String> categories, String transactionsList) {
+        StringBuilder categoriesText = new StringBuilder();
+        for (int i = 0; i < categories.size(); i++) {
+            categoriesText.append(i + 1).append(". ").append(categories.get(i)).append('\n');
+        }
 
         return String.format("""
         Ets un assistent financer. Classifica aquests moviments bancaris segons aquestes categories:
@@ -86,7 +121,7 @@ public class AiEngineService {
 
         INSTRUCCIONS:
         - Respon EXCLUSIVAMENT en format JSON (una llista d'objectes).
-        - Camps obligatoris: "companyName" (nom net de l'empresa), "category" (una de les 20 categories), "description_curta" (descripció breu), "cost" (import numèric), "date" (data original).
+        - Camps obligatoris: "companyName" (nom net de l'empresa), "category" (una de les categories de la llista, copiada exactament), "description_curta" (descripció breu), "cost" (import numèric), "date" (data original).
         - Si dubtes, marca el camp "dubte": true.
         - NO afegeixis text fora del JSON.
         """, categoriesText, transactionsList);

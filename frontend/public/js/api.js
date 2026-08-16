@@ -297,6 +297,15 @@ export async function getBudgetMonthlySummary(year, month) {
     return handleResponse(response);
 }
 
+/** Duplica al mes indicat les assignacions del mes anterior. */
+export async function copyPreviousMonthBudgets(year, month) {
+    const params = new URLSearchParams({ year, month });
+    const response = await apiFetch(`/budgets/copy-previous-month?${params.toString()}`, {
+        method: 'POST'
+    });
+    return handleResponse(response);
+}
+
 // ============ SOU DEL MES ============
 export async function getMonthlyIncomes() {
     const response = await apiFetch(`/budgets/monthly-income`);

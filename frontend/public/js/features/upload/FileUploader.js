@@ -23,13 +23,26 @@ export async function initUpload(container) {
                 <h3 class="card-title text-warning-dark">Revisió de Transaccions</h3>
                 <div class="flex gap-2">
                     <button id="cancel-review" class="btn btn-outline btn-sm">Cancel·lar</button>
-                    <button id="confirm-review" class="btn btn-success btn-sm">Confirmar Tot</button>
+                    <button id="confirm-review" class="btn btn-success btn-sm">Confirmar</button>
                 </div>
             </div>
+
+            <div class="flex flex-wrap items-center justify-between gap-3 p-3">
+                <input type="search" id="review-search" class="input input-sm"
+                       style="min-width: 16rem;"
+                       placeholder="Buscar per empresa, concepte, categoria o import…">
+                <div class="flex items-center gap-2">
+                    <button id="select-all" class="btn btn-outline btn-sm" type="button">Marcar-ho tot</button>
+                    <button id="select-none" class="btn btn-outline btn-sm" type="button">Desmarcar-ho tot</button>
+                </div>
+            </div>
+            <p id="review-summary" class="px-3 pb-2 text-sm text-gray-500"></p>
+
             <div class="table-responsive max-h-96 overflow-y-auto">
                 <table class="table table-sm">
                     <thead>
                         <tr>
+                            <th style="width: 2.5rem;"></th>
                             <th>Data</th>
                             <th>Empresa (Editable)</th>
                             <th>Categoria (Seleccionar)</th>
@@ -39,6 +52,9 @@ export async function initUpload(container) {
                     <tbody id="review-body"></tbody>
                 </table>
             </div>
+            <p id="review-empty" class="p-4 text-center text-gray-500 hidden">
+                Cap moviment coincideix amb la cerca.
+            </p>
         </div>
     `;
 
@@ -83,8 +99,11 @@ export async function initUpload(container) {
         try {
             const result = await uploadCsv(file);
             if (result.status === 'review') {
-                currentReviewData = result.data;
-                renderReviewTable(currentReviewData);
+                // Tot entra marcat: el cas normal és importar-ho sencer i
+                // descartar-ne quatre, no al revés.
+                currentReviewData = result.data.map(t => ({ ...t, inclos: true }));
+                document.getElementById('review-search').value = '';
+                renderReviewTable();
                 reviewSection.classList.remove('hidden');
                 statusDiv.textContent = '✅ Anàlisi completada. Si us plau, revisa les dades.';
                 statusDiv.classList.add('text-success');
@@ -98,8 +117,26 @@ export async function initUpload(container) {
         }
     });
 
-    function renderReviewTable(data) {
-        reviewBody.innerHTML = data.map((t, index) => {
+    /**
+     * Files que passen el filtre de cerca, amb el seu índex original.
+     *
+     * L'índex ha de sobreviure al filtre: és el que lliga cada <tr> amb la seva
+     * posició a currentReviewData, i sense ell una cerca desplaçaria les
+     * edicions a un altre moviment.
+     */
+    function visibleRows() {
+        const query = document.getElementById('review-search').value.trim().toLowerCase();
+        const rows = currentReviewData.map((t, index) => ({ t, index }));
+        if (!query) return rows;
+
+        return rows.filter(({ t }) => [t.empresa, t.concepte_original, t.categoria, t.cost]
+            .some(field => String(field ?? '').toLowerCase().includes(query)));
+    }
+
+    function renderReviewTable() {
+        const rows = visibleRows();
+
+        reviewBody.innerHTML = rows.map(({ t, index }) => {
             // Si la categoria que proposa la IA no és a la llista oficial, el
             // navegador seleccionava la primera opció sense dir res i el
             // moviment s'acabava desant com a "Menjar i supermercat". Ara es
@@ -115,12 +152,21 @@ export async function initUpload(container) {
                 ? ''
                 : `<option value="" selected>— Tria una categoria —</option>`;
 
+            // Un moviment descartat no s'ha de revisar: ni cal categoria ni ha
+            // de cridar l'atenció com si li faltés alguna cosa.
+            const needsReview = t.inclos && !known;
+
             return `
-            <tr data-index="${index}" class="${known ? '' : 'row-needs-review'}">
+            <tr data-index="${index}" class="${needsReview ? 'row-needs-review' : ''}"
+                style="${t.inclos ? '' : 'opacity: 0.45;'}">
+                <td>
+                    <input type="checkbox" name="inclos" ${t.inclos ? 'checked' : ''}
+                           title="Desmarca'l per no importar aquest moviment">
+                </td>
                 <td>${escapeHtml(t.data)}</td>
                 <td><input type="text" class="input input-sm w-full" value="${escapeHtml(t.empresa || '')}" name="empresa"></td>
                 <td>
-                    <select class="input input-sm w-full" name="categoria" ${known ? '' : 'required'}>
+                    <select class="input input-sm w-full" name="categoria" ${needsReview ? 'required' : ''}>
                         ${unknownOption}${options}
                     </select>
                 </td>
@@ -128,24 +174,103 @@ export async function initUpload(container) {
             </tr>
             `;
         }).join('');
+
+        document.getElementById('review-empty').classList.toggle('hidden', rows.length > 0);
+        updateSummary();
     }
 
-    confirmBtn.addEventListener('click', async () => {
-        // Gather data from table
-        const rows = reviewBody.querySelectorAll('tr');
-        const confirmedData = Array.from(rows).map(row => {
-            const index = row.dataset.index;
-            const original = currentReviewData[index];
-            return {
-                ...original,
-                empresa: row.querySelector('input[name="empresa"]').value,
-                categoria: row.querySelector('select[name="categoria"]').value
-            };
-        });
+    function updateSummary() {
+        const chosen = currentReviewData.filter(t => t.inclos);
+        const total = chosen.reduce((sum, t) => sum + (Number.parseFloat(t.cost) || 0), 0);
+        const hidden = currentReviewData.length - visibleRows().length;
 
+        document.getElementById('review-summary').textContent =
+            `${chosen.length} de ${currentReviewData.length} moviments seleccionats · ${formatCurrency(total)}`
+            + (hidden > 0 ? ` · ${hidden} amagats per la cerca` : '');
+
+        confirmBtn.textContent = chosen.length === currentReviewData.length
+            ? 'Confirmar tot'
+            : `Confirmar ${chosen.length}`;
+        confirmBtn.disabled = chosen.length === 0;
+    }
+
+    /**
+     * Cada edició es desa a currentReviewData de seguida.
+     *
+     * La taula es repinta sencera en cercar o en marcar, i el que hi hagi
+     * escrit als camps es perdria: només vivia al DOM. Es fa per delegació
+     * perquè les files no existeixen quan s'enganxa el listener.
+     */
+    reviewBody.addEventListener('input', (event) => {
+        const row = event.target.closest('tr[data-index]');
+        if (!row) return;
+
+        const record = currentReviewData[row.dataset.index];
+        if (event.target.name === 'empresa') record.empresa = event.target.value;
+
+        if (event.target.name === 'categoria') {
+            record.categoria = event.target.value;
+            // La fila deixa d'estar marcada en triar-li categoria. Sense això
+            // seguia en vermell fins al següent repintat i semblava que la
+            // selecció no s'hagués desat.
+            row.classList.toggle('row-needs-review', !record.categoria);
+            event.target.required = !record.categoria;
+        }
+    });
+
+    reviewBody.addEventListener('change', (event) => {
+        if (event.target.name !== 'inclos') return;
+
+        const row = event.target.closest('tr[data-index]');
+        if (!row) return;
+
+        currentReviewData[row.dataset.index].inclos = event.target.checked;
+        // No es repinta la taula sencera: només canvia aquesta fila, i
+        // repintar-la mouria l'scroll de l'usuari a dalt de tot.
+        row.style.opacity = event.target.checked ? '' : '0.45';
+        updateSummary();
+    });
+
+    document.getElementById('review-search').addEventListener('input', renderReviewTable);
+
+    // Marquen i desmarquen el lot sencer, també el que la cerca amaga: així
+    // "desmarcar-ho tot" sempre deixa zero, es miri el que es miri.
+    document.getElementById('select-all').addEventListener('click', () => {
+        currentReviewData.forEach(t => { t.inclos = true; });
+        renderReviewTable();
+    });
+
+    document.getElementById('select-none').addEventListener('click', () => {
+        currentReviewData.forEach(t => { t.inclos = false; });
+        renderReviewTable();
+    });
+
+    confirmBtn.addEventListener('click', async () => {
+        // Les dades surten de currentReviewData i no del DOM: amb la cerca
+        // activa, la taula només ensenya una part i llegir-ne les files
+        // n'importaria una part.
+        const confirmedData = currentReviewData
+            .filter(t => t.inclos)
+            // `inclos` és de la pantalla, no del model: el backend no l'espera.
+            .map(({ inclos, ...transaction }) => transaction);
+
+        if (confirmedData.length === 0) {
+            statusDiv.textContent = '⚠️ No hi ha cap moviment seleccionat.';
+            statusDiv.classList.remove('hidden');
+            return;
+        }
+
+        // Només es valida el que s'importa: un moviment descartat pot quedar
+        // sense categoria i no ha de bloquejar la resta.
         const missingCategory = confirmedData.some(t => !t.categoria);
         if (missingCategory) {
-            statusDiv.textContent = '⚠️ Hi ha moviments sense categoria. Revisa les files marcades.';
+            const search = document.getElementById('review-search');
+            if (search.value) {
+                // Si la cerca amagava la fila incompleta, l'avís semblava fals.
+                search.value = '';
+                renderReviewTable();
+            }
+            statusDiv.textContent = '⚠️ Hi ha moviments sense categoria. Revisa les files marcades o desmarca\'ls.';
             statusDiv.classList.remove('hidden');
             return;
         }
@@ -154,11 +279,16 @@ export async function initUpload(container) {
         statusDiv.textContent = 'Guardant...';
 
         try {
+            const discarded = currentReviewData.length - confirmedData.length;
             const result = await confirmTransactions(confirmedData);
-            statusDiv.textContent = `✅ ${result.message || 'Transaccions guardades correctament!'}`;
+            // Els descartats es diuen explícitament: si no, veure menys
+            // moviments dels que tenia el fitxer sembla que se n'hagin perdut.
+            statusDiv.textContent = `✅ ${result.message || 'Transaccions guardades correctament!'}`
+                + (discarded > 0 ? ` ${discarded} moviments descartats.` : '');
             reviewSection.classList.add('hidden');
             currentReviewData = [];
             reviewBody.innerHTML = '';
+            document.getElementById('review-search').value = '';
             fileInput.value = '';
             uploadBtn.disabled = true;
             setTimeout(() => {
@@ -176,6 +306,7 @@ export async function initUpload(container) {
         reviewSection.classList.add('hidden');
         currentReviewData = [];
         reviewBody.innerHTML = '';
+        document.getElementById('review-search').value = '';
         statusDiv.textContent = 'Operació cancel·lada.';
         statusDiv.classList.remove('hidden');
         confirmBtn.disabled = false;

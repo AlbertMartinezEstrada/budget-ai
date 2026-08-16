@@ -55,6 +55,15 @@ export async function initCategories(container) {
                             <option value="FIXED">Fijo — se prorratea en coste de vida</option>
                         </select>
                     </div>
+                    <div id="category-section-wrapper" style="display: none;">
+                        <label class="block text-sm font-medium mb-1" for="category-section">Sección del reparto</label>
+                        <select id="category-section" class="w-full px-3 py-2 border rounded-lg">
+                            <option value="AUTO">Deducir de las subcategorías</option>
+                            <option value="FIXED">Gastos fijos</option>
+                            <option value="VARIABLE">Gastos variables</option>
+                            <option value="INCOME">Ingresos — dinero que entra, no se reparte</option>
+                        </select>
+                    </div>
                     <p id="category-hint" class="text-xs text-gray-500 dark:text-slate-400"></p>
                     <div class="flex gap-2 justify-end">
                         <button type="button" id="category-cancel-btn" class="px-4 py-2 border rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700">Cancelar</button>
@@ -136,9 +145,10 @@ function renderRow(category, asGroupHeader) {
 
     return `
         <div class="flex items-center justify-between ${asGroupHeader ? '' : 'text-sm'}">
-            <span class="flex items-center gap-2">
+            <span class="flex items-center gap-2 flex-wrap">
                 <span class="${asGroupHeader ? 'font-semibold text-lg' : ''}">${escapeHtml(category.nom)}</span>
                 <span class="text-xs px-2 py-0.5 rounded-full ${badge.cls}">${badge.text}</span>
+                ${sectionBadge(category, group)}
                 ${group ? `<span class="text-xs text-gray-500 dark:text-slate-400">${childrenOf(category.id).length} subcategorías</span>` : ''}
             </span>
             <span class="flex gap-1">
@@ -151,6 +161,25 @@ function renderRow(category, asGroupHeader) {
             </span>
         </div>
     `;
+}
+
+/**
+ * A quina secció del repartiment va un bloc, quan ell mateix ho declara.
+ *
+ * Només als blocs de primer nivell amb subcategories: és l'únic lloc on el
+ * camp vol dir "secció" i no "com es mesura". Si no ho declaren, no s'ensenya
+ * res, perquè la secció surt de les fulles i ja es veu en cadascuna.
+ */
+function sectionBadge(category, group) {
+    if (!group || category.parent_id || !category.tipus_cost) return '';
+
+    if (category.tipus_cost === 'FIXED') {
+        return '<span class="text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">en gastos fijos</span>';
+    }
+    if (category.tipus_cost === 'INCOME') {
+        return '<span class="text-xs px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">en ingresos</span>';
+    }
+    return '<span class="text-xs px-2 py-0.5 rounded-full bg-violet-100 text-violet-700">en gastos variables</span>';
 }
 
 /**
@@ -186,6 +215,7 @@ function openModal(category = null) {
     const modal = document.getElementById('category-modal');
     const form = document.getElementById('category-form');
     const natureWrapper = document.getElementById('category-nature-wrapper');
+    const sectionWrapper = document.getElementById('category-section-wrapper');
     const hint = document.getElementById('category-hint');
 
     form.reset();
@@ -198,16 +228,22 @@ function openModal(category = null) {
         document.getElementById('category-name').value = category.nom;
         document.getElementById('category-parent').value = category.parent_id || '';
         document.getElementById('category-nature').value = category.tipus_cost || 'VARIABLE';
+        document.getElementById('category-section').value = category.tipus_cost || 'AUTO';
 
-        // Un grup no té naturalesa pròpia, així que no es demana.
+        // A un grup, el camp no diu com es mesura —això ho diu cada
+        // subcategoria— sinó a quina secció del repartiment va el bloc sencer.
         const group = isGroup(category);
         natureWrapper.style.display = group ? 'none' : '';
+        sectionWrapper.style.display = group && !category.parent_id ? '' : 'none';
         hint.textContent = group
-            ? 'Es un grupo: su coste sale de sumar sus subcategorías.'
+            ? (category.parent_id
+                ? 'Es un grupo: su coste sale de sumar sus subcategorías.'
+                : 'Un bloque puede ser fijo y tener dentro subcategorías variables: el alquiler no se mueve, la luz sí.')
             : '';
     } else {
         document.getElementById('category-id').value = '';
         natureWrapper.style.display = '';
+        sectionWrapper.style.display = 'none';
         hint.textContent = 'Si le cuelgas subcategorías, pasará a ser un grupo.';
     }
 
@@ -267,8 +303,13 @@ async function handleSubmit(event) {
         data.parent_id = Number.parseInt(parentValue, 10);
     }
 
+    // El mateix camp, dues preguntes: a una fulla, com es mesura; a un bloc de
+    // primer nivell, a quina secció del repartiment va. "AUTO" el buida, per
+    // tornar a deduir-la de les subcategories.
     if (!group) {
         data.tipus_cost = document.getElementById('category-nature').value;
+    } else if (existing && !existing.parent_id) {
+        data.tipus_cost = document.getElementById('category-section').value;
     }
 
     try {

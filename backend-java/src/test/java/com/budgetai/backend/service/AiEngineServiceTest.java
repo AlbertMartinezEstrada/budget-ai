@@ -26,7 +26,9 @@ class AiEngineServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new AiEngineService();
+        // La jerarquia només fa falta per muntar el prompt, i aquests tests
+        // comproven què es fa amb la resposta, no què se li demana.
+        service = new AiEngineService(null);
     }
 
     private Transaction original(String concept, String amount) {

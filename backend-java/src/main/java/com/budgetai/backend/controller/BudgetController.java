@@ -56,6 +56,26 @@ public class BudgetController {
     }
 
     /**
+     * Duplica al mes indicat les assignacions del mes anterior.
+     *
+     * Un pressupost val per al seu període i prou, així que cada mes comença
+     * en blanc i el repartiment s'ha de refer sencer. Copiar-lo és el que
+     * evita tornar a teclejar vint xifres cada trenta dies.
+     *
+     * Va abans de /{id} pel mateix motiu que monthly-summary.
+     */
+    @PostMapping("/copy-previous-month")
+    public Map<String, Object> copyPreviousMonth(
+            @RequestParam(required = false) Integer year,
+            @RequestParam(required = false) Integer month) {
+
+        LocalDate now = LocalDate.now();
+        return budgetService.copyFromPreviousMonth(
+                year != null ? year : now.getYear(),
+                month != null ? month : now.getMonthValue());
+    }
+
+    /**
      * Sou d'un mes concret, quan no és el de sempre.
      * El sou per defecte viu a la configuració (`expectedMonthlyIncome`).
      */
