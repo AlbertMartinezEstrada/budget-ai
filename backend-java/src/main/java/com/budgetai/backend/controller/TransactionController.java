@@ -111,6 +111,153 @@ public class TransactionController {
     // @Transactional: desar els moviments i ajustar els saldos ha de ser una
     // sola operació. Abans els saldos es tocaven dins del bucle i el saveAll
     // era l'últim pas, així que un error deixava saldos moguts sense moviments.
+    /**
+     * Lliga un moviment amb la seva categoria, empresa i compte, i li aplica
+     * el saldo.
+     *
+     * Ho comparteixen la confirmació d'una importació i l'alta manual. És el
+     * codi que mou diners, i tenir-ne dues còpies voldria dir que un arranjament
+     * al saldo o a la regla de les fulles s'aplicaria només a una de les dues
+     * portes d'entrada.
+     *
+     * Qui la cridi ha de ser @Transactional i deixar passar les excepcions:
+     * si peta a la meitat, el saldo ja s'ha mogut i cal el rollback.
+     */
+    private void linkAndApplyToBalance(Transaction t, Account defaultAccount) {
+        // Category (Sempre n'ha d'haver una de les oficials)
+        String catName = t.getCategoryName();
+        if (catName == null || catName.isEmpty()) catName = "Altres";
+
+        final String finalCatName = catName;
+        Category category = categoryRepository.findByName(finalCatName)
+                .orElseGet(() -> categoryRepository.findByName("Altres").get());
+
+        // Les transaccions només s'assignen a fulles: un grup existeix
+        // per agregar els seus fills, no per rebre moviments. Si la
+        // categoria triada és un grup, el moviment aniria a parar a un
+        // node que després tornaria a sumar-lo pels fills i es
+        // comptaria dues vegades.
+        if (categoryHierarchyService.isGroup(category.getId())) {
+            throw new ConfirmUploadException(
+                    "La categoria \"" + category.getName() + "\" és un grup: "
+                            + "tria'n una de concreta.", null);
+        }
+        t.setCategory(category);
+
+        // Company (Si no existeix la creem)
+        String compName = t.getCompanyName();
+        if (compName == null || compName.isEmpty()) compName = "Desconegut";
+
+        final String finalCompName = compName;
+        Company company = companyRepository.findByName(finalCompName)
+                .orElseGet(() -> companyRepository.save(new Company(finalCompName)));
+        t.setCompany(company);
+
+        // Assegurar que el tipus es manté (INCOME/EXPENSE)
+        if (t.getType() == null) {
+            t.setType("EXPENSE");
+        }
+
+        // Asignar cuenta si no tiene
+        if (t.getAccount() == null && defaultAccount != null) {
+            t.setAccount(defaultAccount);
+        }
+
+        // Actualizar el saldo de la cuenta
+        if (t.getAccount() != null) {
+            if ("EXPENSE".equals(t.getType())) {
+                accountService.updateAccountBalance(t.getAccount().getId(), t.getAmount(), "SUBTRACT");
+            } else if ("INCOME".equals(t.getType())) {
+                accountService.updateAccountBalance(t.getAccount().getId(), t.getAmount(), "ADD");
+            }
+        }
+    }
+
+    /**
+     * Alta manual d'un moviment: efectiu, un préstec entre amics, qualsevol
+     * cosa que no surti de l'extracte.
+     *
+     * NO se li calcula hash de verificació, i és a posta. El hash vol dir
+     * "aquesta és una línia concreta d'un extracte i la sabré reconèixer".
+     * Una alta manual no en té cap, i posar-n'hi un faria que dos cafès de
+     * 2,50 € el mateix dia al mateix lloc es prenguessin per un duplicat i el
+     * segon es descartés en silenci.
+     *
+     * @Transactional i sense capturar l'excepció, com la resta del que mou
+     * diners: si el desat falla després d'haver tocat el saldo, cal el rollback.
+     */
+    @PostMapping("/gastos")
+    @Transactional
+    public ResponseEntity<?> createTransaction(@RequestBody Transaction transaction) {
+        if (transaction.getAmount() == null || transaction.getAmount().signum() <= 0) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "status", "error",
+                    "message", "L'import ha de ser més gran que zero."));
+        }
+        if (transaction.getDate() == null) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "status", "error",
+                    "message", "Falta la data del moviment."));
+        }
+
+        // L'import es desa sempre en positiu; el signe viu al tipus, igual que
+        // als moviments que arriben del CSV.
+        transaction.setAmount(transaction.getAmount().abs());
+        transaction.setVerificationHash(null);
+
+        // El saldo resultant només té sentit quan ve de l'extracte: allà és el
+        // que deia el banc en aquell moment. Inventar-lo aquí faria que les
+        // dues fonts diguessin coses diferents amb el mateix nom.
+        transaction.setBalance(null);
+
+        Account defaultAccount = accountRepository.findByName("Compte Principal")
+                .orElseGet(() -> accountRepository.findAll().stream().findFirst().orElse(null));
+
+        linkAndApplyToBalance(transaction, defaultAccount);
+        Transaction saved = transactionRepository.save(transaction);
+
+        return ResponseEntity.ok(Map.of(
+                "status", "success",
+                "message", "Moviment afegit correctament",
+                "id", saved.getId()));
+    }
+
+    /**
+     * Esborra un moviment i **desfà** el que va fer al saldo.
+     *
+     * No n'hi ha prou d'esborrar la fila: el saldo del compte es va moure en
+     * desar-lo i quedaria descompensat per sempre. És el mateix criteri que
+     * amb les transferències.
+     *
+     * @Transactional i sense capturar l'excepció: si l'esborrat falla després
+     * de tocar el saldo, cal el rollback.
+     */
+    @DeleteMapping("/gastos/{id}")
+    @Transactional
+    public ResponseEntity<?> deleteTransaction(@PathVariable Long id) {
+        Transaction transaction = transactionRepository.findById(id).orElse(null);
+        if (transaction == null) {
+            return ResponseEntity.notFound().build();
+        }
+
+        // A l'inrevés que en desar: una despesa va restar, així que ara suma.
+        if (transaction.getAccount() != null && transaction.getAmount() != null) {
+            if ("EXPENSE".equals(transaction.getType())) {
+                accountService.updateAccountBalance(
+                        transaction.getAccount().getId(), transaction.getAmount(), "ADD");
+            } else if ("INCOME".equals(transaction.getType())) {
+                accountService.updateAccountBalance(
+                        transaction.getAccount().getId(), transaction.getAmount(), "SUBTRACT");
+            }
+        }
+
+        transactionRepository.delete(transaction);
+
+        return ResponseEntity.ok(Map.of(
+                "status", "success",
+                "message", "Moviment esborrat"));
+    }
+
     @PostMapping("/confirm-upload")
     @Transactional
     public ResponseEntity<?> confirmUpload(@RequestBody List<Transaction> confirmedTransactions) {
@@ -164,53 +311,7 @@ public class TransactionController {
             }
 
             for (Transaction t : toPersist) {
-                // Category (Sempre n'ha d'haver una de les oficials)
-                String catName = t.getCategoryName();
-                if (catName == null || catName.isEmpty()) catName = "Altres";
-
-                final String finalCatName = catName;
-                Category category = categoryRepository.findByName(finalCatName)
-                        .orElseGet(() -> categoryRepository.findByName("Altres").get());
-
-                // Les transaccions només s'assignen a fulles: un grup existeix
-                // per agregar els seus fills, no per rebre moviments. Si la
-                // categoria triada és un grup, el moviment aniria a parar a un
-                // node que després tornaria a sumar-lo pels fills i es
-                // comptaria dues vegades.
-                if (categoryHierarchyService.isGroup(category.getId())) {
-                    throw new ConfirmUploadException(
-                            "La categoria \"" + category.getName() + "\" és un grup: "
-                                    + "tria'n una de concreta.", null);
-                }
-                t.setCategory(category);
-
-                // Company (Si no existeix la creem)
-                String compName = t.getCompanyName();
-                if (compName == null || compName.isEmpty()) compName = "Desconegut";
-
-                final String finalCompName = compName;
-                Company company = companyRepository.findByName(finalCompName)
-                        .orElseGet(() -> companyRepository.save(new Company(finalCompName)));
-                t.setCompany(company);
-
-                // Assegurar que el tipus es manté (INCOME/EXPENSE)
-                if (t.getType() == null) {
-                    t.setType("EXPENSE");
-                }
-
-                // Asignar cuenta si no tiene
-                if (t.getAccount() == null && defaultAccount != null) {
-                    t.setAccount(defaultAccount);
-                }
-
-                // Actualizar el saldo de la cuenta
-                if (t.getAccount() != null) {
-                    if ("EXPENSE".equals(t.getType())) {
-                        accountService.updateAccountBalance(t.getAccount().getId(), t.getAmount(), "SUBTRACT");
-                    } else if ("INCOME".equals(t.getType())) {
-                        accountService.updateAccountBalance(t.getAccount().getId(), t.getAmount(), "ADD");
-                    }
-                }
+                linkAndApplyToBalance(t, defaultAccount);
             }
 
             transactionRepository.saveAll(toPersist);
@@ -237,6 +338,25 @@ public class TransactionController {
         ConfirmUploadException(String message, Throwable cause) {
             super(message, cause);
         }
+    }
+
+    /**
+     * Deixa arribar el motiu de l'error al client.
+     *
+     * Sense això la resposta era el cos d'error per defecte de Spring, que
+     * porta el missatge buit si no s'activa server.error.include-message. El
+     * frontend ensenyava "Error 500" i l'usuari no sabia què havia passat, per
+     * exemple que la categoria triada era un grup.
+     *
+     * Capturar-la aquí no impedeix el rollback, a diferència de fer-ho amb un
+     * try/catch dins del mètode: quan arriba en aquest punt, la transacció ja
+     * s'ha desfet perquè l'excepció ha travessat el límit de @Transactional.
+     */
+    @ExceptionHandler(ConfirmUploadException.class)
+    public ResponseEntity<Map<String, String>> handleConfirmUploadError(ConfirmUploadException e) {
+        return ResponseEntity.internalServerError().body(Map.of(
+                "status", "error",
+                "message", e.getMessage() != null ? e.getMessage() : "Error desconegut"));
     }
 
     @GetMapping("/gastos")

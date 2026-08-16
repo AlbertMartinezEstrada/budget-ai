@@ -1,4 +1,7 @@
-import { getTransactions, getCategories, getCompanies, formatCurrency, escapeHtml } from '../../api.js';
+import {
+    getTransactions, getCategories, getCompanies, createTransaction, deleteTransaction,
+    formatCurrency, escapeHtml
+} from '../../api.js';
 
 const MONTH_FORMATTER = new Intl.DateTimeFormat('ca-ES', {
     month: 'long',
@@ -41,6 +44,9 @@ export async function initTransactions(container) {
             <div class="card-header">
                 <h3 class="card-title">Llistat de Transaccions</h3>
                 <div class="card-header-actions">
+                    <button class="btn btn-sm btn-primary" id="add-transaction-btn" type="button">
+                        + Afegir moviment
+                    </button>
                     <button class="btn btn-sm btn-outline" id="toggle-transaction-sort" type="button"></button>
                     <span class="badge badge-secondary" id="transaction-count">0</span>
                 </div>
@@ -54,12 +60,59 @@ export async function initTransactions(container) {
                             <th>Categoria</th>
                             <th>Descripció</th>
                             <th class="text-right">Import</th>
+                            <th style="width: 3rem;"></th>
                         </tr>
                     </thead>
                     <tbody id="transactions-body">
-                        <tr><td colspan="5" class="text-center">Carregant...</td></tr>
+                        <tr><td colspan="6" class="text-center">Carregant...</td></tr>
                     </tbody>
                 </table>
+            </div>
+        </div>
+
+        <!-- Modal d'alta manual -->
+        <div id="transaction-modal" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-50 p-4">
+            <div class="bg-white dark:bg-slate-800 rounded-xl p-6 w-full max-w-md max-h-full overflow-y-auto">
+                <h3 class="text-xl font-bold mb-1">Afegir moviment</h3>
+                <p class="text-sm text-gray-500 dark:text-slate-400 mb-4">
+                    Per al que no surt de l'extracte: efectiu, un préstec, una devolució.
+                </p>
+                <form id="transaction-form" class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium mb-1" for="new-type">Tipus</label>
+                        <select id="new-type" class="form-control">
+                            <option value="EXPENSE">Despesa — resta del saldo</option>
+                            <option value="INCOME">Ingrés — suma al saldo</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-1" for="new-amount">Import</label>
+                        <input type="number" id="new-amount" class="form-control" step="0.01" min="0.01" required>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-1" for="new-date">Data</label>
+                        <input type="date" id="new-date" class="form-control" required>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-1" for="new-category">Categoria</label>
+                        <select id="new-category" class="form-control" required></select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-1" for="new-company">Empresa</label>
+                        <input type="text" id="new-company" class="form-control" list="company-suggestions"
+                               placeholder="Desconegut">
+                        <datalist id="company-suggestions"></datalist>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-1" for="new-description">Descripció</label>
+                        <input type="text" id="new-description" class="form-control" placeholder="Opcional">
+                    </div>
+                    <p id="transaction-form-error" class="text-error text-sm hidden"></p>
+                    <div class="flex gap-2 justify-end">
+                        <button type="button" id="transaction-cancel" class="btn btn-outline">Cancel·lar</button>
+                        <button type="submit" class="btn btn-primary">Afegir</button>
+                    </div>
+                </form>
             </div>
         </div>
     `;
@@ -110,6 +163,120 @@ export async function initTransactions(container) {
         updateSortButton();
         loadData();
     });
+
+    // Delegació: les files es repinten a cada filtre, així que un listener
+    // posat a cada botó no sobreviuria. I res d'onclick amb dades
+    // interpolades, que es trenca amb un nom com O'Brien.
+    document.getElementById('transactions-body').addEventListener('click', handleRowAction);
+
+    setUpManualEntry(categories, companies);
+}
+
+async function handleRowAction(event) {
+    const button = event.target.closest('button[data-action="delete-transaction"]');
+    if (!button) return;
+
+    const id = Number.parseInt(button.dataset.id, 10);
+    if (!Number.isInteger(id)) return;
+
+    // Esborrar mou el saldo del compte cap enrere, així que es pregunta.
+    if (!confirm('Esborrar aquest moviment? El saldo del compte es desfarà.')) return;
+
+    button.disabled = true;
+    try {
+        await deleteTransaction(id);
+        await loadData();
+    } catch (error) {
+        alert(error.message || 'No s\'ha pogut esborrar el moviment.');
+        button.disabled = false;
+    }
+}
+
+/**
+ * Alta manual d'un moviment.
+ *
+ * Al desplegable només hi van les fulles. Un grup existeix per agregar els
+ * seus fills, i un moviment penjat d'un grup es comptaria dues vegades: el
+ * backend ho rebutja, així que val més no oferir-ho.
+ */
+function setUpManualEntry(categories, companies) {
+    const modal = document.getElementById('transaction-modal');
+    const form = document.getElementById('transaction-form');
+    const error = document.getElementById('transaction-form-error');
+
+    const parents = new Set(categories.map(c => c.parent_id).filter(Boolean));
+    const leaves = categories.filter(c => !parents.has(c.id));
+
+    document.getElementById('new-category').innerHTML = leaves
+        .map(c => `<option value="${escapeHtml(c.nom)}">${escapeHtml(c.nom)}</option>`)
+        .join('');
+
+    document.getElementById('company-suggestions').innerHTML = companies
+        .map(c => `<option value="${escapeHtml(c.nom)}"></option>`)
+        .join('');
+
+    const close = () => {
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+    };
+
+    document.getElementById('add-transaction-btn').addEventListener('click', () => {
+        form.reset();
+        error.classList.add('hidden');
+        // Per defecte, avui: el cas normal és apuntar una cosa que acaba de passar.
+        document.getElementById('new-date').value = todayInputValue();
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+    });
+
+    document.getElementById('transaction-cancel').addEventListener('click', close);
+    modal.addEventListener('click', (e) => {
+        if (e.target.id === 'transaction-modal') close();
+    });
+
+    form.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        error.classList.add('hidden');
+
+        const amount = Number.parseFloat(document.getElementById('new-amount').value);
+        if (!Number.isFinite(amount) || amount <= 0) {
+            error.textContent = 'L\'import ha de ser més gran que zero.';
+            error.classList.remove('hidden');
+            return;
+        }
+
+        const submitButton = form.querySelector('button[type="submit"]');
+        submitButton.disabled = true;
+
+        try {
+            await createTransaction({
+                data: document.getElementById('new-date').value,
+                cost: amount,
+                type: document.getElementById('new-type').value,
+                categoria: document.getElementById('new-category').value,
+                empresa: document.getElementById('new-company').value.trim() || 'Desconegut',
+                descripcio_curta: document.getElementById('new-description').value.trim()
+            });
+            close();
+            await loadData();
+        } catch (e) {
+            error.textContent = e.message || 'No s\'ha pogut afegir el moviment.';
+            error.classList.remove('hidden');
+        } finally {
+            // Es rehabilita sempre: si fallava, el botó quedava bloquejat i
+            // calia tancar i tornar a obrir el formulari.
+            submitButton.disabled = false;
+        }
+    });
+}
+
+/** Avui en el format que espera un <input type="date">. */
+function todayInputValue() {
+    const now = new Date();
+    // toISOString() passa a UTC i pot restar un dia segons la zona horària.
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    return `${now.getFullYear()}-${month}-${day}`;
 }
 
 async function loadData() {
@@ -203,7 +370,7 @@ function compareTransactions(left, right, sortBy) {
 function buildMonthRow(date) {
     return `
         <tr class="table-group-row">
-            <td colspan="5">${formatMonth(date)}</td>
+            <td colspan="6">${formatMonth(date)}</td>
         </tr>
     `;
 }
@@ -216,6 +383,12 @@ function buildTransactionRow(transaction) {
             <td><span class="badge badge-outline">${escapeHtml(transaction.categoria || '-')}</span></td>
             <td class="text-muted text-sm">${escapeHtml(transaction.descripcio_curta || '-')}</td>
             <td class="text-right font-bold">${formatAmount(transaction.cost)}</td>
+            <td class="text-right">
+                <button class="btn btn-sm btn-outline" data-action="delete-transaction"
+                        data-id="${transaction.id}" title="Esborrar aquest moviment">
+                    <span class="material-symbols-outlined text-sm">delete</span>
+                </button>
+            </td>
         </tr>
     `;
 }
@@ -223,7 +396,7 @@ function buildTransactionRow(transaction) {
 function renderMessageRow(message, isError = false) {
     document.getElementById('transactions-body').innerHTML = `
         <tr>
-            <td colspan="5" class="text-center ${isError ? 'text-error' : ''}">${message}</td>
+            <td colspan="6" class="text-center ${isError ? 'text-error' : ''}">${message}</td>
         </tr>
     `;
 }
