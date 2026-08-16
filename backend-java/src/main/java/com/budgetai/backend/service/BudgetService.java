@@ -162,6 +162,9 @@ public class BudgetService {
 
         return transactionRepository.findAll().stream()
                 .filter(t -> "EXPENSE".equals(t.getType()))
+                // Els diners que ja es van comptar en sortir del compte
+                // principal no tornen a comptar en gastar-se al compte destí.
+                .filter(t -> !t.isExcludedFromBudget())
                 .filter(t -> t.getCategory() != null && categoryIds.contains(t.getCategory().getId()))
                 .filter(t -> t.getDate() != null
                         && !t.getDate().isBefore(from) && !t.getDate().isAfter(to))
@@ -422,6 +425,9 @@ public class BudgetService {
     private BigDecimal incomeIn(Long categoryId, LocalDate from, LocalDate to) {
         return transactionRepository.findAll().stream()
                 .filter(t -> "INCOME".equals(t.getType()))
+                // Una entrada per traspàs no són diners nous: eixamplaria el
+                // bot a repartir amb els mateixos euros que ja hi eren.
+                .filter(t -> !t.isExcludedFromBudget())
                 .filter(t -> categoryId == null
                         || (t.getCategory() != null && categoryId.equals(t.getCategory().getId())))
                 .filter(t -> t.getDate() != null

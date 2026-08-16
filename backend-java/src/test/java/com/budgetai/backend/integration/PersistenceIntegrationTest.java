@@ -171,25 +171,52 @@ class PersistenceIntegrationTest extends AbstractIntegrationTest {
         assertThat(accountRepository.findById(id)).isPresent();
     }
 
-    @Test
-    @DisplayName("El hash de verificació és únic a la base de dades")
-    void verificationHashIsUniqueAtTheDatabaseLevel() {
-        Transaction first = new Transaction();
-        first.setAmount(new BigDecimal("10.00"));
-        first.setDate(LocalDate.of(2026, 2, 15));
-        first.setType("EXPENSE");
-        first.setVerificationHash("hash-repetit");
-        transactionRepository.saveAndFlush(first);
+    private Transaction statementLine(String hash, Account account) {
+        Transaction t = new Transaction();
+        t.setAmount(new BigDecimal("10.00"));
+        t.setDate(LocalDate.of(2026, 2, 15));
+        t.setType("EXPENSE");
+        t.setVerificationHash(hash);
+        t.setAccount(account);
+        return t;
+    }
 
-        Transaction duplicate = new Transaction();
-        duplicate.setAmount(new BigDecimal("10.00"));
-        duplicate.setDate(LocalDate.of(2026, 2, 15));
-        duplicate.setType("EXPENSE");
-        duplicate.setVerificationHash("hash-repetit");
+    @Test
+    @DisplayName("El hash de verificació és únic dins d'un mateix compte")
+    void verificationHashIsUniquePerAccount() {
+        Account account = accountRepository.save(accountNamed("Compte del hash"));
+        transactionRepository.saveAndFlush(statementLine("hash-repetit", account));
 
         // L'última barrera contra duplicats: encara que la comprovació de
         // l'aplicació fallés, la base de dades no ho permet.
-        assertThatThrownBy(() -> transactionRepository.saveAndFlush(duplicate))
+        assertThatThrownBy(() -> transactionRepository.saveAndFlush(
+                statementLine("hash-repetit", account)))
                 .isInstanceOf(Exception.class);
+    }
+
+    @Test
+    @DisplayName("El mateix hash a dos comptes diferents sí que s'admet")
+    void theSameHashIsAllowedInAnotherAccount() {
+        Account origin = accountRepository.save(accountNamed("Origen del traspàs"));
+        Account destination = accountRepository.save(accountNamed("Destí del traspàs"));
+
+        transactionRepository.saveAndFlush(statementLine("hash-traspas", origin));
+
+        // Un traspàs deixa el mateix import el mateix dia als extractes dels
+        // dos comptes. Amb la unicitat només sobre el hash, la segona pota es
+        // rebutjava i el compte destí es quedava sense el moviment.
+        transactionRepository.saveAndFlush(statementLine("hash-traspas", destination));
+
+        assertThat(transactionRepository.findAll())
+                .filteredOn(t -> "hash-traspas".equals(t.getVerificationHash()))
+                .hasSize(2);
+    }
+
+    private Account accountNamed(String name) {
+        Account account = new Account();
+        account.setName(name);
+        account.setType("CORRIENTE");
+        account.setCurrentBalance(new BigDecimal("0.00"));
+        return account;
     }
 }

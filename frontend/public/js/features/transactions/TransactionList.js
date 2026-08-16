@@ -1,6 +1,6 @@
 import {
-    getTransactions, getCategories, getCompanies, createTransaction, deleteTransaction,
-    formatCurrency, escapeHtml
+    getTransactions, getCategories, getCompanies, getAccounts,
+    createTransaction, deleteTransaction, formatCurrency, escapeHtml
 } from '../../api.js';
 
 const MONTH_FORMATTER = new Intl.DateTimeFormat('ca-ES', {
@@ -32,6 +32,12 @@ export async function initTransactions(container) {
                     </select>
                 </div>
                 <div class="form-group">
+                    <label for="filter-account">Compte</label>
+                    <select id="filter-account" class="form-control">
+                        <option value="">Tots</option>
+                    </select>
+                </div>
+                <div class="form-group">
                     <label for="filter-month">Mes</label>
                     <select id="filter-month" class="form-control">
                         <option value="">Tots els mesos</option>
@@ -56,6 +62,7 @@ export async function initTransactions(container) {
                     <thead>
                         <tr>
                             <th>Data</th>
+                            <th>Compte</th>
                             <th>Empresa</th>
                             <th>Categoria</th>
                             <th>Descripció</th>
@@ -64,7 +71,7 @@ export async function initTransactions(container) {
                         </tr>
                     </thead>
                     <tbody id="transactions-body">
-                        <tr><td colspan="6" class="text-center">Carregant...</td></tr>
+                        <tr><td colspan="7" class="text-center">Carregant...</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -129,6 +136,14 @@ export async function initTransactions(container) {
         catSelect.appendChild(option);
     });
 
+    const accSelect = document.getElementById('filter-account');
+    (await getAccounts()).forEach(a => {
+        const option = document.createElement('option');
+        option.value = a.id;
+        option.textContent = a.nom;
+        accSelect.appendChild(option);
+    });
+
     const compSelect = document.getElementById('filter-company');
     companies.forEach(c => {
         const option = document.createElement('option');
@@ -153,11 +168,13 @@ export async function initTransactions(container) {
     // Event Listeners
     document.getElementById('filter-category').addEventListener('change', loadData);
     document.getElementById('filter-company').addEventListener('change', loadData);
+    document.getElementById('filter-account').addEventListener('change', loadData);
     document.getElementById('filter-month').addEventListener('change', loadData);
     document.getElementById('toggle-transaction-sort').addEventListener('click', toggleSortMode);
     document.getElementById('clear-filters').addEventListener('click', () => {
         document.getElementById('filter-category').value = '';
         document.getElementById('filter-company').value = '';
+        document.getElementById('filter-account').value = '';
         document.getElementById('filter-month').value = '';
         currentSortMode = 'month-desc';
         updateSortButton();
@@ -282,11 +299,13 @@ function todayInputValue() {
 async function loadData() {
     const categoryId = document.getElementById('filter-category').value;
     const companyId = document.getElementById('filter-company').value;
+    const accountId = document.getElementById('filter-account').value;
     const selectedMonth = document.getElementById('filter-month').value;
-    
+
     const filters = {};
     if (categoryId) filters.categoryId = categoryId;
     if (companyId) filters.companyId = companyId;
+    if (accountId) filters.accountId = accountId;
     if (selectedMonth) {
         const { startDate, endDate } = buildMonthRange(selectedMonth);
         filters.startDate = startDate;
@@ -370,7 +389,7 @@ function compareTransactions(left, right, sortBy) {
 function buildMonthRow(date) {
     return `
         <tr class="table-group-row">
-            <td colspan="6">${formatMonth(date)}</td>
+            <td colspan="7">${formatMonth(date)}</td>
         </tr>
     `;
 }
@@ -379,7 +398,13 @@ function buildTransactionRow(transaction) {
     return `
         <tr>
             <td>${escapeHtml(formatTransactionDate(transaction.data))}</td>
-            <td>${escapeHtml(transaction.empresa || '-')}</td>
+            <td class="text-sm">${escapeHtml(transaction.account?.nom || '-')}</td>
+            <td>
+                ${escapeHtml(transaction.empresa || '-')}
+                ${transaction.exclos_pressupost
+                    ? '<span class="badge badge-outline text-sm" title="Diners ja comptats en sortir del compte principal: no compten al pressupost">no compta</span>'
+                    : ''}
+            </td>
             <td><span class="badge badge-outline">${escapeHtml(transaction.categoria || '-')}</span></td>
             <td class="text-muted text-sm">${escapeHtml(transaction.descripcio_curta || '-')}</td>
             <td class="text-right font-bold">${formatAmount(transaction.cost)}</td>
@@ -396,7 +421,7 @@ function buildTransactionRow(transaction) {
 function renderMessageRow(message, isError = false) {
     document.getElementById('transactions-body').innerHTML = `
         <tr>
-            <td colspan="6" class="text-center ${isError ? 'text-error' : ''}">${message}</td>
+            <td colspan="7" class="text-center ${isError ? 'text-error' : ''}">${message}</td>
         </tr>
     `;
 }

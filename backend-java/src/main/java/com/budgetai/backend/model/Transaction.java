@@ -65,6 +65,25 @@ public class Transaction {
     @JsonProperty("concepte_original")
     private String originalConcept;
 
+    /**
+     * Diners que no s'han de tornar a comptar al pressupost.
+     *
+     * Un cop surten del compte principal ja estan comptats: el traspàs cap a
+     * Revolut compta com a despesa, i a partir d'aquí l'entrada a Revolut i la
+     * compra que s'hi faci són el mateix diner una altra vegada. Sense això,
+     * 100 € traspassats i invertits sortien com a 200 € de despesa, i l'entrada
+     * al compte destí a més inflava el bot a repartir.
+     *
+     * Es diu "exclòs del pressupost" i no "és traspàs" perquè la compra de dins
+     * del compte destí no és cap traspàs, però tampoc s'ha de comptar.
+     *
+     * El saldo sí que es mou igualment: cada extracte és la veritat del seu
+     * compte i el moviment hi ha passat de debò.
+     */
+    @Column(name = "exclos_pressupost")
+    @JsonProperty("exclos_pressupost")
+    private Boolean excludedFromBudget;
+
     @Column(name = "compte_nom")
     private String accountName;
 
@@ -84,6 +103,22 @@ public class Transaction {
         if (accountName == null) accountName = "Principal";
         if (currency == null) currency = "EUR";
         if (createdAt == null) createdAt = LocalDateTime.now();
+        // La columna és NOT NULL. El valor per defecte va aquí i no a la
+        // declaració del camp: allà, una actualització parcial arribaria amb
+        // el valor per defecte i no es podria distingir de "no me l'han enviat".
+        if (excludedFromBudget == null) excludedFromBudget = Boolean.FALSE;
+    }
+
+    /**
+     * Un moviment sense la marca compta, que és el comportament de sempre.
+     *
+     * @JsonIgnore perquè el camp ja surt com a "exclos_pressupost": sense això,
+     * Jackson afegiria un "excludedFromBudget" duplicat al costat.
+     */
+    @Transient
+    @JsonIgnore
+    public boolean isExcludedFromBudget() {
+        return Boolean.TRUE.equals(excludedFromBudget);
     }
 
     // Mètodes per assegurar entrada/sortida correcta del JSON

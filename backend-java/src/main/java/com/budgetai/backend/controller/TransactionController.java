@@ -71,7 +71,8 @@ public class TransactionController {
     }
 
     @PostMapping("/upload-csv")
-    public ResponseEntity<?> uploadCsv(@RequestParam("file") MultipartFile file) {
+    public ResponseEntity<?> uploadCsv(@RequestParam("file") MultipartFile file,
+                                      @RequestParam(required = false) Long accountId) {
         try {
             // 1. Read and clean CSV
             List<Transaction> initialTransactions = bankReaderService.readBankCsv(file);
@@ -80,9 +81,20 @@ public class TransactionController {
                 return ResponseEntity.badRequest().body("No s'han trobat moviments al CSV");
             }
 
-            // 2. Filter out already existing transactions by hash
+            // 2. Es descarta el que ja s'ha importat en aquest mateix compte.
+            //
+            // El compte hi entra perquè un traspàs deixa el mateix import el
+            // mateix dia als extractes dels dos comptes. Mirant només el hash,
+            // la segona pota es filtrava aquí i l'usuari no arribava ni a
+            // veure-la a la pantalla de revisió.
             List<Transaction> newTransactions = initialTransactions.stream()
-                    .filter(t -> transactionRepository.findByVerificationHash(t.getVerificationHash()).isEmpty())
+                    .filter(t -> transactionRepository.findByVerificationHash(t.getVerificationHash())
+                            .map(existing -> {
+                                Long existingAccount = existing.getAccount() != null
+                                        ? existing.getAccount().getId() : null;
+                                return !Objects.equals(existingAccount, accountId);
+                            })
+                            .orElse(true))
                     .collect(Collectors.toList());
 
             if (newTransactions.isEmpty()) {
@@ -108,9 +120,19 @@ public class TransactionController {
         }
     }
 
-    // @Transactional: desar els moviments i ajustar els saldos ha de ser una
-    // sola operació. Abans els saldos es tocaven dins del bucle i el saveAll
-    // era l'últim pas, així que un error deixava saldos moguts sense moviments.
+    /**
+     * Identitat d'un moviment importat: la seva línia d'extracte i el compte.
+     *
+     * El hash sol no basta des que hi ha diversos comptes. Un traspàs produeix
+     * el mateix import el mateix dia a dos extractes diferents, i mirant només
+     * el hash el segon es prenia per un duplicat i es descartava en silenci
+     * —just el moviment que l'usuari vol veure a l'altre compte—.
+     */
+    private static String identityOf(Transaction t) {
+        Long accountId = t.getAccount() != null ? t.getAccount().getId() : null;
+        return t.getVerificationHash() + "@" + accountId;
+    }
+
     /**
      * Lliga un moviment amb la seva categoria, empresa i compte, i li aplica
      * el saldo.
@@ -260,6 +282,9 @@ public class TransactionController {
                 "message", "Moviment esborrat"));
     }
 
+    // @Transactional: desar els moviments i ajustar els saldos ha de ser una
+    // sola operació. Abans els saldos es tocaven dins del bucle i el saveAll
+    // era l'últim pas, així que un error deixava saldos moguts sense moviments.
     @PostMapping("/confirm-upload")
     @Transactional
     public ResponseEntity<?> confirmUpload(@RequestBody List<Transaction> confirmedTransactions) {
@@ -277,7 +302,12 @@ public class TransactionController {
             // la columna única no ho impedia perquè PostgreSQL admet tants
             // nulls com vulguis. Confirmar dues vegades el mateix lot —un doble
             // clic, un reintent després d'un error— el desava repetit.
+            // El compte s'assigna abans de comparar, perquè forma part de la
+            // identitat del moviment.
             for (Transaction t : confirmedTransactions) {
+                if (t.getAccount() == null && defaultAccount != null) {
+                    t.setAccount(defaultAccount);
+                }
                 t.setVerificationHash(transactionHasher.hash(t));
             }
 
@@ -289,7 +319,7 @@ public class TransactionController {
             Set<String> alreadyStored = incomingHashes.isEmpty()
                     ? Set.of()
                     : transactionRepository.findByVerificationHashIn(incomingHashes).stream()
-                            .map(Transaction::getVerificationHash)
+                            .map(TransactionController::identityOf)
                             .collect(Collectors.toSet());
 
             // Un lot pot portar dues vegades la mateixa fila si el fitxer la
@@ -297,8 +327,8 @@ public class TransactionController {
             // única rebentaria la transacció sencera.
             Set<String> seen = new HashSet<>();
             List<Transaction> toPersist = confirmedTransactions.stream()
-                    .filter(t -> !alreadyStored.contains(t.getVerificationHash()))
-                    .filter(t -> seen.add(t.getVerificationHash()))
+                    .filter(t -> !alreadyStored.contains(identityOf(t)))
+                    .filter(t -> seen.add(identityOf(t)))
                     .collect(Collectors.toList());
 
             int skipped = confirmedTransactions.size() - toPersist.size();
@@ -365,6 +395,7 @@ public class TransactionController {
     public List<Transaction> getTransactions(
             @RequestParam(required = false) Long categoryId,
             @RequestParam(required = false) Long companyId,
+            @RequestParam(required = false) Long accountId,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
 
@@ -373,7 +404,8 @@ public class TransactionController {
                     "La data 'des de' no pot ser posterior a la data 'fins a'");
         }
 
-        if (categoryId != null || companyId != null || startDate != null || endDate != null) {
+        if (categoryId != null || companyId != null || accountId != null
+                || startDate != null || endDate != null) {
             Specification<Transaction> specification = Specification.where(null);
 
             if (categoryId != null) {
@@ -384,6 +416,13 @@ public class TransactionController {
             if (companyId != null) {
                 specification = specification.and((root, query, criteriaBuilder) ->
                         criteriaBuilder.equal(root.get("company").get("id"), companyId));
+            }
+
+            // Amb diversos comptes, mirar-los per separat és el que permet
+            // quadrar el saldo de cadascun amb el seu extracte.
+            if (accountId != null) {
+                specification = specification.and((root, query, criteriaBuilder) ->
+                        criteriaBuilder.equal(root.get("account").get("id"), accountId));
             }
 
             if (startDate != null) {

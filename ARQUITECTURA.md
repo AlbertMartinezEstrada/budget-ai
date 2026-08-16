@@ -329,6 +329,41 @@ para que la tabla se pueda leer por sí sola.
    los hijos no pueden tomar un porcentaje de una cifra que aún no existe.
 3. Para un bloque de primer nivel, el bote de su sección.
 
+### Dinero que se mueve entre tus propias cuentas
+
+Con varias cuentas, el mismo dinero aparece varias veces. Un traspaso de 100 €
+de la cuenta principal a Revolut sale en los extractos de las dos:
+
+```
+Principal  −100  «traspàs a Revolut»   contaba como GASTO
+Revolut    +100  «entrada»             contaba como INGRESO
+Revolut    −100  «compra accions»      contaba como GASTO
+```
+
+200 € de gasto donde solo hay 100. Y la entrada era peor: desde que la cabecera
+del presupuesto sale de la suma de ingresos, **ensanchaba el bote a repartir con
+euros que ya estaban dentro**.
+
+La regla: **una vez el dinero sale de la cuenta principal, ya está contado.** Lo
+que haga después —llegar a Revolut, comprarse algo allí— mueve saldos pero no
+vuelve a contar. Es lo que marca `exclos_pressupost`, y `spentIn` e `incomeIn`
+lo descuentan.
+
+Se llama «excluido del presupuesto» y no «es traspaso» porque la compra dentro
+de la cuenta destino no es ningún traspaso, pero tampoco debe contar.
+
+**El saldo sí se mueve igual**: cada extracto es la verdad de su propia cuenta y
+el movimiento ocurrió de verdad. Por eso **no hace falta emparejar las dos
+patas**: la salida vive en Principal, la entrada en Revolut, y cada una toca
+solo su saldo. Sin conciliación ni riesgo de mover el saldo dos veces.
+
+La identidad de un movimiento importado pasa a ser **hash + cuenta**. Un
+traspaso deja el mismo importe el mismo día en dos extractos, y con la unicidad
+solo sobre el hash la segunda pata se tomaba por un duplicado y se descartaba en
+silencio — justo el movimiento que se quiere ver en la otra cuenta. La fórmula
+del hash no se toca: cambiarla dejaría los movimientos ya importados con una
+identidad vieja y volver a subir el mismo fichero los duplicaría.
+
 ### Las tres secciones
 
 `tipus_cost` responde **dos preguntas distintas según dónde esté**:

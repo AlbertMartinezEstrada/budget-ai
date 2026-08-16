@@ -1,4 +1,6 @@
-import { uploadCsv, confirmTransactions, getCategories, formatCurrency, escapeHtml } from '../../api.js';
+import {
+    uploadCsv, confirmTransactions, getCategories, getAccounts, formatCurrency, escapeHtml
+} from '../../api.js';
 
 /**
  * Ingrés o despesa.
@@ -29,6 +31,13 @@ export async function initUpload(container) {
                     <span class="mt-2 text-sm text-gray-500">Arrossega un fitxer CSV o fes clic per seleccionar-lo</span>
                 </label>
                 <button id="upload-btn" class="btn btn-primary mt-4" disabled>Pujar i Analitzar</button>
+            </div>
+            <div class="form-group mt-3">
+                <label for="upload-account">Compte d'aquest extracte</label>
+                <select id="upload-account" class="form-control"></select>
+                <p class="text-sm text-muted mt-1">
+                    Tots els moviments del fitxer s'assignaran a aquest compte.
+                </p>
             </div>
             <div id="upload-status" class="mt-4 text-center hidden"></div>
         </div>
@@ -63,6 +72,7 @@ export async function initUpload(container) {
                             <th>Empresa (Editable)</th>
                             <th>Categoria (Seleccionar)</th>
                             <th class="text-right">Import</th>
+                            <th title="Diners que ja es van comptar en sortir del compte principal">No comptar</th>
                         </tr>
                     </thead>
                     <tbody id="review-body"></tbody>
@@ -93,6 +103,17 @@ export async function initUpload(container) {
         console.error('Error loading categories:', error);
     }
 
+    // Un extracte és d'un compte. Sense triar-lo, tot queia al principal i amb
+    // tres comptes els saldos i el pressupost deixaven de voler dir res.
+    try {
+        const accounts = await getAccounts();
+        document.getElementById('upload-account').innerHTML = accounts
+            .map(a => `<option value="${a.id}">${escapeHtml(a.nom)}</option>`)
+            .join('');
+    } catch (error) {
+        console.error('Error loading accounts:', error);
+    }
+
     fileInput.addEventListener('change', () => {
         if (fileInput.files.length > 0) {
             uploadBtn.disabled = false;
@@ -113,7 +134,7 @@ export async function initUpload(container) {
         statusDiv.classList.remove('hidden', 'text-error', 'text-success');
 
         try {
-            const result = await uploadCsv(file);
+            const result = await uploadCsv(file, document.getElementById('upload-account').value);
             if (result.status === 'review') {
                 // Tot entra marcat: el cas normal és importar-ho sencer i
                 // descartar-ne quatre, no al revés.
@@ -202,6 +223,10 @@ export async function initUpload(container) {
                 <td class="text-right ${style.classe}" style="white-space: nowrap;">
                     ${style.signe}${formatCurrency(t.cost)}
                 </td>
+                <td class="text-center">
+                    <input type="checkbox" name="exclos" ${t.exclos_pressupost ? 'checked' : ''}
+                           title="Marca'l si aquests diners ja es van comptar en sortir del compte principal: una entrada per traspàs, o una compra feta amb diners ja traspassats.">
+                </td>
             </tr>
             `;
         }).join('');
@@ -267,10 +292,16 @@ export async function initUpload(container) {
     });
 
     reviewBody.addEventListener('change', (event) => {
-        if (event.target.name !== 'inclos') return;
+        if (event.target.name !== 'inclos' && event.target.name !== 'exclos') return;
 
         const row = event.target.closest('tr[data-index]');
         if (!row) return;
+
+        if (event.target.name === 'exclos') {
+            currentReviewData[row.dataset.index].exclos_pressupost = event.target.checked;
+            updateSummary();
+            return;
+        }
 
         currentReviewData[row.dataset.index].inclos = event.target.checked;
         // No es repinta la taula sencera: només canvia aquesta fila, i
@@ -297,10 +328,17 @@ export async function initUpload(container) {
         // Les dades surten de currentReviewData i no del DOM: amb la cerca
         // activa, la taula només ensenya una part i llegir-ne les files
         // n'importaria una part.
+        const accountId = Number.parseInt(document.getElementById('upload-account').value, 10);
+
         const confirmedData = currentReviewData
             .filter(t => t.inclos)
             // `inclos` és de la pantalla, no del model: el backend no l'espera.
-            .map(({ inclos, ...transaction }) => transaction);
+            .map(({ inclos, ...transaction }) => ({
+                ...transaction,
+                // Tot el fitxer va al compte triat a dalt.
+                ...(Number.isInteger(accountId) ? { account: { id: accountId } } : {}),
+                exclos_pressupost: Boolean(transaction.exclos_pressupost)
+            }));
 
         if (confirmedData.length === 0) {
             statusDiv.textContent = '⚠️ No hi ha cap moviment seleccionat.';

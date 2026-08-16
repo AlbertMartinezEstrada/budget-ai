@@ -31,7 +31,7 @@ docker compose up -d --build backend  # aplicar cambios de Java
 docker compose logs -f backend        # logs
 
 cd backend-java && ./gradlew test              # 91 unitarios, sin Docker
-cd backend-java && ./gradlew integrationTest   # 66, requieren Docker
+cd backend-java && ./gradlew integrationTest   # 73, requieren Docker
 cd frontend && npm test                        # 17
 ```
 
@@ -42,7 +42,7 @@ recargar.
 **Los de integración también en local.** `build.gradle` le pregunta a Docker qué
 versión de API exige y ajusta el cliente si hace falta: docker-java pide la 1.43
 y no la negocia, y los Docker Desktop recientes la rechazan con un 400, de modo
-que Testcontainers concluía que no había Docker y fallaban los 66 de golpe. Si
+que Testcontainers concluía que no había Docker y fallaban todos de golpe. Si
 alguna vez vuelven a fallar todos a la vez sin tocar nada, mira ahí antes que en
 el código.
 
@@ -191,7 +191,19 @@ solo actúa de respaldo cuando no hay sección de ingresos.
 El reparto es **en cascada**: un `percentatge` es del bote del nivel de encima,
 **no del total**. Ver [ARQUITECTURA.md](ARQUITECTURA.md).
 
-### 8. La IA no decide sobre el dinero
+### 8. El dinero que se mueve entre tus cuentas solo se cuenta una vez
+
+Con varias cuentas, el mismo euro aparece en dos extractos. La regla: **una vez
+sale de la cuenta principal, ya está contado**; lo que haga después mueve saldos
+pero no vuelve a contar. Es `exclos_pressupost`, y lo descuentan `spentIn` e
+`incomeIn`. Sin ello, 100 € traspasados e invertidos salían como 200 € de gasto,
+y la entrada en la cuenta destino además ensanchaba el bote a repartir.
+
+La identidad de un movimiento importado es **hash + cuenta**, no solo el hash: un
+traspaso deja el mismo importe el mismo día en dos extractos y la segunda pata se
+descartaba como duplicada.
+
+### 9. La IA no decide sobre el dinero
 
 Gemini solo puede fijar empresa, categoría y descripción. **El importe, la
 fecha, el tipo y el hash de verificación se conservan siempre del CSV.**
