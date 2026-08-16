@@ -50,12 +50,18 @@ CREATE TABLE IF NOT EXISTS transactions (
     concepte_original TEXT,
     compte_nom VARCHAR(100) DEFAULT 'Principal', -- Per si tens diversos comptes
     moneda VARCHAR(5) DEFAULT 'EUR',
-    hash_verificacio VARCHAR(64) UNIQUE, -- Per evitar duplicats
+    -- Un cop els diners surten del compte principal ja estan comptats: el que
+    -- facin després (arribar a un altre compte, comprar-hi alguna cosa) mou
+    -- saldos però no torna a comptar al pressupost.
+    exclos_pressupost BOOLEAN NOT NULL DEFAULT FALSE,
+    hash_verificacio VARCHAR(64), -- Per evitar duplicats
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 
     -- Columnes per compatibilitat amb el front actual
     categoria VARCHAR(100),
-    empresa VARCHAR(255)
+    empresa VARCHAR(255),
+
+    CONSTRAINT transactions_hash_compte_key UNIQUE (hash_verificacio, account_id)
 );
 
 -- Taula de Pressupostos

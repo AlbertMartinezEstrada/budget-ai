@@ -206,10 +206,13 @@ export async function getCompanies() {
 }
 
 // Upload a CSV file for processing
-export async function uploadCsv(file) {
+export async function uploadCsv(file, accountId) {
     const formData = new FormData();
     formData.append('file', file);
-    
+    // El compte va a la pujada perquè el descart de duplicats es fa per
+    // extracte: la mateixa xifra el mateix dia a dos comptes és un traspàs.
+    if (accountId) formData.append('accountId', accountId);
+
     const response = await apiFetch(`/upload-csv`, {
         method: 'POST',
         body: formData,
