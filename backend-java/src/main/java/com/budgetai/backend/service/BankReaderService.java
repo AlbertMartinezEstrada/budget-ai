@@ -13,16 +13,19 @@ import java.io.InputStreamReader;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
-import java.util.Base64;
 import java.util.List;
 
 @Service
 public class BankReaderService {
+
+    private final TransactionHasher transactionHasher;
+
+    public BankReaderService(TransactionHasher transactionHasher) {
+        this.transactionHasher = transactionHasher;
+    }
 
     public List<Transaction> readBankCsv(MultipartFile file) throws IOException {
         List<Transaction> transactions = new ArrayList<>();
@@ -62,9 +65,10 @@ public class BankReaderService {
                     t.setType("INCOME");
                 }
                 
-                // Generem el hash únic per evitar duplicats (data + concepte + import + saldo)
-                String rawHashStr = fechaStr + concepto + importeStr + (saldoStr != null ? saldoStr : "");
-                t.setVerificationHash(generateHash(rawHashStr));
+                // El hash surt dels camps ja normalitzats de l'entitat i no de
+                // les cadenes crues, perquè s'ha de poder tornar a calcular en
+                // confirmar la importació, quan les cadenes ja no existeixen.
+                t.setVerificationHash(transactionHasher.hash(t));
 
                 transactions.add(t);
             }
@@ -123,13 +127,4 @@ public class BankReaderService {
         }
     }
 
-    private String generateHash(String input) {
-        try {
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            byte[] hash = digest.digest(input.getBytes(StandardCharsets.UTF_8));
-            return Base64.getEncoder().encodeToString(hash);
-        } catch (NoSuchAlgorithmException e) {
-            return input; // Fallback al text original
-        }
-    }
 }

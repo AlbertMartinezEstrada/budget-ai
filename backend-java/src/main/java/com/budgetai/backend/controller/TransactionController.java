@@ -12,6 +12,7 @@ import com.budgetai.backend.service.AccountService;
 import com.budgetai.backend.service.AiEngineService;
 import com.budgetai.backend.service.BankReaderService;
 import com.budgetai.backend.service.CategoryHierarchyService;
+import com.budgetai.backend.service.TransactionHasher;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
@@ -26,6 +27,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.time.LocalDate;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -38,6 +40,9 @@ public class TransactionController {
 
     @Autowired
     private BankReaderService bankReaderService;
+
+    @Autowired
+    private TransactionHasher transactionHasher;
 
     @Autowired
     private AiEngineService aiEngineService;
@@ -114,9 +119,19 @@ public class TransactionController {
             Account defaultAccount = accountRepository.findByName("Compte Principal")
                     .orElseGet(() -> accountRepository.findAll().stream().findFirst().orElse(null));
 
-            // El hash només es comprovava en pujar el fitxer. Entre la pujada i
-            // la confirmació el mateix lot es pot enviar dues vegades (doble
-            // clic, reintent), així que cal tornar-ho a mirar aquí.
+            // El hash es torna a calcular aquí, no arriba del client.
+            //
+            // Porta @JsonIgnore a propòsit —no ha de sortir mai cap al
+            // navegador—, i per tant tampoc pot tornar-ne. Mentre es llegia del
+            // cos de la petició era sempre null: la comprovació de duplicats no
+            // descartava mai res, els moviments es desaven amb el hash a null i
+            // la columna única no ho impedia perquè PostgreSQL admet tants
+            // nulls com vulguis. Confirmar dues vegades el mateix lot —un doble
+            // clic, un reintent després d'un error— el desava repetit.
+            for (Transaction t : confirmedTransactions) {
+                t.setVerificationHash(transactionHasher.hash(t));
+            }
+
             Set<String> incomingHashes = confirmedTransactions.stream()
                     .map(Transaction::getVerificationHash)
                     .filter(Objects::nonNull)
@@ -128,9 +143,13 @@ public class TransactionController {
                             .map(Transaction::getVerificationHash)
                             .collect(Collectors.toSet());
 
+            // Un lot pot portar dues vegades la mateixa fila si el fitxer la
+            // duplica; sense el segon filtre passarien totes dues i la columna
+            // única rebentaria la transacció sencera.
+            Set<String> seen = new HashSet<>();
             List<Transaction> toPersist = confirmedTransactions.stream()
-                    .filter(t -> t.getVerificationHash() == null
-                            || !alreadyStored.contains(t.getVerificationHash()))
+                    .filter(t -> !alreadyStored.contains(t.getVerificationHash()))
+                    .filter(t -> seen.add(t.getVerificationHash()))
                     .collect(Collectors.toList());
 
             int skipped = confirmedTransactions.size() - toPersist.size();

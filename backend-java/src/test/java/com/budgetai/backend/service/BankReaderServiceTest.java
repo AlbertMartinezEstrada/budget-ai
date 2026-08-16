@@ -22,7 +22,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  */
 class BankReaderServiceTest {
 
-    private final BankReaderService service = new BankReaderService();
+    private final BankReaderService service = new BankReaderService(new TransactionHasher());
 
     private List<Transaction> parse(String csv) throws Exception {
         MockMultipartFile file = new MockMultipartFile(
