@@ -1,5 +1,20 @@
 import { uploadCsv, confirmTransactions, getCategories, formatCurrency, escapeHtml } from '../../api.js';
 
+/**
+ * Ingrés o despesa.
+ *
+ * L'import es desa sempre en positiu i el signe viu només al tipus, així que
+ * sense ensenyar-lo un ingrés de 2.000 € i una despesa de 2.000 € es veien
+ * exactament igual a la revisió. I no és un detall estètic: el tipus decideix
+ * si el saldo del compte puja o baixa en confirmar.
+ */
+const TYPES = {
+    EXPENSE: { etiqueta: 'Despesa', signe: '−', classe: 'text-error' },
+    INCOME:  { etiqueta: 'Ingrés',  signe: '+', classe: 'text-success' }
+};
+
+const typeOf = (t) => TYPES[t.type] ? t.type : 'EXPENSE';
+
 export async function initUpload(container) {
     container.innerHTML = `
         <div class="card mb-4">
@@ -44,9 +59,10 @@ export async function initUpload(container) {
                         <tr>
                             <th style="width: 2.5rem;"></th>
                             <th>Data</th>
+                            <th>Tipus</th>
                             <th>Empresa (Editable)</th>
                             <th>Categoria (Seleccionar)</th>
-                            <th>Import</th>
+                            <th class="text-right">Import</th>
                         </tr>
                     </thead>
                     <tbody id="review-body"></tbody>
@@ -129,8 +145,11 @@ export async function initUpload(container) {
         const rows = currentReviewData.map((t, index) => ({ t, index }));
         if (!query) return rows;
 
-        return rows.filter(({ t }) => [t.empresa, t.concepte_original, t.categoria, t.cost]
-            .some(field => String(field ?? '').toLowerCase().includes(query)));
+        return rows.filter(({ t }) => [
+            t.empresa, t.concepte_original, t.categoria, t.cost,
+            // També pel tipus, per poder aïllar d'un cop tot el que entra.
+            TYPES[typeOf(t)].etiqueta
+        ].some(field => String(field ?? '').toLowerCase().includes(query)));
     }
 
     function renderReviewTable() {
@@ -156,6 +175,9 @@ export async function initUpload(container) {
             // de cridar l'atenció com si li faltés alguna cosa.
             const needsReview = t.inclos && !known;
 
+            const type = typeOf(t);
+            const style = TYPES[type];
+
             return `
             <tr data-index="${index}" class="${needsReview ? 'row-needs-review' : ''}"
                 style="${t.inclos ? '' : 'opacity: 0.45;'}">
@@ -164,13 +186,22 @@ export async function initUpload(container) {
                            title="Desmarca'l per no importar aquest moviment">
                 </td>
                 <td>${escapeHtml(t.data)}</td>
+                <td>
+                    <select class="input input-sm" name="type"
+                            title="El CSV el dedueix del signe de l'import. Si el banc el porta al revés, corregeix-lo aquí.">
+                        <option value="EXPENSE" ${type === 'EXPENSE' ? 'selected' : ''}>Despesa</option>
+                        <option value="INCOME" ${type === 'INCOME' ? 'selected' : ''}>Ingrés</option>
+                    </select>
+                </td>
                 <td><input type="text" class="input input-sm w-full" value="${escapeHtml(t.empresa || '')}" name="empresa"></td>
                 <td>
                     <select class="input input-sm w-full" name="categoria" ${needsReview ? 'required' : ''}>
                         ${unknownOption}${options}
                     </select>
                 </td>
-                <td class="text-right">${formatCurrency(t.cost)}</td>
+                <td class="text-right ${style.classe}" style="white-space: nowrap;">
+                    ${style.signe}${formatCurrency(t.cost)}
+                </td>
             </tr>
             `;
         }).join('');
@@ -181,11 +212,21 @@ export async function initUpload(container) {
 
     function updateSummary() {
         const chosen = currentReviewData.filter(t => t.inclos);
-        const total = chosen.reduce((sum, t) => sum + (Number.parseFloat(t.cost) || 0), 0);
         const hidden = currentReviewData.length - visibleRows().length;
 
+        // Els dos costats van separats: sumar-los en una sola xifra restaria
+        // els ingressos de les despeses i no voldria dir res.
+        const sumOf = (type) => chosen
+            .filter(t => typeOf(t) === type)
+            .reduce((sum, t) => sum + (Number.parseFloat(t.cost) || 0), 0);
+
+        const spent = sumOf('EXPENSE');
+        const earned = sumOf('INCOME');
+
         document.getElementById('review-summary').textContent =
-            `${chosen.length} de ${currentReviewData.length} moviments seleccionats · ${formatCurrency(total)}`
+            `${chosen.length} de ${currentReviewData.length} moviments seleccionats`
+            + ` · −${formatCurrency(spent)} de despesa`
+            + (earned > 0 ? ` · +${formatCurrency(earned)} d'ingrés` : '')
             + (hidden > 0 ? ` · ${hidden} amagats per la cerca` : '');
 
         confirmBtn.textContent = chosen.length === currentReviewData.length
@@ -215,6 +256,13 @@ export async function initUpload(container) {
             // selecció no s'hagués desat.
             row.classList.toggle('row-needs-review', !record.categoria);
             event.target.required = !record.categoria;
+        }
+
+        if (event.target.name === 'type') {
+            record.type = event.target.value;
+            // Canviar el tipus canvia el signe i el color de l'import, i també
+            // de quin costat compta al resum: es repinta la fila sencera.
+            renderReviewTable();
         }
     });
 
