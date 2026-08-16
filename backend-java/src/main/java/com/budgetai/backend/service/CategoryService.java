@@ -45,7 +45,15 @@ public class CategoryService {
                 .orElseThrow(() -> new IllegalArgumentException("Categoria no trobada: " + id));
 
         if (changes.getName() != null) category.setName(changes.getName());
-        if (changes.getCostType() != null) category.setCostType(changes.getCostType());
+
+        // La naturalesa també es pot buidar: en un grup vol dir "torna a
+        // deduir la secció de les subcategories". Com que un camp absent no
+        // s'ha de tocar, cal un valor sentinella per distingir-ho, igual que
+        // amb el pare.
+        if (changes.getCostType() != null) {
+            category.setCostType(Category.AUTO.equals(changes.getCostType())
+                    ? null : changes.getCostType());
+        }
 
         // El pare sí que es pot buidar explícitament, per treure una categoria
         // d'un grup: per això es distingeix "no enviat" de "enviat a null" amb

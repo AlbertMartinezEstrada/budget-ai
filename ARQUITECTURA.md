@@ -259,17 +259,112 @@ la puerta a que se contradigan; el endpoint recibe el mes por parámetro y
 considera vigente cualquier presupuesto cuyo periodo lo solape, así que un
 presupuesto trimestral o anual también aparece.
 
-### Reparto del sueldo por porcentajes
+**La interfaz aplica ese mismo filtro.** Sin él, el botón de editar de un
+bloque abría el presupuesto de otro mes: la pantalla decía «sin asignar» y el
+formulario salía lleno, y el porcentaje se guardaba calculado sobre el bote del
+mes que se estaba mirando y no sobre el suyo.
 
-Un presupuesto puede fijar su techo de dos maneras:
+`POST /budgets/copy-previous-month?year=&month=` duplica al mes indicado las
+asignaciones del anterior. Como un presupuesto vale para su periodo y nada más,
+cada mes empieza en blanco y el reparto habría que rehacerlo entero. Las
+categorías que ya tienen asignación en el mes destino no se tocan, así que
+llamarlo dos veces no duplica nada. **Se copia el porcentaje tal cual**: el
+importe lo recalcula el bote del mes nuevo, que es todo el sentido de repartir
+por porcentajes.
 
-- **Importe fijo** (`quantitat_limit`), como siempre.
-- **Porcentaje del sueldo** (`percentatge`). Si está informado, **manda sobre
-  el importe**: el techo se calcula como sueldo × porcentaje ÷ 100 en cada
-  consulta, así que si cambia el sueldo, el presupuesto se ajusta solo.
+### Reparto del sueldo: en cascada, por niveles
+
+El sueldo no se reparte de una vez entre todas las categorías. Baja por
+niveles, y **cada nivel se reparte dentro de lo que le ha tocado al de encima**:
+
+```
+INGRESOS  ──> nómina, regalos, premios, trabajos puntuales
+    │         su suma es lo que hay para repartir
+    ├──> FIJOS       importe exacto de cada bloque
+    └──> VARIABLES   lo que queda: ingresos − fijos
+                     └─> bloques       % del bote de variables
+                                       └─> subsecciones  % de su bloque
+```
+
+**El sueldo no es la base del presupuesto: es un bloque de ingreso más.** Al
+lado puede haber un regalo, un premio o una factura suelta, y todos ensanchan
+lo repartible exactamente igual. La cabecera de la pantalla es esa suma.
+
+Cada hoja de ingreso aporta **el mayor entre su previsión y lo que ha entrado**:
+
+| Previsión | Recibido | Aporta | Por qué |
+|---|---|---|---|
+| 3.300 | 0 | 3.300 | la nómina aún no está importada, pero se sabe que llega |
+| 3.300 | 3.400 | 3.400 | lo que ha pasado manda sobre lo que se contaba |
+| 0 | 500 | 500 | un regalo no estaba previsto, por definición |
+
+**Tomar el máximo y no la suma** es lo que impide contar dos veces la misma
+nómina: la previsión y el movimiento importado son la misma cosa vista dos
+veces, no dos ingresos. Sumarlas daría 6.700 € donde hay 3.400.
+
+Si la sección de ingresos está vacía se aplica el **sueldo de referencia** como
+respaldo (`total_disponible_origen` dice cuál de los dos manda). Sin él, una
+instalación recién montada no tendría nada que repartir y la pantalla se
+quedaría muerta hasta dar de alta los bloques de ingreso.
+
+Por eso **un porcentaje no es del sueldo: es del bote del nivel de encima**.
+«30% de gastos variables» y «30% del sueldo» son cifras distintas, y antes no
+se podían distinguir porque todo se calculaba contra el sueldo.
+
+Un presupuesto sigue fijando su cifra de dos maneras:
+
+- **Importe exacto** (`quantitat_limit`).
+- **Porcentaje** (`percentatge`). Si está informado, **manda sobre el
+  importe**: se recalcula como bote × porcentaje ÷ 100 en cada consulta, así
+  que si cambia el sueldo —o lo asignado al bloque de encima—, se ajusta solo.
 
 `quantitat_limit` sigue siendo `NOT NULL` y guarda el último importe calculado,
 para que la tabla se pueda leer por sí sola.
+
+**Cuál es el bote de cada nodo**, por orden:
+
+1. Lo asignado a su padre, si el padre tiene una cifra propia.
+2. Si no la tiene, el bote del padre. Sin esta segunda regla habría una
+   pescadilla: el bote de un bloque sin asignación sale de sumar sus hijos, y
+   los hijos no pueden tomar un porcentaje de una cifra que aún no existe.
+3. Para un bloque de primer nivel, el bote de su sección.
+
+### Las tres secciones
+
+`tipus_cost` responde **dos preguntas distintas según dónde esté**:
+
+| Dónde | Qué significa |
+|---|---|
+| En una **hoja** | Cómo se mide: un fijo por su prorrateo, un variable por el gasto real |
+| En un **bloque** de primer nivel | A qué sección va el bloque: `FIXED`, `VARIABLE` o `INCOME` |
+
+**`INCOME` solo tiene sentido en un bloque**, y no es una tercera forma de
+gastar: es de donde sale el dinero. Sus hojas no se prorratean ni se comparan
+con un techo — se miden por los movimientos de **entrada** del mes. Mientras
+estuvieron entre los gastos, una categoría de ingreso caía en variables por
+descarte y salía como un bloque de cero euros compitiendo por un bote que es
+justamente suyo.
+
+Son preguntas separadas porque las respuestas no tienen por qué coincidir.
+**«Llar» es un gasto fijo** —el alquiler no se negocia cada mes— pero la luz y
+el agua de dentro se miden por consumo real, para que un invierno caro salga
+como desviación sobre lo previsto y no como un pico de caja inexplicable.
+Mientras la sección salía solo de las hojas, esas dos hojas variables se
+llevaban el bloque entero, alquiler incluido, a la sección de variables.
+
+Un bloque que **no declara nada** deduce su sección: es fijo cuando **todas**
+sus hojas son `FIXED`; si mezcla, va entero a variables. Partirlo por la mitad
+dejaría el mismo bloque en las dos secciones y no se podría repartir ni en un
+sitio ni en otro.
+
+Para volver a la deducción automática hay que vaciar el campo, y una
+actualización parcial no distingue «vacío» de «no enviado». El valor centinela
+es **`AUTO`**, el mismo criterio que el `parent_id` negativo.
+
+El bote de los fijos es el sueldo entero —son la primera mordida, no hay nada
+por encima—. El de los variables es lo que queda después de ellos. Así, marcar
+una categoría como fija en la pantalla de Categorías es lo único que hace falta
+para mover un bloque de sección.
 
 **De dónde sale el sueldo**, por orden:
 
@@ -295,13 +390,40 @@ calculado:
   "sou_base": 2000.00,
   "sou_base_origen": "PER_DEFECTE",
   "ingressos_reals": 1980.00,
+  "ingressos_previstos": 2000.00,
+  "total_disponible": 2000.00,
+  "total_disponible_origen": "INGRESSOS",
+  "total_assignat": 1700.00,
   "percentatge_assignat": 85.00,
+  "seccions": [
+    { "tipus": "INCOME",   "base": null,    "assignat": 2000.00, "real": 1980.00,
+      "percentatge_del_sou": null, "restant": null, "grups": [ ... ] },
+    { "tipus": "FIXED",    "base": 2000.00, "assignat": 800.00,
+      "percentatge_del_sou": 40.00, "restant": 1200.00, "grups": [ ... ] },
+    { "tipus": "VARIABLE", "base": 1200.00, "assignat": 900.00,
+      "percentatge_del_sou": 45.00, "restant":  300.00, "grups": [ ... ] }
+  ],
   "grups": [ ... ]
 }
 ```
 
-`percentatge_assignat` es la suma de lo repartido. Pasar del 100% es un error de
-planificación, no del programa: la interfaz lo marca en rojo pero no lo impide.
+Los ingresos van **primero**: leído de arriba abajo, el mes se explica solo —lo
+que entra, lo que está comprometido, lo que queda—. Su sección no reparte nada,
+así que no tiene `base` ni porcentaje, y sus hojas traen `aporta_al_disponible`
+con lo que cada una pone en el total.
+
+Cada nodo trae además `base_assignacio` (sobre qué bote se mide),
+`percentatge_efectiu` (qué porcentaje de ese bote representa, aunque se haya
+fijado por importe), `percentatge_del_sou` y `restant` (lo que un bloque tiene
+asignado y todavía no ha repartido entre sus hijos).
+
+`percentatge_assignat` sale **de los euros**, no de sumar los porcentajes
+guardados: un 25% de un bloque y un 30% del sueldo no se pueden sumar. Pasar del
+100% es un error de planificación, no del programa: la interfaz lo marca en rojo
+pero no lo impide.
+
+`grups` mantiene la lista plana de bloques de primer nivel, para quien no
+necesite saber en qué sección cae cada uno.
 
 ## La sesión
 

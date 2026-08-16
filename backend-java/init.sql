@@ -8,9 +8,14 @@ CREATE TABLE IF NOT EXISTS categories (
     -- ON DELETE SET NULL: esborrar un grup no ha d'arrossegar els seus fills
     -- ni, per tant, les transaccions que hi pengen.
     parent_id BIGINT REFERENCES categories(id) ON DELETE SET NULL,
-    -- FIXED o VARIABLE. Només té sentit a les fulles; als grups es deixa NULL.
-    -- Una fulla amb NULL es tracta com a VARIABLE.
-    tipus_cost VARCHAR(20) CHECK (tipus_cost IN ('FIXED', 'VARIABLE'))
+    -- Vol dir dues coses segons on estigui:
+    --   a una FULLA, com es mesura: FIXED pel prorrateig, VARIABLE pel gasto
+    --     real del mes. NULL compta com a VARIABLE.
+    --   a un BLOC de primer nivell, a quina secció del repartiment va: FIXED,
+    --     VARIABLE o INCOME. NULL la dedueix de les seves fulles.
+    -- INCOME només té sentit a un bloc: marca els diners que entren, que ni es
+    -- prorrategen ni es comparen amb un sostre.
+    tipus_cost VARCHAR(20) CHECK (tipus_cost IN ('FIXED', 'VARIABLE', 'INCOME'))
 );
 
 -- Taula d'Empreses
@@ -138,12 +143,58 @@ CREATE TABLE IF NOT EXISTS monthly_income (
 );
 
 -- Inserció de categories per defecte
-INSERT INTO categories (nom) VALUES
-('Menjar i supermercat'), ('Bars i restaurants'), ('Transport'), ('Allotjament'),
-('Compres i roba'), ('Higiene i bellesa'), ('Salut i farmàcia'), ('Gimnàs i esport'),
-('Cultura, oci i entreteniment'), ('Jocs de taula i videojocs'), ('Festa i alcohol'),
-('Tecnologia'), ('Regals i detalls'), ('Casa i mobiliari'), ('Mascotes'),
-('Altres'), ('Educació'), ('Inversions'), ('Nòmina'), ('Ingressos Altres')
+--
+-- Van en dos passos perquè les subcategories necessiten l'id del seu bloc, i
+-- aquest s'assigna en inserir-lo. Mantenir-ho aquí i a
+-- migrations/004_blocs_de_repartiment.sql és el preu de tenir una instal·lació
+-- nova i una d'existent acabant igual.
+-- Blocs de primer nivell. A un bloc, tipus_cost diu a quina secció del
+-- repartiment va (FIXED, VARIABLE o INCOME); a null, es dedueix de les fulles.
+INSERT INTO categories (nom, tipus_cost) VALUES
+('Llar', 'FIXED'), ('Subscripcions', 'FIXED'), ('Assegurances i salut', 'FIXED'),
+('Trade Republic', 'VARIABLE'), ('Gastos compartits', 'VARIABLE'),
+('Fons d''inversió', 'VARIABLE'), ('Gast mensual', 'VARIABLE'),
+('Inversió de risc', 'VARIABLE'), ('Regals i altres', 'VARIABLE'),
+('Ingressos', 'INCOME')
+ON CONFLICT (nom) DO NOTHING;
+
+-- A una fulla, en canvi, tipus_cost diu com es mesura: un fix pel prorrateig
+-- del seu recurrent, un variable pel gasto real del mes. Per això dins d'un
+-- bloc fix com "Llar" hi ha fulles variables: el lloguer no es mou, la llum sí.
+INSERT INTO categories (nom, parent_id, tipus_cost)
+SELECT sub.nom, (SELECT id FROM categories WHERE nom = sub.bloc), sub.natura
+FROM (VALUES
+    ('Casa', 'Llar', 'FIXED'), ('Internet', 'Llar', 'FIXED'),
+    ('Llum', 'Llar', 'VARIABLE'), ('Aigua', 'Llar', 'VARIABLE'),
+    ('Claude', 'Subscripcions', 'FIXED'), ('iCloud', 'Subscripcions', 'FIXED'),
+    ('Amazon Prime', 'Subscripcions', 'FIXED'), ('Revolut', 'Subscripcions', 'FIXED'),
+    ('Telèfon portuguès', 'Subscripcions', 'FIXED'),
+    ('Assegurances', 'Assegurances i salut', 'FIXED'),
+    ('Medicare', 'Assegurances i salut', 'FIXED'),
+
+    ('Menjar i supermercat', 'Gast mensual', 'VARIABLE'),
+    ('Bars i restaurants', 'Gast mensual', 'VARIABLE'),
+    -- Separada del supermercat: la compra toca fer-la, demanar sopar es pot
+    -- retallar, i amb totes dues al mateix sac el sostre no deia res.
+    ('Delivery', 'Gast mensual', 'VARIABLE'),
+    ('Transport', 'Gast mensual', 'VARIABLE'), ('Compres i roba', 'Gast mensual', 'VARIABLE'),
+    ('Higiene i bellesa', 'Gast mensual', 'VARIABLE'),
+    ('Salut i farmàcia', 'Gast mensual', 'VARIABLE'),
+    ('Gimnàs i esport', 'Gast mensual', 'VARIABLE'),
+    ('Cultura, oci i entreteniment', 'Gast mensual', 'VARIABLE'),
+    ('Jocs de taula i videojocs', 'Gast mensual', 'VARIABLE'),
+    ('Festa i alcohol', 'Gast mensual', 'VARIABLE'),
+    ('Tecnologia', 'Gast mensual', 'VARIABLE'),
+    ('Casa i mobiliari', 'Gast mensual', 'VARIABLE'),
+    ('Mascotes', 'Gast mensual', 'VARIABLE'), ('Educació', 'Gast mensual', 'VARIABLE'),
+    ('Regals i detalls', 'Regals i altres', 'VARIABLE'),
+    ('Altres', 'Regals i altres', 'VARIABLE'),
+    ('Inversions', 'Fons d''inversió', 'VARIABLE'),
+    -- A les fulles d'ingrés, tipus_cost no vol dir res: no es prorrategen ni
+    -- es comparen amb un sostre, es mesuren pel que hi ha entrat.
+    ('Nòmina', 'Ingressos', NULL), ('Ingressos Altres', 'Ingressos', NULL),
+    ('Regals i premis', 'Ingressos', NULL)
+) AS sub(nom, bloc, natura)
 ON CONFLICT (nom) DO NOTHING;
 
 -- Inserció d'un compte principal per defecte

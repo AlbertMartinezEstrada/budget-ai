@@ -160,11 +160,29 @@ se contaría dos veces**: por sí mismo y al agregar sus hijos. El backend lo
 rechaza al confirmar una importación; el frontend no debe ofrecer grupos donde
 se elige la categoría de un movimiento.
 
-`tipus_cost` (`FIXED`/`VARIABLE`) solo tiene sentido en las hojas. `null` cuenta
-como variable.
+`tipus_cost` (`FIXED`/`VARIABLE`) **significa dos cosas distintas según dónde
+esté**, y confundirlas es fácil:
 
-En el resumen mensual, un **fijo** entra por su prorrateo y un **variable** por
-su gasto real. Ver [ARQUITECTURA.md](ARQUITECTURA.md).
+- En una **hoja**, cómo se mide: un fijo entra por su prorrateo y un variable
+  por su gasto real. `null` cuenta como variable.
+- En un **bloque** de primer nivel, a qué sección va: `FIXED`, `VARIABLE` o
+  `INCOME`. A `null`, se deduce: es fijo si todas sus hojas lo son.
+
+Por eso un bloque fijo puede tener hojas variables dentro (el alquiler no se
+mueve, la luz sí). Para vaciar el campo hace falta el centinela `AUTO`: una
+actualización parcial no distingue «vacío» de «no enviado».
+
+**`INCOME` cambia qué se mide**: las hojas de un bloque de ingresos suman los
+movimientos de entrada, no los de gasto. Con el filtro de gasto sumaban siempre
+cero.
+
+**Lo que se reparte es la suma de los ingresos**, no el sueldo: el sueldo es un
+bloque de ingreso más. Cada hoja aporta el **mayor** entre su previsión y lo
+recibido — sumarlos contaría la misma nómina dos veces. El sueldo de referencia
+solo actúa de respaldo cuando no hay sección de ingresos.
+
+El reparto es **en cascada**: un `percentatge` es del bote del nivel de encima,
+**no del total**. Ver [ARQUITECTURA.md](ARQUITECTURA.md).
 
 ### 8. La IA no decide sobre el dinero
 
