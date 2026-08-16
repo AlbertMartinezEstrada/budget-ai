@@ -200,9 +200,11 @@ public class TransactionController {
                     "message", "Falta la data del moviment."));
         }
 
-        // L'import es desa sempre en positiu; el signe viu al tipus, igual que
-        // als moviments que arriben del CSV.
-        transaction.setAmount(transaction.getAmount().abs());
+        // L'import es desa sempre en positiu i el signe viu al tipus, igual que
+        // als moviments del CSV. Un negatiu no es normalitza amb abs(): es
+        // rebutja a la validació de dalt. Girar-li el signe en silenci seria
+        // endevinar què volia dir qui escriu "-12,50" en un ingrés, i pot ser
+        // tant "és una despesa" com "m'he equivocat de camp".
         transaction.setVerificationHash(null);
 
         // El saldo resultant només té sentit quan ve de l'extracte: allà és el

@@ -121,15 +121,18 @@ class ManualTransactionIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("Un import negatiu es desa en positiu: el signe viu al tipus")
-    void amountsAreStoredPositive() {
-        transactionController.createTransaction(manual("-12.50", "EXPENSE"));
+    @DisplayName("Un import negatiu es rebutja en comptes de girar-li el signe")
+    void negativeAmountsAreRejected() {
+        // El signe viu al tipus, així que un negatiu al camp de l'import és un
+        // error de qui l'escriu. Normalitzar-lo amb abs() seria endevinar: qui
+        // posa "-12,50" en un ingrés tant pot voler dir "és una despesa" com
+        // "m'he equivocat de camp". I amb el signe intacte, una despesa
+        // negativa hauria SUMAT al saldo en restar-ne un negatiu.
+        assertThat(transactionController.createTransaction(manual("-12.50", "EXPENSE"))
+                .getStatusCode().value()).isEqualTo(400);
 
-        // Sense l'abs(), un import negatiu amb tipus despesa hauria SUMAT al
-        // saldo en restar-ne un negatiu.
-        assertThat(transactionRepository.findAll().get(0).getAmount())
-                .isEqualByComparingTo("12.50");
-        assertThat(balance()).isEqualByComparingTo("987.50");
+        assertThat(transactionRepository.findAll()).isEmpty();
+        assertThat(balance()).isEqualByComparingTo("1000.00");
     }
 
     @Test
@@ -198,13 +201,21 @@ class ManualTransactionIntegrationTest extends AbstractIntegrationTest {
     @Test
     @DisplayName("No es pot penjar un moviment d'un grup de categories")
     void groupsAreRejected() {
-        Category group = categoryRepository.save(new Category("Gast mensual"));
-        Category leaf = new Category("Cafès");
-        leaf.setParentId(group.getId());
-        categoryRepository.save(leaf);
+        // Noms propis d'aquest test i creats només si falten. "nom" és únic i
+        // el contenidor es comparteix entre classes: agafar un nom real de
+        // l'init.sql, com "Gast mensual", peta contra la restricció, i donar
+        // per fet que la categoria no hi és peta la segona vegada.
+        Category group = categoryRepository.findByName("ZZ Grup de prova")
+                .orElseGet(() -> categoryRepository.save(new Category("ZZ Grup de prova")));
+
+        if (categoryRepository.findByName("ZZ Fulla de prova").isEmpty()) {
+            Category leaf = new Category("ZZ Fulla de prova");
+            leaf.setParentId(group.getId());
+            categoryRepository.save(leaf);
+        }
 
         Transaction t = manual("10.00", "EXPENSE");
-        t.setCategoryName("Gast mensual");
+        t.setCategoryName("ZZ Grup de prova");
 
         // Penjat d'un grup, el moviment es comptaria dues vegades: per ell
         // mateix i en agregar els fills.
