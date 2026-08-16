@@ -500,17 +500,22 @@ class MonthlySummaryIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("Cobrar menys del previst no encongeix el bot")
-    void missingIncomeDoesNotShrinkThePot() {
-        settingsService.updateSettings(settingsWithIncome("2000.00"));
+    @DisplayName("Una previsió que encara no ha arribat segueix comptant")
+    void aForecastThatHasNotArrivedStillCounts() {
+        Category income = saveCategory("Ingressos", null, "INCOME");
+        Long payroll = saveCategory("Nòmina", income.getId(), null).getId();
+        saveBudget(payroll, "2000.00", null);
+        // Cap moviment d'ingrés: la nòmina del març encara no s'ha importat.
 
-        // La nòmina del març encara no s'ha importat. Si els ingressos reals
-        // manessin, el pla del mes seria de zero euros fins a importar-la.
         Map<String, Object> summary = budgetService.getMonthlySummary(2026, 3);
 
         assertThat((BigDecimal) summary.get("ingressos_reals")).isEqualByComparingTo("0");
-        assertThat((BigDecimal) summary.get("ingressos_extra")).isEqualByComparingTo("0");
+        // Si manessin els ingressos reals, el pla del mes seria de zero euros
+        // fins a importar l'extracte. La previsió és el terra.
         assertThat((BigDecimal) summary.get("total_disponible")).isEqualByComparingTo("2000.00");
+        // I surt de la secció d'ingressos, no del sou de referència: aquí no
+        // n'hi ha cap de configurat.
+        assertThat(summary.get("total_disponible_origen")).isEqualTo("INGRESSOS");
     }
 
     @Test
