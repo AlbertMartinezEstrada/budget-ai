@@ -31,13 +31,20 @@ docker compose up -d --build backend  # aplicar cambios de Java
 docker compose logs -f backend        # logs
 
 cd backend-java && ./gradlew test              # 91 unitarios, sin Docker
-cd backend-java && ./gradlew integrationTest   # 54, requieren Docker
+cd backend-java && ./gradlew integrationTest   # 66, requieren Docker
 cd frontend && npm test                        # 17
 ```
 
 **Ejecuta los tests antes de dar nada por terminado.** El backend hay que
 reconstruirlo para ver cambios de Java; el frontend se sirve desde disco y basta
 recargar.
+
+**Los de integración también en local.** `build.gradle` le pregunta a Docker qué
+versión de API exige y ajusta el cliente si hace falta: docker-java pide la 1.43
+y no la negocia, y los Docker Desktop recientes la rechazan con un 400, de modo
+que Testcontainers concluía que no había Docker y fallaban los 66 de golpe. Si
+alguna vez vuelven a fallar todos a la vez sin tocar nada, mira ahí antes que en
+el código.
 
 ---
 

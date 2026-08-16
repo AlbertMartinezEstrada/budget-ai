@@ -7,6 +7,16 @@ plugins {
 group = 'com.budgetai'
 version = '0.0.1-SNAPSHOT'
 
+// Testcontainers per davant de la versió que fixa el BOM de Spring Boot.
+//
+// El BOM en porta la 1.19.3, que arrossega docker-java 3.3.4. Aquell client
+// demana la versió 1.43 de l'API de Docker, i els Docker Desktop recents
+// exigeixen com a mínim la 1.44: el dimoni respon 400 i Testcontainers conclou
+// que no hi ha cap entorn de Docker vàlid. Els tests d'integració fallaven
+// tots alhora en local, abans d'executar ni una línia de codi del projecte, i
+// només es podien comprovar al CI.
+ext['testcontainers.version'] = '1.20.4'
+
 java {
     sourceCompatibility = '17'
 }
@@ -51,6 +61,44 @@ tasks.named('test') {
     }
 }
 
+/**
+ * Versió de l'API de Docker que exigeix el dimoni, si demana més de la que el
+ * client fa servir per defecte. Null si no cal fer res.
+ *
+ * docker-java demana la 1.43 i no la negocia. Els Docker Desktop recents
+ * responen 400 a qualsevol versió per sota de la seva MinAPIVersion, i llavors
+ * Testcontainers conclou que no hi ha cap entorn de Docker vàlid: fallen els
+ * tests d'integració sencers abans d'executar ni una línia del projecte.
+ *
+ * Es pregunta al dimoni en comptes de fixar un número perquè imposar-ne un
+ * trencaria a l'inrevés: en una màquina amb Docker antic, exigir una versió
+ * que no arriba a suportar. Així només s'intervé quan el client es queda curt,
+ * i allà on ja funciona —el CI— no canvia res.
+ */
+static String dockerApiVersionFloor() {
+    try {
+        Process process = new ProcessBuilder('docker', 'version', '--format', '{{.Server.MinAPIVersion}}')
+                .redirectErrorStream(true).start()
+        if (!process.waitFor(10, java.util.concurrent.TimeUnit.SECONDS) || process.exitValue() != 0) {
+            return null
+        }
+
+        String minimum = process.inputStream.text.trim()
+        if (!(minimum ==~ /\d+\.\d+/)) return null
+
+        // Comparació numèrica: "1.9" no és més gran que "1.43" en text.
+        def asNumbers = { String v -> v.tokenize('.').collect { it as int } }
+        def required = asNumbers(minimum)
+        def clientDefault = [1, 43]
+
+        return (required[0] <=> clientDefault[0] ?: required[1] <=> clientDefault[1]) > 0 ? minimum : null
+    } catch (Exception ignored) {
+        // Sense Docker no hi ha res a ajustar: els tests ja fallaran sols i
+        // amb un missatge més clar que el que podríem donar aquí.
+        return null
+    }
+}
+
 // Els d'integració aixequen un PostgreSQL de debò amb Testcontainers, així
 // que requereixen Docker en marxa.
 tasks.register('integrationTest', Test) {
@@ -62,6 +110,16 @@ tasks.register('integrationTest', Test) {
         includeTags 'integration'
     }
     shouldRunAfter tasks.named('test')
+
+    // A doFirst i no a la configuració: així només es crida Docker quan els
+    // tests s'executen de debò, no cada vegada que Gradle llegeix el fitxer.
+    doFirst {
+        String floor = dockerApiVersionFloor()
+        if (floor != null) {
+            systemProperty 'api.version', floor
+            logger.lifecycle("Docker exigeix com a mínim l'API $floor; s'hi ajusta el client.")
+        }
+    }
 }
 
 tasks.named('check') {
