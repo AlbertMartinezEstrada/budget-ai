@@ -3,6 +3,19 @@ import {
     createTransaction, deleteTransaction, formatCurrency, escapeHtml
 } from '../../api.js';
 
+/**
+ * Ingrés o despesa.
+ *
+ * L'import es desa sempre en positiu i el signe viu només al tipus, així que
+ * sense ensenyar-lo un ingrés i una despesa del mateix import es veien iguals.
+ */
+const TYPES = {
+    EXPENSE: { etiqueta: 'Despesa', signe: '−', classe: 'text-error' },
+    INCOME:  { etiqueta: 'Ingrés',  signe: '+', classe: 'text-success' }
+};
+
+const typeOf = (t) => TYPES[t.type] ? t.type : 'EXPENSE';
+
 const MONTH_FORMATTER = new Intl.DateTimeFormat('ca-ES', {
     month: 'long',
     year: 'numeric'
@@ -38,6 +51,14 @@ export async function initTransactions(container) {
                     </select>
                 </div>
                 <div class="form-group">
+                    <label for="filter-type">Tipus</label>
+                    <select id="filter-type" class="form-control">
+                        <option value="">Tots</option>
+                        <option value="EXPENSE">Despeses</option>
+                        <option value="INCOME">Ingressos</option>
+                    </select>
+                </div>
+                <div class="form-group">
                     <label for="filter-month">Mes</label>
                     <select id="filter-month" class="form-control">
                         <option value="">Tots els mesos</option>
@@ -63,6 +84,7 @@ export async function initTransactions(container) {
                         <tr>
                             <th>Data</th>
                             <th>Compte</th>
+                            <th>Tipus</th>
                             <th>Empresa</th>
                             <th>Categoria</th>
                             <th>Descripció</th>
@@ -71,7 +93,7 @@ export async function initTransactions(container) {
                         </tr>
                     </thead>
                     <tbody id="transactions-body">
-                        <tr><td colspan="7" class="text-center">Carregant...</td></tr>
+                        <tr><td colspan="8" class="text-center">Carregant...</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -169,12 +191,14 @@ export async function initTransactions(container) {
     document.getElementById('filter-category').addEventListener('change', loadData);
     document.getElementById('filter-company').addEventListener('change', loadData);
     document.getElementById('filter-account').addEventListener('change', loadData);
+    document.getElementById('filter-type').addEventListener('change', loadData);
     document.getElementById('filter-month').addEventListener('change', loadData);
     document.getElementById('toggle-transaction-sort').addEventListener('click', toggleSortMode);
     document.getElementById('clear-filters').addEventListener('click', () => {
         document.getElementById('filter-category').value = '';
         document.getElementById('filter-company').value = '';
         document.getElementById('filter-account').value = '';
+        document.getElementById('filter-type').value = '';
         document.getElementById('filter-month').value = '';
         currentSortMode = 'month-desc';
         updateSortButton();
@@ -300,12 +324,14 @@ async function loadData() {
     const categoryId = document.getElementById('filter-category').value;
     const companyId = document.getElementById('filter-company').value;
     const accountId = document.getElementById('filter-account').value;
+    const type = document.getElementById('filter-type').value;
     const selectedMonth = document.getElementById('filter-month').value;
 
     const filters = {};
     if (categoryId) filters.categoryId = categoryId;
     if (companyId) filters.companyId = companyId;
     if (accountId) filters.accountId = accountId;
+    if (type) filters.type = type;
     if (selectedMonth) {
         const { startDate, endDate } = buildMonthRange(selectedMonth);
         filters.startDate = startDate;
@@ -389,16 +415,19 @@ function compareTransactions(left, right, sortBy) {
 function buildMonthRow(date) {
     return `
         <tr class="table-group-row">
-            <td colspan="7">${formatMonth(date)}</td>
+            <td colspan="8">${formatMonth(date)}</td>
         </tr>
     `;
 }
 
 function buildTransactionRow(transaction) {
+    const style = TYPES[typeOf(transaction)];
+
     return `
         <tr>
             <td>${escapeHtml(formatTransactionDate(transaction.data))}</td>
             <td class="text-sm">${escapeHtml(transaction.account?.nom || '-')}</td>
+            <td class="text-sm ${style.classe}">${style.etiqueta}</td>
             <td>
                 ${escapeHtml(transaction.empresa || '-')}
                 ${transaction.exclos_pressupost
@@ -407,7 +436,9 @@ function buildTransactionRow(transaction) {
             </td>
             <td><span class="badge badge-outline">${escapeHtml(transaction.categoria || '-')}</span></td>
             <td class="text-muted text-sm">${escapeHtml(transaction.descripcio_curta || '-')}</td>
-            <td class="text-right font-bold">${formatAmount(transaction.cost)}</td>
+            <td class="text-right font-bold ${style.classe}" style="white-space: nowrap;">
+                ${style.signe}${formatAmount(transaction.cost)}
+            </td>
             <td class="text-right">
                 <button class="btn btn-sm btn-outline" data-action="delete-transaction"
                         data-id="${transaction.id}" title="Esborrar aquest moviment">
@@ -421,7 +452,7 @@ function buildTransactionRow(transaction) {
 function renderMessageRow(message, isError = false) {
     document.getElementById('transactions-body').innerHTML = `
         <tr>
-            <td colspan="7" class="text-center ${isError ? 'text-error' : ''}">${message}</td>
+            <td colspan="8" class="text-center ${isError ? 'text-error' : ''}">${message}</td>
         </tr>
     `;
 }

@@ -186,6 +186,40 @@ class TraspassosIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
+    @DisplayName("Es poden llistar les despeses i els ingressos per separat")
+    void movementsCanBeFilteredByType() {
+        transactionController.confirmUpload(List.of(
+                movement("Compra", "40.00", "EXPENSE", principal, false),
+                movement("Nòmina", "2000.00", "INCOME", principal, false)
+        ));
+
+        // L'import es desa en positiu i el signe viu al tipus, així que
+        // separar-los només es pot fer per aquí.
+        assertThat(transactionController.getTransactions(null, null, null, "EXPENSE", null, null))
+                .singleElement()
+                .extracting(Transaction::getOriginalConcept).isEqualTo("Compra");
+
+        assertThat(transactionController.getTransactions(null, null, null, "INCOME", null, null))
+                .singleElement()
+                .extracting(Transaction::getOriginalConcept).isEqualTo("Nòmina");
+
+        assertThat(transactionController.getTransactions(null, null, null, null, null, null)).hasSize(2);
+    }
+
+    @Test
+    @DisplayName("Es poden llistar els moviments d'un sol compte")
+    void movementsCanBeFilteredByAccount() {
+        transactionController.confirmUpload(List.of(
+                movement("Traspàs", "100.00", "EXPENSE", principal, false),
+                movement("Compra accions", "40.00", "EXPENSE", revolut, true)
+        ));
+
+        assertThat(transactionController.getTransactions(null, null, revolut.getId(), null, null, null))
+                .singleElement()
+                .extracting(Transaction::getOriginalConcept).isEqualTo("Compra accions");
+    }
+
+    @Test
     @DisplayName("Cada moviment es queda al compte que li toca")
     void movementsKeepTheirAccount() {
         transactionController.confirmUpload(List.of(
