@@ -196,6 +196,25 @@ public class TransactionController {
     }
 
     /**
+     * Desfà el que un moviment va fer al saldo del seu compte.
+     *
+     * A l'inrevés que en desar-lo: una despesa va restar, així que ara suma.
+     * Ho comparteixen esborrar i editar —editar és desfer i tornar a aplicar—,
+     * i el compte que es toca és el que tenia abans, no el nou.
+     */
+    private void revertFromBalance(Transaction transaction) {
+        if (transaction.getAccount() == null || transaction.getAmount() == null) return;
+
+        if ("EXPENSE".equals(transaction.getType())) {
+            accountService.updateAccountBalance(
+                    transaction.getAccount().getId(), transaction.getAmount(), "ADD");
+        } else if ("INCOME".equals(transaction.getType())) {
+            accountService.updateAccountBalance(
+                    transaction.getAccount().getId(), transaction.getAmount(), "SUBTRACT");
+        }
+    }
+
+    /**
      * Alta manual d'un moviment: efectiu, un préstec entre amics, qualsevol
      * cosa que no surti de l'extracte.
      *
@@ -247,6 +266,66 @@ public class TransactionController {
     }
 
     /**
+     * Edita un moviment ja desat.
+     *
+     * Editar és **desfer i tornar a aplicar**: primer es reverteix el que el
+     * moviment havia fet al saldo del seu compte d'abans, i després s'aplica
+     * el nou. Sense la reversió, canviar l'import de 40 a 50 restaria 50 més
+     * en comptes de 10, i canviar-lo de compte deixaria el saldo mogut als
+     * dos.
+     *
+     * El hash NO es toca. Identifica de quina línia d'extracte ve el moviment,
+     * i corregir-ne l'empresa o la categoria no el converteix en una altra
+     * línia: recalcular-lo faria que tornar a importar el mateix fitxer el
+     * dupliqués, que és justament el que el hash evita.
+     *
+     * Actualització parcial: un camp absent no s'ha de tocar.
+     *
+     * @Transactional i sense capturar l'excepció, com la resta del que mou
+     * diners.
+     */
+    @PutMapping("/gastos/{id}")
+    @Transactional
+    public ResponseEntity<?> updateTransaction(@PathVariable Long id,
+                                               @RequestBody Transaction changes) {
+        Transaction existing = transactionRepository.findById(id).orElse(null);
+        if (existing == null) {
+            return ResponseEntity.notFound().build();
+        }
+
+        if (changes.getAmount() != null && changes.getAmount().signum() <= 0) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "status", "error",
+                    "message", "L'import ha de ser més gran que zero."));
+        }
+
+        revertFromBalance(existing);
+
+        if (changes.getDate() != null) existing.setDate(changes.getDate());
+        if (changes.getAmount() != null) existing.setAmount(changes.getAmount());
+        if (changes.getType() != null) existing.setType(changes.getType());
+        if (changes.getShortDescription() != null) existing.setShortDescription(changes.getShortDescription());
+        if (changes.getCategoryName() != null) existing.setCategoryName(changes.getCategoryName());
+        if (changes.getCompanyName() != null) existing.setCompanyName(changes.getCompanyName());
+        if (changes.getExcludedFromBudget() != null) {
+            existing.setExcludedFromBudget(changes.getExcludedFromBudget());
+        }
+
+        if (changes.getAccount() != null && changes.getAccount().getId() != null) {
+            accountRepository.findById(changes.getAccount().getId()).ifPresent(existing::setAccount);
+        }
+
+        // Torna a lligar categoria i empresa —poden haver canviat de nom— i
+        // aplica el saldo nou al compte que toqui ara.
+        linkAndApplyToBalance(existing, existing.getAccount());
+        transactionRepository.save(existing);
+
+        return ResponseEntity.ok(Map.of(
+                "status", "success",
+                "message", "Moviment actualitzat"));
+    }
+
+    /**
      * Esborra un moviment i **desfà** el que va fer al saldo.
      *
      * No n'hi ha prou d'esborrar la fila: el saldo del compte es va moure en
@@ -264,17 +343,7 @@ public class TransactionController {
             return ResponseEntity.notFound().build();
         }
 
-        // A l'inrevés que en desar: una despesa va restar, així que ara suma.
-        if (transaction.getAccount() != null && transaction.getAmount() != null) {
-            if ("EXPENSE".equals(transaction.getType())) {
-                accountService.updateAccountBalance(
-                        transaction.getAccount().getId(), transaction.getAmount(), "ADD");
-            } else if ("INCOME".equals(transaction.getType())) {
-                accountService.updateAccountBalance(
-                        transaction.getAccount().getId(), transaction.getAmount(), "SUBTRACT");
-            }
-        }
-
+        revertFromBalance(transaction);
         transactionRepository.delete(transaction);
 
         return ResponseEntity.ok(Map.of(

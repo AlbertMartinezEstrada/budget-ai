@@ -1,6 +1,6 @@
 import {
     getTransactions, getCategories, getCompanies, getAccounts,
-    createTransaction, deleteTransaction, formatCurrency, escapeHtml
+    createTransaction, updateTransaction, deleteTransaction, formatCurrency, escapeHtml
 } from '../../api.js';
 
 /**
@@ -23,6 +23,9 @@ const MONTH_FORMATTER = new Intl.DateTimeFormat('ca-ES', {
 
 let currentSortMode = 'month-desc';
 let currentTransactions = [];
+// La fixa setUpManualEntry, que és qui té el formulari a mà, i la crida el
+// listener de la taula, que viu fora.
+let openEditor = () => {};
 
 export async function initTransactions(container) {
     container.innerHTML = `
@@ -102,11 +105,12 @@ export async function initTransactions(container) {
         <!-- Modal d'alta manual -->
         <div id="transaction-modal" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-50 p-4">
             <div class="bg-white dark:bg-slate-800 rounded-xl p-6 w-full max-w-md max-h-full overflow-y-auto">
-                <h3 class="text-xl font-bold mb-1">Afegir moviment</h3>
-                <p class="text-sm text-gray-500 dark:text-slate-400 mb-4">
+                <h3 class="text-xl font-bold mb-1" id="transaction-modal-title">Afegir moviment</h3>
+                <p class="text-sm text-gray-500 dark:text-slate-400 mb-4" id="transaction-modal-hint">
                     Per al que no surt de l'extracte: efectiu, un préstec, una devolució.
                 </p>
                 <form id="transaction-form" class="space-y-4">
+                    <input type="hidden" id="edit-id">
                     <div>
                         <label class="block text-sm font-medium mb-1" for="new-type">Tipus</label>
                         <select id="new-type" class="form-control">
@@ -133,9 +137,23 @@ export async function initTransactions(container) {
                         <datalist id="company-suggestions"></datalist>
                     </div>
                     <div>
+                        <label class="block text-sm font-medium mb-1" for="new-account">Compte</label>
+                        <select id="new-account" class="form-control"></select>
+                    </div>
+                    <div>
                         <label class="block text-sm font-medium mb-1" for="new-description">Descripció</label>
                         <input type="text" id="new-description" class="form-control" placeholder="Opcional">
                     </div>
+                    <label class="flex items-start gap-2 text-sm">
+                        <input type="checkbox" id="new-excluded" class="mt-1">
+                        <span>
+                            No comptar al pressupost
+                            <span class="block text-xs text-gray-500 dark:text-slate-400">
+                                Per a diners que ja es van comptar en sortir del compte principal:
+                                una entrada per traspàs, o una compra feta amb diners ja traspassats.
+                            </span>
+                        </span>
+                    </label>
                     <p id="transaction-form-error" class="text-error text-sm hidden"></p>
                     <div class="flex gap-2 justify-end">
                         <button type="button" id="transaction-cancel" class="btn btn-outline">Cancel·lar</button>
@@ -214,11 +232,19 @@ export async function initTransactions(container) {
 }
 
 async function handleRowAction(event) {
-    const button = event.target.closest('button[data-action="delete-transaction"]');
+    const button = event.target.closest('button[data-action]');
     if (!button) return;
 
     const id = Number.parseInt(button.dataset.id, 10);
     if (!Number.isInteger(id)) return;
+
+    if (button.dataset.action === 'edit-transaction') {
+        const transaction = currentTransactions.find(t => t.id === id);
+        if (transaction) openEditor(transaction);
+        return;
+    }
+
+    if (button.dataset.action !== 'delete-transaction') return;
 
     // Esborrar mou el saldo del compte cap enrere, així que es pregunta.
     if (!confirm('Esborrar aquest moviment? El saldo del compte es desfarà.')) return;
@@ -248,6 +274,12 @@ function setUpManualEntry(categories, companies) {
     const parents = new Set(categories.map(c => c.parent_id).filter(Boolean));
     const leaves = categories.filter(c => !parents.has(c.id));
 
+    getAccounts().then(accounts => {
+        document.getElementById('new-account').innerHTML = accounts
+            .map(a => `<option value="${a.id}">${escapeHtml(a.nom)}</option>`)
+            .join('');
+    }).catch(error => console.error('Error loading accounts:', error));
+
     document.getElementById('new-category').innerHTML = leaves
         .map(c => `<option value="${escapeHtml(c.nom)}">${escapeHtml(c.nom)}</option>`)
         .join('');
@@ -261,14 +293,52 @@ function setUpManualEntry(categories, companies) {
         modal.classList.remove('flex');
     };
 
+    const open = () => {
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+    };
+
     document.getElementById('add-transaction-btn').addEventListener('click', () => {
         form.reset();
         error.classList.add('hidden');
+        document.getElementById('edit-id').value = '';
+        document.getElementById('transaction-modal-title').textContent = 'Afegir moviment';
+        document.getElementById('transaction-modal-hint').textContent =
+            "Per al que no surt de l'extracte: efectiu, un préstec, una devolució.";
         // Per defecte, avui: el cas normal és apuntar una cosa que acaba de passar.
         document.getElementById('new-date').value = todayInputValue();
-        modal.classList.remove('hidden');
-        modal.classList.add('flex');
+        open();
     });
+
+    /**
+     * Obre el formulari amb un moviment ja existent a dins.
+     *
+     * Les dades surten de la llista que ja s'ha carregat i no d'una crida
+     * nova: és la mateixa que s'està ensenyant, i demanar-la un altre cop
+     * només afegiria una espera.
+     */
+    openEditor = (transaction) => {
+        form.reset();
+        error.classList.add('hidden');
+
+        document.getElementById('edit-id').value = transaction.id;
+        document.getElementById('transaction-modal-title').textContent = 'Editar moviment';
+        document.getElementById('transaction-modal-hint').textContent =
+            'El saldo del compte s\'ajusta sol: es desfà l\'efecte anterior i s\'aplica el nou.';
+
+        document.getElementById('new-type').value = typeOf(transaction);
+        document.getElementById('new-amount').value = Number.parseFloat(transaction.cost) || '';
+        document.getElementById('new-date').value = transaction.data || '';
+        document.getElementById('new-category').value = transaction.categoria || '';
+        document.getElementById('new-company').value = transaction.empresa || '';
+        document.getElementById('new-description').value = transaction.descripcio_curta || '';
+        document.getElementById('new-excluded').checked = Boolean(transaction.exclos_pressupost);
+        if (transaction.account?.id) {
+            document.getElementById('new-account').value = transaction.account.id;
+        }
+
+        open();
+    };
 
     document.getElementById('transaction-cancel').addEventListener('click', close);
     modal.addEventListener('click', (e) => {
@@ -289,15 +359,26 @@ function setUpManualEntry(categories, companies) {
         const submitButton = form.querySelector('button[type="submit"]');
         submitButton.disabled = true;
 
+        const accountId = Number.parseInt(document.getElementById('new-account').value, 10);
+        const payload = {
+            data: document.getElementById('new-date').value,
+            cost: amount,
+            type: document.getElementById('new-type').value,
+            categoria: document.getElementById('new-category').value,
+            empresa: document.getElementById('new-company').value.trim() || 'Desconegut',
+            descripcio_curta: document.getElementById('new-description').value.trim(),
+            exclos_pressupost: document.getElementById('new-excluded').checked
+        };
+        if (Number.isInteger(accountId)) payload.account = { id: accountId };
+
+        const editingId = document.getElementById('edit-id').value;
+
         try {
-            await createTransaction({
-                data: document.getElementById('new-date').value,
-                cost: amount,
-                type: document.getElementById('new-type').value,
-                categoria: document.getElementById('new-category').value,
-                empresa: document.getElementById('new-company').value.trim() || 'Desconegut',
-                descripcio_curta: document.getElementById('new-description').value.trim()
-            });
+            if (editingId) {
+                await updateTransaction(Number.parseInt(editingId, 10), payload);
+            } else {
+                await createTransaction(payload);
+            }
             close();
             await loadData();
         } catch (e) {
@@ -439,7 +520,11 @@ function buildTransactionRow(transaction) {
             <td class="text-right font-bold ${style.classe}" style="white-space: nowrap;">
                 ${style.signe}${formatAmount(transaction.cost)}
             </td>
-            <td class="text-right">
+            <td class="text-right" style="white-space: nowrap;">
+                <button class="btn btn-sm btn-outline" data-action="edit-transaction"
+                        data-id="${transaction.id}" title="Editar aquest moviment">
+                    <span class="material-symbols-outlined text-sm">edit</span>
+                </button>
                 <button class="btn btn-sm btn-outline" data-action="delete-transaction"
                         data-id="${transaction.id}" title="Esborrar aquest moviment">
                     <span class="material-symbols-outlined text-sm">delete</span>
