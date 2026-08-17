@@ -396,6 +396,7 @@ public class TransactionController {
             @RequestParam(required = false) Long categoryId,
             @RequestParam(required = false) Long companyId,
             @RequestParam(required = false) Long accountId,
+            @RequestParam(required = false) String type,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
 
@@ -405,7 +406,7 @@ public class TransactionController {
         }
 
         if (categoryId != null || companyId != null || accountId != null
-                || startDate != null || endDate != null) {
+                || (type != null && !type.isBlank()) || startDate != null || endDate != null) {
             Specification<Transaction> specification = Specification.where(null);
 
             if (categoryId != null) {
@@ -416,6 +417,13 @@ public class TransactionController {
             if (companyId != null) {
                 specification = specification.and((root, query, criteriaBuilder) ->
                         criteriaBuilder.equal(root.get("company").get("id"), companyId));
+            }
+
+            // L'import es desa en positiu i el signe viu al tipus, així que
+            // separar despeses d'ingressos només es pot fer per aquí.
+            if (type != null && !type.isBlank()) {
+                specification = specification.and((root, query, criteriaBuilder) ->
+                        criteriaBuilder.equal(root.get("type"), type));
             }
 
             // Amb diversos comptes, mirar-los per separat és el que permet

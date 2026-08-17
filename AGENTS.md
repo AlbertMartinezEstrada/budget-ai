@@ -31,7 +31,7 @@ docker compose up -d --build backend  # aplicar cambios de Java
 docker compose logs -f backend        # logs
 
 cd backend-java && ./gradlew test              # 91 unitarios, sin Docker
-cd backend-java && ./gradlew integrationTest   # 73, requieren Docker
+cd backend-java && ./gradlew integrationTest   # 75, requieren Docker
 cd frontend && npm test                        # 17
 ```
 
