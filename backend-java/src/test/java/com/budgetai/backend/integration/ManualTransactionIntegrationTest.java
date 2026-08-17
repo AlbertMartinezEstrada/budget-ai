@@ -189,6 +189,97 @@ class ManualTransactionIntegrationTest extends AbstractIntegrationTest {
         assertThat(balance()).isEqualByComparingTo("1000.00");
     }
 
+    /** Un canvi solt, per no repetir el moviment sencer a cada test. */
+    private Transaction change() {
+        return new Transaction();
+    }
+
+    @Test
+    @DisplayName("Canviar l'import ajusta el saldo per la diferència")
+    void editingTheAmountMovesOnlyTheDifference() {
+        transactionController.createTransaction(manual("40.00", "EXPENSE"));
+        Long id = transactionRepository.findAll().get(0).getId();
+
+        Transaction changes = change();
+        changes.setAmount(new BigDecimal("50.00"));
+        transactionController.updateTransaction(id, changes);
+
+        // 1000 − 50. Sense desfer l'efecte anterior, hauria restat 50 més
+        // sobre els 960 que ja hi havia i hauria quedat a 910.
+        assertThat(balance()).isEqualByComparingTo("950.00");
+    }
+
+    @Test
+    @DisplayName("Canviar de despesa a ingrés gira el saldo sencer")
+    void editingTheTypeFlipsTheBalance() {
+        transactionController.createTransaction(manual("40.00", "EXPENSE"));
+        Long id = transactionRepository.findAll().get(0).getId();
+
+        Transaction changes = change();
+        changes.setType("INCOME");
+        transactionController.updateTransaction(id, changes);
+
+        // Es tornen els 40 restats i se'n sumen 40: de 960 a 1040.
+        assertThat(balance()).isEqualByComparingTo("1040.00");
+    }
+
+    @Test
+    @DisplayName("Un camp que no s'envia no es toca")
+    void absentFieldsAreLeftAlone() {
+        transactionController.createTransaction(manual("40.00", "EXPENSE"));
+        Long id = transactionRepository.findAll().get(0).getId();
+
+        Transaction changes = change();
+        changes.setCategoria("Altres");
+        transactionController.updateTransaction(id, changes);
+
+        Transaction saved = transactionRepository.findById(id).orElseThrow();
+        assertThat(saved.getCategory().getName()).isEqualTo("Altres");
+        // L'import i l'empresa no anaven a la petició.
+        assertThat(saved.getAmount()).isEqualByComparingTo("40.00");
+        assertThat(saved.getCompany().getName()).isEqualTo("Bar de la cantonada");
+        assertThat(balance()).isEqualByComparingTo("960.00");
+    }
+
+    @Test
+    @DisplayName("Editar no canvia el hash: segueix sent la mateixa línia d'extracte")
+    void editingKeepsTheStatementIdentity() {
+        Transaction imported = manual("40.00", "EXPENSE");
+        imported.setVerificationHash("hash-de-l-extracte");
+        transactionRepository.save(imported);
+
+        Transaction changes = change();
+        changes.setCompanyName("Nom corregit");
+        transactionController.updateTransaction(imported.getId(), changes);
+
+        // Recalcular-lo faria que tornar a importar el mateix fitxer dupliqués
+        // el moviment, que és justament el que el hash evita.
+        assertThat(transactionRepository.findById(imported.getId()).orElseThrow()
+                .getVerificationHash()).isEqualTo("hash-de-l-extracte");
+    }
+
+    @Test
+    @DisplayName("Editar un import a zero es rebutja i no toca el saldo")
+    void editingToAnInvalidAmountIsRejected() {
+        transactionController.createTransaction(manual("40.00", "EXPENSE"));
+        Long id = transactionRepository.findAll().get(0).getId();
+
+        Transaction changes = change();
+        changes.setAmount(new BigDecimal("0.00"));
+
+        assertThat(transactionController.updateTransaction(id, changes)
+                .getStatusCode().value()).isEqualTo(400);
+        // Es valida abans de desfer res: el saldo es queda com estava.
+        assertThat(balance()).isEqualByComparingTo("960.00");
+    }
+
+    @Test
+    @DisplayName("Editar un moviment que no existeix dona 404")
+    void editingSomethingMissingIsA404() {
+        assertThat(transactionController.updateTransaction(999_999L, change())
+                .getStatusCode().value()).isEqualTo(404);
+    }
+
     @Test
     @DisplayName("Esborrar un moviment que no existeix dona 404 i no toca el saldo")
     void deletingSomethingMissingIsA404() {

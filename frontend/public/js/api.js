@@ -184,6 +184,21 @@ export async function createTransaction(data) {
 }
 
 /**
+ * Edita un moviment ja desat.
+ *
+ * El backend desfà l'efecte antic al saldo i aplica el nou, així que canviar
+ * l'import o el compte no descompensa res.
+ */
+export async function updateTransaction(id, data) {
+    const response = await apiFetch(`/gastos/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+    });
+    return handleResponse(response);
+}
+
+/**
  * Esborra un moviment i desfà el que va fer al saldo del compte.
  *
  * No n'hi ha prou d'esborrar la fila: el saldo es va moure en desar-lo.
