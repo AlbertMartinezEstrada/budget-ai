@@ -149,4 +149,95 @@ class BankReaderServiceTest {
     void emptyCsvYieldsNothing() throws Exception {
         assertThat(parse("Fecha;Concepto;Importe\n")).isEmpty();
     }
+
+    // ============ FORMAT DE REVOLUT ============
+
+    private static final String REVOLUT_HEADER =
+            "Tipo,Produto,Data de início,Data de Conclusão,Descrição,Montante,Comissão,Moeda,Estado,Saldo\n";
+
+    private List<Transaction> readRevolut(String... rows) throws Exception {
+        String content = REVOLUT_HEADER + String.join("\n", rows) + "\n";
+        return service.readBankCsv(new MockMultipartFile(
+                "file", "revolut.csv", "text/csv", content.getBytes(StandardCharsets.UTF_8)));
+    }
+
+    @Test
+    @DisplayName("El format de Revolut es reconeix per la capçalera, sense preguntar")
+    void revolutIsDetectedByItsHeader() throws Exception {
+        List<Transaction> read = readRevolut(
+                "Pagamento com cartão,Atual,2026-08-01 10:59:05,2026-08-04 09:13:10,WOO,-7.00,0.00,EUR,CONCLUÍDA,0.00");
+
+        assertThat(read).hasSize(1);
+        assertThat(read.get(0).getOriginalConcept()).isEqualTo("WOO");
+        assertThat(read.get(0).getType()).isEqualTo("EXPENSE");
+        assertThat(read.get(0).getAmount()).isEqualByComparingTo("7.00");
+    }
+
+    @Test
+    @DisplayName("Mana la data de conclusió, que és quan es mou el saldo")
+    void theCompletionDateWins() throws Exception {
+        List<Transaction> read = readRevolut(
+                "Pagamento com cartão,Atual,2026-08-01 10:59:05,2026-08-04 09:13:10,WOO,-7.00,0.00,EUR,CONCLUÍDA,0.00");
+
+        // Un pagament pot començar un dia i completar-se un altre.
+        assertThat(read.get(0).getDate()).isEqualTo(LocalDate.of(2026, 8, 4));
+    }
+
+    @Test
+    @DisplayName("La comissió compta encara que l'import sigui zero")
+    void theFeeIsPartOfTheMovement() throws Exception {
+        List<Transaction> read = readRevolut(
+                "Cobrança,Atual,2026-08-01 01:49:44,2026-08-01 01:49:44,"
+                        + "Comissão de manutenção de conta pacote Premium,0.00,4.99,EUR,CONCLUÍDA,-1.89");
+
+        // Llegint només "Montante", aquesta despesa entrava com a zero euros.
+        assertThat(read).hasSize(1);
+        assertThat(read.get(0).getAmount()).isEqualByComparingTo("4.99");
+        assertThat(read.get(0).getType()).isEqualTo("EXPENSE");
+    }
+
+    @Test
+    @DisplayName("Els moviments que no estan conclosos no s'importen")
+    void pendingMovementsAreSkipped() throws Exception {
+        List<Transaction> read = readRevolut(
+                "Pagamento com cartão,Atual,2026-08-01 10:00:00,2026-08-01 10:00:00,Pendent,-9.99,0.00,EUR,PENDENTE,0.00",
+                "Pagamento com cartão,Atual,2026-08-02 10:00:00,2026-08-02 10:00:00,Fet,-5.00,0.00,EUR,CONCLUÍDA,0.00");
+
+        // Importar-los mouria el saldo de diners que no s'han mogut.
+        assertThat(read).hasSize(1);
+        assertThat(read.get(0).getOriginalConcept()).isEqualTo("Fet");
+    }
+
+    @Test
+    @DisplayName("Una entrada de diners és un ingrés i en desa el saldo")
+    void topUpsAreIncome() throws Exception {
+        List<Transaction> read = readRevolut(
+                "Carregamento,Atual,2026-08-05 09:24:18,2026-08-05 09:24:20,"
+                        + "Carregamento com Apple Pay através de *9469,10.00,0.00,EUR,CONCLUÍDA,10.00");
+
+        assertThat(read.get(0).getType()).isEqualTo("INCOME");
+        assertThat(read.get(0).getAmount()).isEqualByComparingTo("10.00");
+        assertThat(read.get(0).getBalance()).isEqualByComparingTo("10.00");
+    }
+
+    @Test
+    @DisplayName("Una fila que no mou res no s'importa")
+    void zeroMovementsAreSkipped() throws Exception {
+        List<Transaction> read = readRevolut(
+                "Cobrança,Atual,2026-08-01 01:00:00,2026-08-01 01:00:00,Res,0.00,0.00,EUR,CONCLUÍDA,0.00");
+
+        assertThat(read).isEmpty();
+    }
+
+    @Test
+    @DisplayName("El format de sempre segueix funcionant")
+    void theClassicFormatStillWorks() throws Exception {
+        String content = "Fecha;Concepto;Importe\n15/02/2026;MERCADONA;-45,30 EUR\n";
+        List<Transaction> read = service.readBankCsv(new MockMultipartFile(
+                "file", "classic.csv", "text/csv", content.getBytes(StandardCharsets.UTF_8)));
+
+        assertThat(read).hasSize(1);
+        assertThat(read.get(0).getDate()).isEqualTo(LocalDate.of(2026, 2, 15));
+        assertThat(read.get(0).getAmount()).isEqualByComparingTo("45.30");
+    }
 }

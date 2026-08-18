@@ -208,6 +208,28 @@ export async function deleteTransaction(id) {
     return handleResponse(response);
 }
 
+// ============ REGLES D'IMPORTACIÓ ============
+// Miren el concepte original del moviment i, si hi troben el seu patró, el
+// marquen com a ja comptat i li poden posar categoria.
+export async function getImportRules() {
+    const response = await apiFetch('/import-rules');
+    return handleResponse(response);
+}
+
+export async function createImportRule(data) {
+    const response = await apiFetch('/import-rules', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+    });
+    return handleResponse(response);
+}
+
+export async function deleteImportRule(id) {
+    const response = await apiFetch(`/import-rules/${id}`, { method: 'DELETE' });
+    if (!response.ok) throw new Error(await extractErrorMessage(response));
+}
+
 // Fetch all categories
 export async function getCategories() {
     const response = await apiFetch(`/categories`);

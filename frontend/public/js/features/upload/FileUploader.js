@@ -1,5 +1,6 @@
 import {
-    uploadCsv, confirmTransactions, getCategories, getAccounts, formatCurrency, escapeHtml
+    uploadCsv, confirmTransactions, getCategories, getAccounts,
+    getImportRules, createImportRule, deleteImportRule, formatCurrency, escapeHtml
 } from '../../api.js';
 
 /**
@@ -41,6 +42,33 @@ export async function initUpload(container) {
             </div>
             <div id="upload-status" class="mt-4 text-center hidden"></div>
         </div>
+
+        <details class="card mb-4">
+            <summary style="cursor: pointer; padding: 1rem; font-weight: 600;">
+                Regles d'importació
+            </summary>
+            <div class="p-3">
+                <p class="text-sm text-muted mb-3">
+                    Si el concepte del moviment conté el text de la regla, es marca sol com a
+                    <strong>ja comptat</strong>. Per a les entrades que vénen d'un altre compte teu:
+                    els diners ja es van comptar en sortir del principal.
+                    Sempre pots desmarcar-ho a la revisió abans de confirmar.
+                </p>
+                <form id="rule-form" class="flex flex-wrap items-end gap-2 mb-3">
+                    <div class="form-group" style="flex: 1; min-width: 12rem; margin: 0;">
+                        <label for="rule-pattern">El concepte conté</label>
+                        <input type="text" id="rule-pattern" class="form-control"
+                               placeholder="p. ex. *9469" required>
+                    </div>
+                    <div class="form-group" style="min-width: 12rem; margin: 0;">
+                        <label for="rule-category">Categoria (opcional)</label>
+                        <select id="rule-category" class="form-control"></select>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Afegir regla</button>
+                </form>
+                <div id="rules-list"></div>
+            </div>
+        </details>
 
         <div id="review-section" class="card hidden">
             <div class="card-header bg-warning-light">
@@ -113,6 +141,70 @@ export async function initUpload(container) {
     } catch (error) {
         console.error('Error loading accounts:', error);
     }
+
+    // ============ REGLES ============
+    const rulesList = document.getElementById('rules-list');
+
+    async function renderRules() {
+        try {
+            const rules = await getImportRules();
+            rulesList.innerHTML = rules.length === 0
+                ? '<p class="text-sm text-muted">Cap regla encara.</p>'
+                : rules.map(rule => `
+                    <div class="flex items-center justify-between gap-2 py-1 text-sm">
+                        <span>
+                            <code>${escapeHtml(rule.patro)}</code>
+                            ${rule.marca_exclos ? '→ no comptar al pressupost' : ''}
+                            ${rule.categoria ? `→ ${escapeHtml(rule.categoria)}` : ''}
+                        </span>
+                        <button class="btn btn-sm btn-outline" data-action="delete-rule"
+                                data-id="${rule.id}" type="button">Esborrar</button>
+                    </div>`).join('');
+        } catch (error) {
+            rulesList.innerHTML = `<p class="text-error text-sm">${escapeHtml(error.message)}</p>`;
+        }
+    }
+
+    // Només fulles: una regla que assignés un grup faria que el moviment es
+    // rebutgés en confirmar.
+    const ruleCategorySelect = document.getElementById('rule-category');
+    const parentIds = new Set(categoriesList.map(c => c.parent_id).filter(Boolean));
+    ruleCategorySelect.innerHTML = '<option value="">— No la toquis —</option>'
+        + categoriesList.filter(c => !parentIds.has(c.id))
+            .map(c => `<option value="${escapeHtml(c.nom)}">${escapeHtml(c.nom)}</option>`)
+            .join('');
+
+    document.getElementById('rule-form').addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const patro = document.getElementById('rule-pattern').value.trim();
+        if (!patro) return;
+
+        try {
+            await createImportRule({
+                patro,
+                marca_exclos: true,
+                categoria: ruleCategorySelect.value || null
+            });
+            document.getElementById('rule-pattern').value = '';
+            await renderRules();
+        } catch (error) {
+            alert(error.message || 'No s\'ha pogut desar la regla.');
+        }
+    });
+
+    rulesList.addEventListener('click', async (event) => {
+        const button = event.target.closest('button[data-action="delete-rule"]');
+        if (!button) return;
+
+        try {
+            await deleteImportRule(Number.parseInt(button.dataset.id, 10));
+            await renderRules();
+        } catch (error) {
+            alert(error.message || 'No s\'ha pogut esborrar la regla.');
+        }
+    });
+
+    await renderRules();
 
     fileInput.addEventListener('change', () => {
         if (fileInput.files.length > 0) {

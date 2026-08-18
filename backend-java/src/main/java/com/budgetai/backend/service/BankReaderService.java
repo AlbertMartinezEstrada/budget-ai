@@ -9,7 +9,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.InputStreamReader;
+import java.io.StringReader;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.nio.charset.StandardCharsets;
@@ -27,54 +27,150 @@ public class BankReaderService {
         this.transactionHasher = transactionHasher;
     }
 
+    /**
+     * Llegeix un extracte, sigui del format que sigui.
+     *
+     * El format es dedueix de la capçalera i no es demana a qui puja el
+     * fitxer: les columnes ja diuen de quin banc ve, i un desplegable més
+     * només afegiria un pas i una manera d'equivocar-se.
+     */
     public List<Transaction> readBankCsv(MultipartFile file) throws IOException {
+        String content = new String(file.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+        // Alguns bancs exporten amb BOM i la primera columna deixa de tenir el
+        // nom que diu la capçalera.
+        if (content.startsWith("\uFEFF")) content = content.substring(1);
+
+        String header = content.lines().findFirst().orElse("");
+        return isRevolut(header) ? readRevolut(content) : readClassic(content);
+    }
+
+    /**
+     * Revolut porta l'import a "Montante" i la comissió en una columna a part.
+     * Cap dels dos noms surt a l'altre format, així que n'hi ha prou de mirar-ho.
+     */
+    private boolean isRevolut(String header) {
+        return header.contains("Montante") || header.contains("Data de Conclus");
+    }
+
+    private CSVParser parse(String content, char delimiter) throws IOException {
+        return new CSVParser(new BufferedReader(new StringReader(content)), CSVFormat.DEFAULT
+                .withDelimiter(delimiter)
+                .withFirstRecordAsHeader()
+                .withIgnoreHeaderCase()
+                .withTrim());
+    }
+
+    /** El format de sempre: Fecha;Concepto;Importe. */
+    private List<Transaction> readClassic(String content) throws IOException {
         List<Transaction> transactions = new ArrayList<>();
 
-        try (BufferedReader reader = new BufferedReader(new InputStreamReader(file.getInputStream(), StandardCharsets.UTF_8));
-             CSVParser csvParser = new CSVParser(reader, CSVFormat.DEFAULT
-                     .withDelimiter(';')
-                     .withFirstRecordAsHeader()
-                     .withIgnoreHeaderCase()
-                     .withTrim())) {
-
+        try (CSVParser csvParser = parse(content, ';')) {
             for (CSVRecord csvRecord : csvParser) {
-                String importeStr = csvRecord.get("Importe");
                 String saldoStr = csvRecord.isMapped("Saldo") ? csvRecord.get("Saldo") : null;
-                String concepto = csvRecord.get("Concepto");
-                String fechaStr = csvRecord.get("Fecha");
 
-                // Netegem els valors
-                BigDecimal amount = cleanNumber(importeStr);
+                BigDecimal amount = cleanNumber(csvRecord.get("Importe"));
                 BigDecimal balance = (saldoStr != null) ? cleanNumber(saldoStr) : null;
 
-                Transaction t = new Transaction();
-                t.setOriginalConcept(concepto);
-
-                // Parsejar data DD/MM/YYYY
-                LocalDate date = LocalDate.parse(fechaStr, DateTimeFormatter.ofPattern("dd/MM/yyyy"));
-                t.setDate(date);
-
-                // Mantenim l'import original (podria ser positiu per ingresos)
-                t.setAmount(amount.abs());
-                t.setBalance(balance);
-
-                // Determinem el tipus
-                if (amount.signum() < 0) {
-                    t.setType("EXPENSE");
-                } else {
-                    t.setType("INCOME");
-                }
-                
-                // El hash surt dels camps ja normalitzats de l'entitat i no de
-                // les cadenes crues, perquè s'ha de poder tornar a calcular en
-                // confirmar la importació, quan les cadenes ja no existeixen.
-                t.setVerificationHash(transactionHasher.hash(t));
-
-                transactions.add(t);
+                transactions.add(build(
+                        LocalDate.parse(csvRecord.get("Fecha"), DateTimeFormatter.ofPattern("dd/MM/yyyy")),
+                        csvRecord.get("Concepto"), amount, balance));
             }
         }
-
         return transactions;
+    }
+
+    /**
+     * Extracte de Revolut.
+     *
+     * Tres coses que no són com semblen:
+     *
+     * L'IMPORT NO ÉS NOMÉS "Montante". La comissió va a part, i una fila de
+     * manteniment porta Montante=0 i Comissão=4.99: llegint només el primer,
+     * aquella despesa entrava com a zero euros. El moviment real és la resta
+     * dels dos.
+     *
+     * HI HA DUES DATES. Un pagament pot començar un dia i completar-se un
+     * altre —el saldo es mou el segon—, així que mana "Data de Conclusão".
+     *
+     * NO TOT ESTÀ FET. Revolut també exporta moviments pendents i revertits.
+     * Importar-los mouria saldos de diners que no s'han mogut.
+     */
+    private List<Transaction> readRevolut(String content) throws IOException {
+        List<Transaction> transactions = new ArrayList<>();
+
+        try (CSVParser csvParser = parse(content, ',')) {
+            for (CSVRecord csvRecord : csvParser) {
+                if (!isCompleted(column(csvRecord, "Estado", "Estat", "State"))) continue;
+
+                BigDecimal amount = cleanNumber(column(csvRecord, "Montante", "Amount"));
+                BigDecimal fee = cleanNumber(column(csvRecord, "Comissão", "Comissao", "Fee"));
+                BigDecimal net = amount.subtract(fee);
+
+                // Una fila sense moviment no és res que calgui desar.
+                if (net.signum() == 0) continue;
+
+                LocalDate date = parseDateTime(column(csvRecord, "Data de Conclusão",
+                        "Data de Conclusao", "Completed Date"));
+                if (date == null) continue;
+
+                String concept = column(csvRecord, "Descrição", "Descricao", "Description");
+                if (concept == null || concept.isBlank()) {
+                    concept = column(csvRecord, "Tipo", "Type");
+                }
+
+                transactions.add(build(date, concept, net,
+                        cleanNumber(column(csvRecord, "Saldo", "Balance"))));
+            }
+        }
+        return transactions;
+    }
+
+    /** Els noms de columna canvien amb l'idioma de l'exportació. */
+    private String column(CSVRecord record, String... names) {
+        for (String name : names) {
+            if (record.isMapped(name)) return record.get(name);
+        }
+        return null;
+    }
+
+    private boolean isCompleted(String state) {
+        // Sense columna d'estat, s'assumeix que el que hi ha està fet.
+        if (state == null || state.isBlank()) return true;
+
+        String normalised = state.trim().toUpperCase();
+        return normalised.startsWith("CONCLU") || normalised.equals("COMPLETED");
+    }
+
+    /** "2026-08-04 09:13:10" -> 2026-08-04. */
+    private LocalDate parseDateTime(String value) {
+        if (value == null || value.isBlank()) return null;
+
+        String trimmed = value.trim();
+        int space = trimmed.indexOf(' ');
+        try {
+            return LocalDate.parse(space > 0 ? trimmed.substring(0, space) : trimmed);
+        } catch (Exception e) {
+            throw new IllegalArgumentException("Data il·legible al CSV: \"" + value + "\"", e);
+        }
+    }
+
+    /**
+     * El signe del moviment viu al tipus i l'import es desa en positiu, igual
+     * que a la resta de l'aplicació.
+     */
+    private Transaction build(LocalDate date, String concept, BigDecimal signedAmount, BigDecimal balance) {
+        Transaction t = new Transaction();
+        t.setOriginalConcept(concept);
+        t.setDate(date);
+        t.setAmount(signedAmount.abs());
+        t.setBalance(balance);
+        t.setType(signedAmount.signum() < 0 ? "EXPENSE" : "INCOME");
+
+        // El hash surt dels camps ja normalitzats de l'entitat i no de les
+        // cadenes crues, perquè s'ha de poder tornar a calcular en confirmar
+        // la importació, quan les cadenes ja no existeixen.
+        t.setVerificationHash(transactionHasher.hash(t));
+        return t;
     }
 
     /**
