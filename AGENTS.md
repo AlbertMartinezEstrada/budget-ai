@@ -30,8 +30,8 @@ docker compose up -d --build          # levantar todo
 docker compose up -d --build backend  # aplicar cambios de Java
 docker compose logs -f backend        # logs
 
-cd backend-java && ./gradlew test              # 91 unitarios, sin Docker
-cd backend-java && ./gradlew integrationTest   # 81, requieren Docker
+cd backend-java && ./gradlew test              # 98 unitarios, sin Docker
+cd backend-java && ./gradlew integrationTest   # 86, requieren Docker
 cd frontend && npm test                        # 17
 ```
 
@@ -203,7 +203,28 @@ La identidad de un movimiento importado es **hash + cuenta**, no solo el hash: u
 traspaso deja el mismo importe el mismo día en dos extractos y la segunda pata se
 descartaba como duplicada.
 
-### 9. La IA no decide sobre el dinero
+### 9. Cada banco exporta a su manera
+
+El lector **deduce el formato de la cabecera**, no se le pregunta a quien sube
+el fichero. Hoy entiende dos: el clásico (`Fecha;Concepto;Importe`, con `;`) y
+el de Revolut (con `,`). Tres trampas del segundo, todas descubiertas leyendo un
+extracto real:
+
+- **El importe no es solo `Montante`.** La comisión va aparte, y una fila de
+  mantenimiento trae `Montante=0` y `Comissão=4.99`: leyendo solo el primero,
+  ese gasto entraba como cero euros. El movimiento real es la resta.
+- **Hay dos fechas.** Un pago puede empezar un día y completarse otro; el saldo
+  se mueve el segundo, así que manda `Data de Conclusão`.
+- **No todo está hecho.** Revolut exporta también pendientes y revertidos.
+  Importarlos movería saldos de dinero que no se movió.
+
+Las **reglas de importación** (`import_rules`) miran el concepto original y
+marcan solos los movimientos que no deben contar. Se aplican **después** de la
+IA —una regla es una decisión explícita del usuario y manda sobre lo que
+adivine el modelo— y **antes** de la pantalla de revisión, para que se vea lo
+que han hecho y se pueda deshacer fila a fila.
+
+### 10. La IA no decide sobre el dinero
 
 Gemini solo puede fijar empresa, categoría y descripción. **El importe, la
 fecha, el tipo y el hash de verificación se conservan siempre del CSV.**

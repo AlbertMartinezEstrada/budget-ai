@@ -12,6 +12,7 @@ import com.budgetai.backend.service.AccountService;
 import com.budgetai.backend.service.AiEngineService;
 import com.budgetai.backend.service.BankReaderService;
 import com.budgetai.backend.service.CategoryHierarchyService;
+import com.budgetai.backend.service.ImportRuleService;
 import com.budgetai.backend.service.TransactionHasher;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Sort;
@@ -65,6 +66,9 @@ public class TransactionController {
     @Autowired
     private CategoryHierarchyService categoryHierarchyService;
 
+    @Autowired
+    private ImportRuleService importRuleService;
+
     @GetMapping("/")
     public Map<String, String> readRoot() {
         return Map.of("status", "API Budget AI (Java) con BBDD profesional funcionant correctament", "version", "2.0");
@@ -107,6 +111,11 @@ public class TransactionController {
 
             // 3. Classify with IA
             List<Transaction> classifiedTransactions = aiEngineService.classifyTransactions(newTransactions);
+
+            // 4. I al damunt, les regles de l'usuari. Van després de la IA a
+            //    posta: una regla és una decisió explícita seva i ha de manar
+            //    sobre el que endevini el model.
+            importRuleService.apply(classifiedTransactions);
 
             return ResponseEntity.ok(Map.of(
                     "status", "review",

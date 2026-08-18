@@ -148,6 +148,22 @@ CREATE TABLE IF NOT EXISTS monthly_income (
     notes TEXT
 );
 
+-- Regles que s'apliquen soles en importar un extracte.
+-- Miren el concepte original i, si hi troben el seu patró, poden marcar el
+-- moviment com a ja comptat i assignar-li categoria. S'apliquen a la pantalla
+-- de revisió, on encara es pot desmarcar abans de confirmar.
+CREATE TABLE IF NOT EXISTS import_rules (
+    id BIGSERIAL PRIMARY KEY,
+    -- Text a trobar dins del concepte, sense distingir majúscules.
+    patro VARCHAR(255) NOT NULL,
+    marca_exclos BOOLEAN NOT NULL DEFAULT TRUE,
+    -- NULL = la regla no toca la categoria.
+    categoria VARCHAR(100),
+    notes TEXT,
+    activa BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 -- Inserció de categories per defecte
 --
 -- Van en dos passos perquè les subcategories necessiten l'id del seu bloc, i
