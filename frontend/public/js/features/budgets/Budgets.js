@@ -336,7 +336,8 @@ function renderHeader(summary) {
                 <div class="text-3xl font-bold">${formatCurrency(base)}</div>
                 <div class="text-xs text-gray-500 dark:text-slate-400">
                     ${fromIncome
-                        ? `suma de los bloques de ingreso${real > 0 ? ` · ${formatCurrency(real)} ya recibidos` : ' (previsión)'}`
+                        ? `suma de los bloques de ingreso${real > 0 ? ` · ${formatCurrency(real)} ya recibidos` : ' (previsión)'}
+                           · <button data-action="edit-income" class="text-primary hover:underline">cambiar sueldo</button>`
                         : `sueldo de referencia${summary.sou_base_origen === 'MES' ? ' de este mes' : ' por defecto'}
                            · <button data-action="edit-income" class="text-primary hover:underline">cambiar</button>`}
                 </div>
@@ -739,7 +740,12 @@ Lo que ya tenga asignación este mes no se toca.`)) return;
     }
 }
 
-/** Sou d'aquest mes concret; buit vol dir "torna al sou per defecte". */
+/**
+ * Sou d'aquest mes concret; buit vol dir "torna al sou per defecte".
+ *
+ * El backend el posa també com a previsió de la nòmina del mes, així que no
+ * cal entrar-lo dues vegades.
+ */
 async function editMonthlyIncome() {
     const { year, month } = selectedPeriod();
     const period = `${year}-${String(month).padStart(2, '0')}`;
@@ -748,7 +754,7 @@ async function editMonthlyIncome() {
         : '';
 
     const input = prompt(
-        `Sueldo para ${period}.
+        `Sueldo para ${period}. También se pondrá como previsión de la nómina.
 Déjalo vacío para volver al sueldo por defecto.`,
         current === '' || current == null ? '' : String(current));
     if (input === null) return;

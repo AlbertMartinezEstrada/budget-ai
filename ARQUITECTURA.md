@@ -307,6 +307,16 @@ respaldo (`total_disponible_origen` dice cuál de los dos manda). Sin él, una
 instalación recién montada no tendría nada que repartir y la pantalla se
 quedaría muerta hasta dar de alta los bloques de ingreso.
 
+Los dos están **ligados**: guardar el sueldo de un mes
+(`PUT /budgets/monthly-income/{periodo}`) escribe también esa cifra como
+previsión de la nómina del mes, en la misma transacción. Antes eran
+independientes, y fijar el sueldo no cambiaba nada en cuanto existía un bloque
+de ingresos. La nómina se reconoce por el nombre de la hoja («Nòmina», «Sou»,
+«Salari», «Sueldo», «Salario», sin distinguir acentos); si no hay ninguna, el
+sueldo se guarda igual y sigue haciendo de respaldo. Borrar el sueldo del mes
+quita la previsión solo si sigue siendo la que puso él: si se ha cambiado a
+mano, es una decisión del usuario y se queda.
+
 Por eso **un porcentaje no es del sueldo: es del bote del nivel de encima**.
 «30% de gastos variables» y «30% del sueldo» son cifras distintas, y antes no
 se podían distinguir porque todo se calculaba contra el sueldo.

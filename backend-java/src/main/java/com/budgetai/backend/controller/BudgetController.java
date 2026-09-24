@@ -10,6 +10,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
+import java.time.YearMonth;
+import java.time.format.DateTimeParseException;
 import java.util.List;
 import java.util.Map;
 
@@ -78,6 +80,9 @@ public class BudgetController {
     /**
      * Sou d'un mes concret, quan no és el de sempre.
      * El sou per defecte viu a la configuració (`expectedMonthlyIncome`).
+     *
+     * Desar-lo fixa també la previsió de la nòmina del mes: és la mateixa
+     * xifra, i sense lligar-les calia entrar-la dues vegades.
      */
     @GetMapping("/monthly-income")
     public List<MonthlyIncome> getMonthlyIncomes() {
@@ -87,20 +92,34 @@ public class BudgetController {
     @PutMapping("/monthly-income/{period}")
     public ResponseEntity<?> setMonthlyIncome(@PathVariable String period,
                                               @RequestBody MonthlyIncome body) {
-        if (!period.matches("\\d{4}-\\d{2}")) {
+        if (!isValidPeriod(period)) {
             return ResponseEntity.badRequest().body(Map.of("error", "El període ha de ser YYYY-MM"));
         }
         if (body.getAmount() == null || body.getAmount().signum() < 0) {
             return ResponseEntity.badRequest().body(Map.of("error", "L'import ha de ser positiu"));
         }
         return ResponseEntity.ok(
-                incomeBaseService.saveOverride(period, body.getAmount(), body.getNotes()));
+                budgetService.setMonthlySalary(period, body.getAmount(), body.getNotes()));
     }
 
     @DeleteMapping("/monthly-income/{period}")
     public ResponseEntity<?> deleteMonthlyIncome(@PathVariable String period) {
-        incomeBaseService.deleteOverride(period);
+        if (!isValidPeriod(period)) {
+            return ResponseEntity.badRequest().body(Map.of("error", "El període ha de ser YYYY-MM"));
+        }
+        budgetService.clearMonthlySalary(period);
         return ResponseEntity.ok(Map.of("message", "Sou del mes esborrat; s'aplicarà el per defecte"));
+    }
+
+    /** "2026-13" passa el patró però no és cap mes, i el servei el necessita llegir. */
+    private static boolean isValidPeriod(String period) {
+        if (!period.matches("\\d{4}-\\d{2}")) return false;
+        try {
+            YearMonth.parse(period);
+            return true;
+        } catch (DateTimeParseException e) {
+            return false;
+        }
     }
 
     @GetMapping("/{id}")
