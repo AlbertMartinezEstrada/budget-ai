@@ -2,6 +2,7 @@ package com.budgetai.backend.service;
 
 import com.budgetai.backend.model.Budget;
 import com.budgetai.backend.model.Category;
+import com.budgetai.backend.model.MonthlyIncome;
 import com.budgetai.backend.model.RecurringTransaction;
 import com.budgetai.backend.model.Transaction;
 import com.budgetai.backend.repository.BudgetRepository;
@@ -139,6 +140,112 @@ public class BudgetService {
         result.put("desti", target.toString());
         result.put("copiats", copied);
         return result;
+    }
+
+    // ============ EL SOU DE REFERÈNCIA I LA NÒMINA ============
+    //
+    // Són la mateixa xifra vista des de dos llocs. El sou de referència només
+    // mana quan la secció d'ingressos és buida; en quant la nòmina té una
+    // previsió, el que es reparteix surt d'allà. Si no estan lligats, fixar el
+    // sou no feia res visible en quant hi havia un bloc d'ingressos, i calia
+    // teclejar la mateixa xifra dues vegades.
+
+    /** Noms que es reconeixen com la fulla de la nòmina, sense accents ni majúscules. */
+    private static final Set<String> PAYROLL_NAMES = Set.of("nomina", "sou", "salari", "sueldo", "salario");
+
+    /**
+     * Desa el sou d'un mes i en fa la previsió de la nòmina d'aquell mes.
+     *
+     * Transaccional perquè són dues escriptures que han d'anar juntes: un
+     * sou desat sense la nòmina tornaria a deixar-los desquadrats.
+     */
+    @Transactional
+    public MonthlyIncome setMonthlySalary(String period, BigDecimal amount, String notes) {
+        MonthlyIncome saved = incomeBaseService.saveOverride(period, amount, notes);
+        YearMonth month = YearMonth.parse(period);
+        payrollLeaf().ifPresent(payroll -> setPayrollForecast(payroll, month, amount));
+        return saved;
+    }
+
+    /**
+     * Esborra el sou d'un mes i, si la previsió de la nòmina era la que hi
+     * havia posat el sou, també.
+     *
+     * Si l'usuari després l'ha canviat a mà, la seva xifra es queda: és una
+     * decisió explícita i no s'ha de perdre per treure el sou.
+     */
+    @Transactional
+    public void clearMonthlySalary(String period) {
+        YearMonth month = YearMonth.parse(period);
+        IncomeBaseService.Base before = incomeBaseService.resolve(month);
+        BigDecimal previous = before.origin() == IncomeBaseService.Origin.MES ? before.amount() : null;
+        incomeBaseService.deleteOverride(period);
+        if (previous == null) return;
+
+        payrollLeaf().flatMap(payroll -> monthlyBudgetOf(payroll, month))
+                .filter(budget -> budget.getPercentage() == null
+                        && budget.getLimitAmount() != null
+                        && budget.getLimitAmount().compareTo(previous) == 0)
+                .ifPresent(budgetRepository::delete);
+    }
+
+    /** La fulla de la nòmina dins la secció d'ingressos, si n'hi ha. */
+    private Optional<Category> payrollLeaf() {
+        CategoryHierarchyService.Tree tree = hierarchyService.loadTree();
+        for (Category root : tree.roots()) {
+            if (!SECTION_INCOME.equals(sectionOf(root, tree))) continue;
+            for (Category leaf : tree.leavesOf(root.getId())) {
+                if (PAYROLL_NAMES.contains(normalize(leaf.getName()))) return Optional.of(leaf);
+            }
+        }
+        return Optional.empty();
+    }
+
+    private static String normalize(String name) {
+        if (name == null) return "";
+        return java.text.Normalizer.normalize(name, java.text.Normalizer.Form.NFD)
+                .replaceAll("\\p{M}", "")
+                .trim()
+                .toLowerCase(Locale.ROOT);
+    }
+
+    /**
+     * Fixa la previsió de la nòmina d'un mes a un import exacte.
+     *
+     * Si ja hi ha un pressupost més llarg que cobreix el mes (trimestral,
+     * anual), no es toca ni se n'afegeix cap: els imports que solapen un mes
+     * se sumen, i la nòmina es comptaria dues vegades.
+     */
+    private void setPayrollForecast(Category payroll, YearMonth month, BigDecimal amount) {
+        Optional<Budget> existing = monthlyBudgetOf(payroll, month);
+        if (existing.isEmpty() && coveredByLongerBudget(payroll, month)) return;
+
+        Budget budget = existing.orElseGet(() -> {
+            Budget created = new Budget();
+            created.setCategory(payroll);
+            created.setPeriodStart(month.atDay(1));
+            created.setPeriodEnd(month.atEndOfMonth());
+            created.setActive(true);
+            return created;
+        });
+        budget.setLimitAmount(amount);
+        // Un sou és un import, no un percentatge de res.
+        budget.setPercentage(null);
+        budgetRepository.save(budget);
+    }
+
+    /** El pressupost d'una categoria que és exactament d'aquest mes. */
+    private Optional<Budget> monthlyBudgetOf(Category category, YearMonth month) {
+        return activeBudgetsOverlapping(month.atDay(1), month.atEndOfMonth()).stream()
+                .filter(b -> b.getCategory().getId().equals(category.getId()))
+                .filter(b -> b.getPeriodStart().equals(month.atDay(1))
+                        && b.getPeriodEnd().equals(month.atEndOfMonth()))
+                .findFirst();
+    }
+
+    private boolean coveredByLongerBudget(Category category, YearMonth month) {
+        return activeBudgetsOverlapping(month.atDay(1), month.atEndOfMonth()).stream()
+                .anyMatch(b -> b.getCategory().getId().equals(category.getId()));
     }
 
     /**

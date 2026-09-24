@@ -532,6 +532,97 @@ class MonthlySummaryIntegrationTest extends AbstractIntegrationTest {
                 .isEqualByComparingTo("50.00");
     }
 
+    // ============ EL SOU DE REFERÈNCIA I LA NÒMINA ============
+
+    @Test
+    @DisplayName("Fixar el sou d'un mes posa la mateixa xifra a la previsió de la nòmina")
+    void settingTheSalaryFillsThePayroll() {
+        Category income = saveCategory("Ingressos", null, "INCOME");
+        Long payroll = saveCategory("Nòmina", income.getId(), null).getId();
+
+        budgetService.setMonthlySalary("2026-03", new BigDecimal("2500.00"), null);
+
+        assertThat(budgetRepository.findAll())
+                .singleElement()
+                .satisfies(b -> {
+                    assertThat(b.getCategory().getId()).isEqualTo(payroll);
+                    assertThat(b.getLimitAmount()).isEqualByComparingTo("2500.00");
+                    assertThat(b.getPercentage()).isNull();
+                    assertThat(b.getPeriodStart()).isEqualTo(LocalDate.of(2026, 3, 1));
+                    assertThat(b.getPeriodEnd()).isEqualTo(LocalDate.of(2026, 3, 31));
+                });
+        // I el que es reparteix ja surt de la secció d'ingressos.
+        Map<String, Object> summary = budgetService.getMonthlySummary(2026, 3);
+        assertThat(summary.get("total_disponible_origen")).isEqualTo("INGRESSOS");
+        assertThat((BigDecimal) summary.get("total_disponible")).isEqualByComparingTo("2500.00");
+    }
+
+    @Test
+    @DisplayName("Canviar el sou actualitza la previsió de la nòmina, no n'afegeix una altra")
+    void changingTheSalaryUpdatesThePayroll() {
+        Category income = saveCategory("Ingressos", null, "INCOME");
+        saveCategory("Nòmina", income.getId(), null);
+
+        budgetService.setMonthlySalary("2026-03", new BigDecimal("2500.00"), null);
+        budgetService.setMonthlySalary("2026-03", new BigDecimal("2700.00"), null);
+
+        // Dues previsions del mateix mes se sumarien: 5200 € que no existeixen.
+        assertThat(budgetRepository.findAll())
+                .singleElement()
+                .extracting(Budget::getLimitAmount)
+                .satisfies(amount -> assertThat(amount).isEqualByComparingTo("2700.00"));
+    }
+
+    @Test
+    @DisplayName("Un pressupost més llarg de la nòmina no es duplica en fixar el sou")
+    void aLongerPayrollBudgetIsLeftAlone() {
+        Category income = saveCategory("Ingressos", null, "INCOME");
+        Category payroll = saveCategory("Nòmina", income.getId(), null);
+        Budget yearly = new Budget();
+        yearly.setCategory(payroll);
+        yearly.setLimitAmount(new BigDecimal("2000.00"));
+        yearly.setPeriodStart(LocalDate.of(2026, 1, 1));
+        yearly.setPeriodEnd(LocalDate.of(2026, 12, 31));
+        yearly.setActive(true);
+        budgetRepository.save(yearly);
+
+        budgetService.setMonthlySalary("2026-03", new BigDecimal("2500.00"), null);
+
+        assertThat(budgetRepository.findAll()).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("Sense fulla de nòmina, el sou es desa igual i fa de respatller")
+    void withoutPayrollTheSalaryIsStillSaved() {
+        budgetService.setMonthlySalary("2026-03", new BigDecimal("2500.00"), null);
+
+        assertThat(budgetRepository.findAll()).isEmpty();
+        Map<String, Object> summary = budgetService.getMonthlySummary(2026, 3);
+        assertThat(summary.get("total_disponible_origen")).isEqualTo("SOU");
+        assertThat((BigDecimal) summary.get("total_disponible")).isEqualByComparingTo("2500.00");
+    }
+
+    @Test
+    @DisplayName("Esborrar el sou treu la previsió que hi havia posat, però no una de canviada a mà")
+    void clearingTheSalaryOnlyUndoesItsOwnForecast() {
+        Category income = saveCategory("Ingressos", null, "INCOME");
+        saveCategory("Nòmina", income.getId(), null);
+
+        budgetService.setMonthlySalary("2026-03", new BigDecimal("2500.00"), null);
+        budgetService.clearMonthlySalary("2026-03");
+        assertThat(budgetRepository.findAll()).isEmpty();
+        assertThat(monthlyIncomeRepository.findAll()).isEmpty();
+
+        budgetService.setMonthlySalary("2026-03", new BigDecimal("2500.00"), null);
+        Budget edited = budgetRepository.findAll().get(0);
+        edited.setLimitAmount(new BigDecimal("2600.00"));
+        budgetRepository.save(edited);
+        budgetService.clearMonthlySalary("2026-03");
+
+        // La xifra que l'usuari ha tocat és seva: treure el sou no l'esborra.
+        assertThat(budgetRepository.findAll()).hasSize(1);
+    }
+
     private Settings settingsWithIncome(String amount) {
         Settings settings = new Settings();
         settings.setExpectedMonthlyIncome(new BigDecimal(amount));
