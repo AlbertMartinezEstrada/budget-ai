@@ -68,19 +68,19 @@ public class AiEngineService {
     }
 
     private String formatTransactionsForPrompt(List<Transaction> transactions) {
-        StringBuilder sb = new StringBuilder();
+        StringBuilder csv = new StringBuilder();
         // Header
-        sb.append("concepte_original, data, Cost\n");
-        for (Transaction t : transactions) {
-            String concept = t.getOriginalConcept() != null
-                    ? t.getOriginalConcept().replace(",", " ")
+        csv.append("concepte_original, data, Cost\n");
+        for (Transaction transaction : transactions) {
+            String concept = transaction.getOriginalConcept() != null
+                    ? transaction.getOriginalConcept().replace(",", " ")
                     : "";
-            sb.append(String.format("%s, %s, %s\n",
+            csv.append(String.format("%s, %s, %s\n",
                 concept,
-                t.getDate(),
-                t.getAmount() != null ? t.getAmount().toPlainString() : "0.00"));
+                transaction.getDate(),
+                transaction.getAmount() != null ? transaction.getAmount().toPlainString() : "0.00"));
         }
-        return sb.toString();
+        return csv.toString();
     }
 
     /**
@@ -108,8 +108,8 @@ public class AiEngineService {
 
     private String createPrompt(List<String> categories, String transactionsList) {
         StringBuilder categoriesText = new StringBuilder();
-        for (int i = 0; i < categories.size(); i++) {
-            categoriesText.append(i + 1).append(". ").append(categories.get(i)).append('\n');
+        for (int position = 0; position < categories.size(); position++) {
+            categoriesText.append(position + 1).append(". ").append(categories.get(position)).append('\n');
         }
 
         return String.format("""
@@ -152,8 +152,8 @@ public class AiEngineService {
                     }
                 }
             }
-        } catch (Exception e) {
-            e.printStackTrace();
+        } catch (Exception exception) {
+            exception.printStackTrace();
         }
         return null;
     }
@@ -180,25 +180,25 @@ public class AiEngineService {
 
                 List<Transaction> classifiedTransactions = new ArrayList<>();
 
-                for (int i = 0; i < originalTransactions.size(); i++) {
-                    JsonNode node = rootNode.get(i);
-                    Transaction original = originalTransactions.get(i);
+                for (int row = 0; row < originalTransactions.size(); row++) {
+                    JsonNode node = rootNode.get(row);
+                    Transaction original = originalTransactions.get(row);
 
                     // Es parteix de l'original i només s'hi apliquen els camps
                     // que la IA pot decidir: empresa, categoria i descripció.
                     // L'import, la data, el tipus i el hash no es toquen mai.
-                    Transaction t = original;
-                    t.setCompanyName(node.has("companyName") ? node.get("companyName").asText() : "Desconegut");
-                    t.setCategoryName(node.has("category") ? node.get("category").asText() : "Altres");
-                    t.setShortDescription(node.has("description_curta") ? node.get("description_curta").asText() : "");
+                    Transaction classified = original;
+                    classified.setCompanyName(node.has("companyName") ? node.get("companyName").asText() : "Desconegut");
+                    classified.setCategoryName(node.has("category") ? node.get("category").asText() : "Altres");
+                    classified.setShortDescription(node.has("description_curta") ? node.get("description_curta").asText() : "");
 
-                    classifiedTransactions.add(t);
+                    classifiedTransactions.add(classified);
                 }
 
                 return classifiedTransactions;
             }
-        } catch (JsonProcessingException e) {
-            e.printStackTrace();
+        } catch (JsonProcessingException exception) {
+            exception.printStackTrace();
         }
         return originalTransactions;
     }

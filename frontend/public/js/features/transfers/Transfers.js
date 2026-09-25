@@ -63,10 +63,10 @@ async function loadAccountsSelect() {
     try {
         accounts = await getAccounts();
         const sourceSelect = document.getElementById('transfer-source');
-        const destSelect = document.getElementById('transfer-destination');
-        const options = accounts.map(acc => `<option value="${acc.id}">${escapeHtml(acc.nom)} (${formatCurrency(acc.saldo_actual)})</option>`).join('');
+        const destinationSelect = document.getElementById('transfer-destination');
+        const options = accounts.map(account => `<option value="${account.id}">${escapeHtml(account.nom)} (${formatCurrency(account.saldo_actual)})</option>`).join('');
         sourceSelect.innerHTML = options;
-        destSelect.innerHTML = options;
+        destinationSelect.innerHTML = options;
     } catch (error) {
         console.error('Error loading accounts:', error);
     }
@@ -141,8 +141,8 @@ async function handleListClick(event) {
     }
 }
 
-async function handleSubmit(e) {
-    e.preventDefault();
+async function handleSubmit(event) {
+    event.preventDefault();
     // Els comptes van com a "sourceAccount"/"destinationAccount": són els noms
     // de camp del model Transfer, que no porta @JsonProperty. Abans s'enviaven
     // "account_origen_id"/"account_desti_id", que són els noms de les columnes

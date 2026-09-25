@@ -44,8 +44,8 @@ export async function initGoals(container) {
 
     document.getElementById('add-goal-btn').addEventListener('click', () => openModal());
     document.getElementById('cancel-btn').addEventListener('click', closeModal);
-    document.getElementById('goal-modal').addEventListener('click', (e) => {
-        if (e.target.id === 'goal-modal') closeModal();
+    document.getElementById('goal-modal').addEventListener('click', (event) => {
+        if (event.target.id === 'goal-modal') closeModal();
     });
     document.getElementById('goal-form').addEventListener('submit', handleSubmit);
     document.getElementById('goals-list').addEventListener('click', handleListClick);
@@ -109,8 +109,8 @@ function closeModal() {
     document.getElementById('goal-modal').classList.remove('flex');
 }
 
-async function handleSubmit(e) {
-    e.preventDefault();
+async function handleSubmit(event) {
+    event.preventDefault();
     const id = document.getElementById('goal-id').value;
     // Els noms han de coincidir amb els @JsonProperty de FinancialGoal:
     // "nom" i "quantitat_objectiu" són NOT NULL a la base de dades.

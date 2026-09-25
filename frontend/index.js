@@ -8,9 +8,9 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
 const PORT = 3000;
 
-app.use((req, res, next) => {
-    res.header('Access-Control-Allow-Origin', '*');
-    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
+app.use((request, response, next) => {
+    response.header('Access-Control-Allow-Origin', '*');
+    response.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
     next();
 });
 
@@ -21,13 +21,13 @@ app.use((req, res, next) => {
 // hagut cap canvi, així que no es descarrega res de més).
 app.use(express.static(path.join(__dirname, 'public'), {
     etag: true,
-    setHeaders: (res) => {
-        res.setHeader('Cache-Control', 'no-cache');
+    setHeaders: (response) => {
+        response.setHeader('Cache-Control', 'no-cache');
     }
 }));
 
-app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+app.get('/', (request, response) => {
+    response.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
 // Aquesta part és la clau: fa que el procés NO s'aturi

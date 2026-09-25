@@ -66,10 +66,10 @@ public class BankReaderService {
 
         try (CSVParser csvParser = parse(content, ';')) {
             for (CSVRecord csvRecord : csvParser) {
-                String saldoStr = csvRecord.isMapped("Saldo") ? csvRecord.get("Saldo") : null;
+                String rawBalance = csvRecord.isMapped("Saldo") ? csvRecord.get("Saldo") : null;
 
                 BigDecimal amount = cleanNumber(csvRecord.get("Importe"));
-                BigDecimal balance = (saldoStr != null) ? cleanNumber(saldoStr) : null;
+                BigDecimal balance = (rawBalance != null) ? cleanNumber(rawBalance) : null;
 
                 transactions.add(build(
                         LocalDate.parse(csvRecord.get("Fecha"), DateTimeFormatter.ofPattern("dd/MM/yyyy")),
@@ -149,8 +149,8 @@ public class BankReaderService {
         int space = trimmed.indexOf(' ');
         try {
             return LocalDate.parse(space > 0 ? trimmed.substring(0, space) : trimmed);
-        } catch (Exception e) {
-            throw new IllegalArgumentException("Data il·legible al CSV: \"" + value + "\"", e);
+        } catch (Exception exception) {
+            throw new IllegalArgumentException("Data il·legible al CSV: \"" + value + "\"", exception);
         }
     }
 
@@ -159,18 +159,18 @@ public class BankReaderService {
      * que a la resta de l'aplicació.
      */
     private Transaction build(LocalDate date, String concept, BigDecimal signedAmount, BigDecimal balance) {
-        Transaction t = new Transaction();
-        t.setOriginalConcept(concept);
-        t.setDate(date);
-        t.setAmount(signedAmount.abs());
-        t.setBalance(balance);
-        t.setType(signedAmount.signum() < 0 ? "EXPENSE" : "INCOME");
+        Transaction transaction = new Transaction();
+        transaction.setOriginalConcept(concept);
+        transaction.setDate(date);
+        transaction.setAmount(signedAmount.abs());
+        transaction.setBalance(balance);
+        transaction.setType(signedAmount.signum() < 0 ? "EXPENSE" : "INCOME");
 
         // El hash surt dels camps ja normalitzats de l'entitat i no de les
         // cadenes crues, perquè s'ha de poder tornar a calcular en confirmar
         // la importació, quan les cadenes ja no existeixen.
-        t.setVerificationHash(transactionHasher.hash(t));
-        return t;
+        transaction.setVerificationHash(transactionHasher.hash(transaction));
+        return transaction;
     }
 
     /**
@@ -182,10 +182,10 @@ public class BankReaderService {
      * convertia en 4530). Ara es detecta quin és el separador decimal mirant
      * quin dels dos apareix més a la dreta.
      */
-    private BigDecimal cleanNumber(String val) {
-        if (val == null || val.isBlank()) return BigDecimal.ZERO;
+    private BigDecimal cleanNumber(String rawAmount) {
+        if (rawAmount == null || rawAmount.isBlank()) return BigDecimal.ZERO;
 
-        String cleaned = val.replaceAll("[^0-9,.\\-]", "").trim();
+        String cleaned = rawAmount.replaceAll("[^0-9,.\\-]", "").trim();
         if (cleaned.isEmpty() || cleaned.equals("-")) return BigDecimal.ZERO;
 
         int lastComma = cleaned.lastIndexOf(',');
@@ -201,13 +201,13 @@ public class BankReaderService {
         } else if (lastComma >= 0) {
             // Només comes. Si en queden dues o més, o en separa exactament tres
             // xifres, són separadors de milers ("1,234"); si no, és el decimal.
-            long commaCount = cleaned.chars().filter(c -> c == ',').count();
+            long commaCount = cleaned.chars().filter(character -> character == ',').count();
             boolean thousandsGroup = cleaned.length() - lastComma - 1 == 3;
             cleaned = (commaCount > 1 || thousandsGroup)
                     ? cleaned.replace(",", "")
                     : cleaned.replace(',', '.');
         } else if (lastDot >= 0) {
-            long dotCount = cleaned.chars().filter(c -> c == '.').count();
+            long dotCount = cleaned.chars().filter(character -> character == '.').count();
             boolean thousandsGroup = cleaned.length() - lastDot - 1 == 3;
             if (dotCount > 1 || thousandsGroup) {
                 cleaned = cleaned.replace(".", "");
@@ -216,10 +216,10 @@ public class BankReaderService {
 
         try {
             return new BigDecimal(cleaned).setScale(2, RoundingMode.HALF_UP);
-        } catch (NumberFormatException e) {
+        } catch (NumberFormatException exception) {
             // Abans es retornava 0.0 en silenci i el moviment es desava amb
             // import zero. Millor avortar la importació que corrompre les dades.
-            throw new IllegalArgumentException("Import il·legible al CSV: \"" + val + "\"", e);
+            throw new IllegalArgumentException("Import il·legible al CSV: \"" + rawAmount + "\"", exception);
         }
     }
 

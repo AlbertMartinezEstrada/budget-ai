@@ -80,11 +80,11 @@ export async function initAccounts(container) {
     document.getElementById('accounts-list').addEventListener('click', handleListClick);
 
     // Tancar els modals fent clic al fons.
-    document.getElementById('account-modal').addEventListener('click', (e) => {
-        if (e.target.id === 'account-modal') closeModal();
+    document.getElementById('account-modal').addEventListener('click', (event) => {
+        if (event.target.id === 'account-modal') closeModal();
     });
-    document.getElementById('adjust-modal').addEventListener('click', (e) => {
-        if (e.target.id === 'adjust-modal') closeAdjustModal();
+    document.getElementById('adjust-modal').addEventListener('click', (event) => {
+        if (event.target.id === 'adjust-modal') closeAdjustModal();
     });
 }
 
@@ -205,7 +205,7 @@ async function handleListClick(event) {
             openAdjustModal(id);
             break;
         case 'edit': {
-            const account = loadedAccounts.find(a => a.id === id);
+            const account = loadedAccounts.find(candidate => candidate.id === id);
             if (account) openModal(account);
             break;
         }
@@ -226,8 +226,8 @@ async function removeAccount(id) {
     }
 }
 
-async function handleSubmit(e) {
-    e.preventDefault();
+async function handleSubmit(event) {
+    event.preventDefault();
     const id = document.getElementById('account-id').value;
     const data = {
         nom: document.getElementById('account-name').value,
@@ -249,8 +249,8 @@ async function handleSubmit(e) {
     }
 }
 
-async function handleAdjustSubmit(e) {
-    e.preventDefault();
+async function handleAdjustSubmit(event) {
+    event.preventDefault();
     const id = parseInt(document.getElementById('adjust-account-id').value);
     const amount = parseFloat(document.getElementById('adjust-amount').value);
 

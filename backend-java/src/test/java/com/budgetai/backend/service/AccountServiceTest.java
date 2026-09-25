@@ -49,7 +49,7 @@ class AccountServiceTest {
     @DisplayName("Actualitzar sense enviar activa i moneda no les esborra")
     void partialUpdateKeepsUntouchedFields() {
         when(accountRepository.findById(1L)).thenReturn(Optional.of(existing));
-        when(accountRepository.save(any(Account.class))).thenAnswer(i -> i.getArgument(0));
+        when(accountRepository.save(any(Account.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         // Això és exactament el que enviava el formulari de comptes.
         Account partial = new Account();
@@ -71,7 +71,7 @@ class AccountServiceTest {
     @DisplayName("Sumar i restar del saldo amb precisió decimal exacta")
     void balanceArithmeticIsExact() {
         when(accountRepository.findById(1L)).thenReturn(Optional.of(existing));
-        when(accountRepository.save(any(Account.class))).thenAnswer(i -> i.getArgument(0));
+        when(accountRepository.save(any(Account.class))).thenAnswer(invocation -> invocation.getArgument(0));
         ArgumentCaptor<Account> saved = ArgumentCaptor.forClass(Account.class);
 
         service.updateAccountBalance(1L, new BigDecimal("0.10"), "SUBTRACT");
@@ -87,7 +87,7 @@ class AccountServiceTest {
     void nullBalanceIsTreatedAsZero() {
         existing.setCurrentBalance(null);
         when(accountRepository.findById(1L)).thenReturn(Optional.of(existing));
-        when(accountRepository.save(any(Account.class))).thenAnswer(i -> i.getArgument(0));
+        when(accountRepository.save(any(Account.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         service.updateAccountBalance(1L, new BigDecimal("25.00"), "ADD");
 

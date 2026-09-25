@@ -40,9 +40,9 @@ public class SecurityConfig {
             // del servidor. La protecció CSRF de Spring no aplica; el que
             // protegeix aquí és SameSite=Strict a la cookie.
             .csrf(csrf -> csrf.disable())
-            .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+            .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 
-            .authorizeHttpRequests(auth -> auth
+            .authorizeHttpRequests(authorization -> authorization
                     // Les preflight de CORS no porten cookie i han de passar.
                     .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
 
@@ -68,7 +68,7 @@ public class SecurityConfig {
             // Sense aquesta línia, Spring respondria amb una redirecció al
             // formulari de login, que per a una API vol dir que el frontend
             // rebria un 200 amb HTML en comptes d'un 401.
-            .exceptionHandling(e -> e
+            .exceptionHandling(exceptions -> exceptions
                     .authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED)))
 
             .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);

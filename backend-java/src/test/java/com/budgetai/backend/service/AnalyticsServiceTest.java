@@ -31,17 +31,17 @@ class AnalyticsServiceTest {
     @InjectMocks private AnalyticsService service;
 
     private Transaction transaction(String type, String amount, LocalDate date, String categoryName) {
-        Transaction t = new Transaction();
-        t.setType(type);
-        t.setAmount(new BigDecimal(amount));
-        t.setDate(date);
+        Transaction transaction = new Transaction();
+        transaction.setType(type);
+        transaction.setAmount(new BigDecimal(amount));
+        transaction.setDate(date);
         if (categoryName != null) {
             Category category = new Category();
             category.setId(1L);
             category.setName(categoryName);
-            t.setCategory(category);
+            transaction.setCategory(category);
         }
-        return t;
+        return transaction;
     }
 
     @Test

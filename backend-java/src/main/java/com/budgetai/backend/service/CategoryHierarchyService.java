@@ -86,7 +86,7 @@ public class CategoryHierarchyService {
             Long parentId = category.getParentId() != null && byId.containsKey(category.getParentId())
                     ? category.getParentId()
                     : null;
-            childrenByParent.computeIfAbsent(parentId, k -> new ArrayList<>()).add(category);
+            childrenByParent.computeIfAbsent(parentId, missingParentId -> new ArrayList<>()).add(category);
         }
 
         childrenByParent.values().forEach(list -> list.sort(Comparator.comparing(Category::getName)));

@@ -80,8 +80,8 @@ export async function initCategories(container) {
     document.getElementById('category-cancel-btn').addEventListener('click', closeModal);
     document.getElementById('category-form').addEventListener('submit', handleSubmit);
     document.getElementById('categories-list').addEventListener('click', handleListClick);
-    document.getElementById('category-modal').addEventListener('click', (e) => {
-        if (e.target.id === 'category-modal') closeModal();
+    document.getElementById('category-modal').addEventListener('click', (event) => {
+        if (event.target.id === 'category-modal') closeModal();
     });
 }
 
@@ -96,7 +96,7 @@ async function loadCategories() {
     }
 }
 
-const childrenOf = (id) => categories.filter(c => c.parent_id === id);
+const childrenOf = (id) => categories.filter(category => category.parent_id === id);
 const isGroup = (category) => childrenOf(category.id).length > 0;
 
 function renderTree() {
@@ -107,9 +107,9 @@ function renderTree() {
         return;
     }
 
-    const roots = categories.filter(c => !c.parent_id);
+    const roots = categories.filter(category => !category.parent_id);
     const groups = roots.filter(isGroup);
-    const loose = roots.filter(c => !isGroup(c));
+    const loose = roots.filter(category => !isGroup(category));
 
     const cards = groups.map(group => `
         <div class="bg-white dark:bg-slate-800 rounded-xl p-4 shadow-sm border border-slate-200 dark:border-slate-700">
@@ -264,7 +264,7 @@ async function handleListClick(event) {
     const id = Number.parseInt(button.dataset.id, 10);
     if (!Number.isInteger(id)) return;
 
-    const category = categories.find(c => c.id === id);
+    const category = categories.find(candidate => candidate.id === id);
     if (!category) return;
 
     if (button.dataset.action === 'edit') {
@@ -289,7 +289,7 @@ async function handleSubmit(event) {
 
     const id = document.getElementById('category-id').value;
     const parentValue = document.getElementById('category-parent').value;
-    const existing = id ? categories.find(c => c.id === Number.parseInt(id, 10)) : null;
+    const existing = id ? categories.find(candidate => candidate.id === Number.parseInt(id, 10)) : null;
     const group = existing ? isGroup(existing) : false;
 
     const data = { nom: document.getElementById('category-name').value };

@@ -92,7 +92,7 @@ public class TransactionController {
             // la segona pota es filtrava aquí i l'usuari no arribava ni a
             // veure-la a la pantalla de revisió.
             List<Transaction> newTransactions = initialTransactions.stream()
-                    .filter(t -> transactionRepository.findByVerificationHash(t.getVerificationHash())
+                    .filter(transaction -> transactionRepository.findByVerificationHash(transaction.getVerificationHash())
                             .map(existing -> {
                                 Long existingAccount = existing.getAccount() != null
                                         ? existing.getAccount().getId() : null;
@@ -123,9 +123,9 @@ public class TransactionController {
                     "data", classifiedTransactions
             ));
 
-        } catch (Exception e) {
-            e.printStackTrace();
-            return ResponseEntity.internalServerError().body("Error processant el fitxer: " + e.getMessage());
+        } catch (Exception exception) {
+            exception.printStackTrace();
+            return ResponseEntity.internalServerError().body("Error processant el fitxer: " + exception.getMessage());
         }
     }
 
@@ -137,9 +137,9 @@ public class TransactionController {
      * el hash el segon es prenia per un duplicat i es descartava en silenci
      * —just el moviment que l'usuari vol veure a l'altre compte—.
      */
-    private static String identityOf(Transaction t) {
-        Long accountId = t.getAccount() != null ? t.getAccount().getId() : null;
-        return t.getVerificationHash() + "@" + accountId;
+    private static String identityOf(Transaction transaction) {
+        Long accountId = transaction.getAccount() != null ? transaction.getAccount().getId() : null;
+        return transaction.getVerificationHash() + "@" + accountId;
     }
 
     /**
@@ -154,13 +154,13 @@ public class TransactionController {
      * Qui la cridi ha de ser @Transactional i deixar passar les excepcions:
      * si peta a la meitat, el saldo ja s'ha mogut i cal el rollback.
      */
-    private void linkAndApplyToBalance(Transaction t, Account defaultAccount) {
+    private void linkAndApplyToBalance(Transaction transaction, Account defaultAccount) {
         // Category (Sempre n'ha d'haver una de les oficials)
-        String catName = t.getCategoryName();
-        if (catName == null || catName.isEmpty()) catName = "Altres";
+        String categoryName = transaction.getCategoryName();
+        if (categoryName == null || categoryName.isEmpty()) categoryName = "Altres";
 
-        final String finalCatName = catName;
-        Category category = categoryRepository.findByName(finalCatName)
+        final String finalCategoryName = categoryName;
+        Category category = categoryRepository.findByName(finalCategoryName)
                 .orElseGet(() -> categoryRepository.findByName("Altres").get());
 
         // Les transaccions només s'assignen a fulles: un grup existeix
@@ -173,33 +173,33 @@ public class TransactionController {
                     "La categoria \"" + category.getName() + "\" és un grup: "
                             + "tria'n una de concreta.", null);
         }
-        t.setCategory(category);
+        transaction.setCategory(category);
 
         // Company (Si no existeix la creem)
-        String compName = t.getCompanyName();
-        if (compName == null || compName.isEmpty()) compName = "Desconegut";
+        String companyName = transaction.getCompanyName();
+        if (companyName == null || companyName.isEmpty()) companyName = "Desconegut";
 
-        final String finalCompName = compName;
+        final String finalCompName = companyName;
         Company company = companyRepository.findByName(finalCompName)
                 .orElseGet(() -> companyRepository.save(new Company(finalCompName)));
-        t.setCompany(company);
+        transaction.setCompany(company);
 
         // Assegurar que el tipus es manté (INCOME/EXPENSE)
-        if (t.getType() == null) {
-            t.setType("EXPENSE");
+        if (transaction.getType() == null) {
+            transaction.setType("EXPENSE");
         }
 
         // Asignar cuenta si no tiene
-        if (t.getAccount() == null && defaultAccount != null) {
-            t.setAccount(defaultAccount);
+        if (transaction.getAccount() == null && defaultAccount != null) {
+            transaction.setAccount(defaultAccount);
         }
 
         // Actualizar el saldo de la cuenta
-        if (t.getAccount() != null) {
-            if ("EXPENSE".equals(t.getType())) {
-                accountService.updateAccountBalance(t.getAccount().getId(), t.getAmount(), "SUBTRACT");
-            } else if ("INCOME".equals(t.getType())) {
-                accountService.updateAccountBalance(t.getAccount().getId(), t.getAmount(), "ADD");
+        if (transaction.getAccount() != null) {
+            if ("EXPENSE".equals(transaction.getType())) {
+                accountService.updateAccountBalance(transaction.getAccount().getId(), transaction.getAmount(), "SUBTRACT");
+            } else if ("INCOME".equals(transaction.getType())) {
+                accountService.updateAccountBalance(transaction.getAccount().getId(), transaction.getAmount(), "ADD");
             }
         }
     }
@@ -382,11 +382,11 @@ public class TransactionController {
             // clic, un reintent després d'un error— el desava repetit.
             // El compte s'assigna abans de comparar, perquè forma part de la
             // identitat del moviment.
-            for (Transaction t : confirmedTransactions) {
-                if (t.getAccount() == null && defaultAccount != null) {
-                    t.setAccount(defaultAccount);
+            for (Transaction transaction : confirmedTransactions) {
+                if (transaction.getAccount() == null && defaultAccount != null) {
+                    transaction.setAccount(defaultAccount);
                 }
-                t.setVerificationHash(transactionHasher.hash(t));
+                transaction.setVerificationHash(transactionHasher.hash(transaction));
             }
 
             Set<String> incomingHashes = confirmedTransactions.stream()
@@ -405,8 +405,8 @@ public class TransactionController {
             // única rebentaria la transacció sencera.
             Set<String> seen = new HashSet<>();
             List<Transaction> toPersist = confirmedTransactions.stream()
-                    .filter(t -> !alreadyStored.contains(identityOf(t)))
-                    .filter(t -> seen.add(identityOf(t)))
+                    .filter(transaction -> !alreadyStored.contains(identityOf(transaction)))
+                    .filter(transaction -> seen.add(identityOf(transaction)))
                     .collect(Collectors.toList());
 
             int skipped = confirmedTransactions.size() - toPersist.size();
@@ -420,8 +420,8 @@ public class TransactionController {
                 ));
             }
 
-            for (Transaction t : toPersist) {
-                linkAndApplyToBalance(t, defaultAccount);
+            for (Transaction transaction : toPersist) {
+                linkAndApplyToBalance(transaction, defaultAccount);
             }
 
             transactionRepository.saveAll(toPersist);
@@ -436,10 +436,10 @@ public class TransactionController {
                     "saved", toPersist.size(),
                     "skipped", skipped
             ));
-        } catch (Exception e) {
+        } catch (Exception exception) {
             // Es rellança perquè la transacció faci rollback: capturar-la i
             // retornar un ResponseEntity deixaria els saldos ja modificats.
-            throw new ConfirmUploadException("Error guardant: " + e.getMessage(), e);
+            throw new ConfirmUploadException("Error guardant: " + exception.getMessage(), exception);
         }
     }
 
@@ -463,10 +463,10 @@ public class TransactionController {
      * s'ha desfet perquè l'excepció ha travessat el límit de @Transactional.
      */
     @ExceptionHandler(ConfirmUploadException.class)
-    public ResponseEntity<Map<String, String>> handleConfirmUploadError(ConfirmUploadException e) {
+    public ResponseEntity<Map<String, String>> handleConfirmUploadError(ConfirmUploadException exception) {
         return ResponseEntity.internalServerError().body(Map.of(
                 "status", "error",
-                "message", e.getMessage() != null ? e.getMessage() : "Error desconegut"));
+                "message", exception.getMessage() != null ? exception.getMessage() : "Error desconegut"));
     }
 
     @GetMapping("/gastos")

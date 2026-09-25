@@ -16,11 +16,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 class RecurringProrationTest {
 
     private RecurringTransaction recurring(String amount, String frequency) {
-        RecurringTransaction rt = new RecurringTransaction();
-        rt.setAmount(amount == null ? null : new BigDecimal(amount));
-        rt.setFrequency(frequency);
-        rt.setType("EXPENSE");
-        return rt;
+        RecurringTransaction recurring = new RecurringTransaction();
+        recurring.setAmount(amount == null ? null : new BigDecimal(amount));
+        recurring.setFrequency(frequency);
+        recurring.setType("EXPENSE");
+        return recurring;
     }
 
     @Test

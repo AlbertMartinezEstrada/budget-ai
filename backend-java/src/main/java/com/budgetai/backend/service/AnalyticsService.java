@@ -23,7 +23,7 @@ public class AnalyticsService {
         LocalDate endDate = startDate.withDayOfMonth(startDate.lengthOfMonth());
 
         List<Transaction> transactions = transactionRepository.findAll().stream()
-                .filter(t -> !t.getDate().isBefore(startDate) && !t.getDate().isAfter(endDate))
+                .filter(transaction -> !transaction.getDate().isBefore(startDate) && !transaction.getDate().isAfter(endDate))
                 .toList();
 
         BigDecimal totalIncome = sumByType(transactions, "INCOME");
@@ -45,13 +45,13 @@ public class AnalyticsService {
         LocalDate endDate = startDate.withDayOfMonth(startDate.lengthOfMonth());
 
         List<Transaction> expenses = transactionRepository.findAll().stream()
-                .filter(t -> "EXPENSE".equals(t.getType()))
-                .filter(t -> !t.getDate().isBefore(startDate) && !t.getDate().isAfter(endDate))
+                .filter(transaction -> "EXPENSE".equals(transaction.getType()))
+                .filter(transaction -> !transaction.getDate().isBefore(startDate) && !transaction.getDate().isAfter(endDate))
                 .toList();
 
         Map<String, BigDecimal> categoryTotals = expenses.stream()
                 .collect(Collectors.groupingBy(
-                        t -> t.getCategory() != null ? t.getCategory().getName() : "Sin categoría",
+                        transaction -> transaction.getCategory() != null ? transaction.getCategory().getName() : "Sin categoría",
                         Collectors.reducing(BigDecimal.ZERO, AnalyticsService::amountOf, BigDecimal::add)
                 ));
 
@@ -70,7 +70,7 @@ public class AnalyticsService {
                             : BigDecimal.ZERO);
                     return item;
                 })
-                .sorted((a, b) -> ((BigDecimal) b.get("total")).compareTo((BigDecimal) a.get("total")))
+                .sorted((firstCategory, secondCategory) -> ((BigDecimal) secondCategory.get("total")).compareTo((BigDecimal) firstCategory.get("total")))
                 .toList();
     }
 
@@ -79,7 +79,7 @@ public class AnalyticsService {
         LocalDate endDate = LocalDate.of(year, 12, 31);
 
         List<Transaction> transactions = transactionRepository.findAll().stream()
-                .filter(t -> !t.getDate().isBefore(startDate) && !t.getDate().isAfter(endDate))
+                .filter(transaction -> !transaction.getDate().isBefore(startDate) && !transaction.getDate().isAfter(endDate))
                 .toList();
 
         BigDecimal totalIncome = sumByType(transactions, "INCOME");
@@ -99,13 +99,13 @@ public class AnalyticsService {
 
     private static BigDecimal sumByType(List<Transaction> transactions, String type) {
         return transactions.stream()
-                .filter(t -> type.equals(t.getType()))
+                .filter(transaction -> type.equals(transaction.getType()))
                 .map(AnalyticsService::amountOf)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
-    private static BigDecimal amountOf(Transaction t) {
-        return t.getAmount() != null ? t.getAmount() : BigDecimal.ZERO;
+    private static BigDecimal amountOf(Transaction transaction) {
+        return transaction.getAmount() != null ? transaction.getAmount() : BigDecimal.ZERO;
     }
 
     public List<Map<String, Object>> getMonthlyTrend(int year) {

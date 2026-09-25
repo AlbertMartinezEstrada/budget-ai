@@ -141,8 +141,8 @@ async function loadSettings() {
 }
 
 async function saveAllSettings() {
-    const statusEl = document.getElementById('save-status');
-    statusEl.textContent = 'Guardando...';
+    const statusElement = document.getElementById('save-status');
+    statusElement.textContent = 'Guardando...';
     
     const theme = document.querySelector('input[name="theme"]:checked')?.value || 'light';
     const currency = document.getElementById('setting-currency').value;
@@ -162,17 +162,17 @@ async function saveAllSettings() {
 
     try {
         await updateSettings(data);
-        statusEl.textContent = '✓ Guardado';
-        setTimeout(() => statusEl.textContent = '', 2000);
+        statusElement.textContent = '✓ Guardado';
+        setTimeout(() => statusElement.textContent = '', 2000);
     } catch (error) {
-        statusEl.textContent = 'Error guardando';
+        statusElement.textContent = 'Error guardando';
         console.error(error);
     }
 }
 
 async function saveProfile() {
-    const statusEl = document.getElementById('save-status');
-    statusEl.textContent = 'Guardando...';
+    const statusElement = document.getElementById('save-status');
+    statusElement.textContent = 'Guardando...';
     
     const data = {
         userName: document.getElementById('setting-name').value,
@@ -181,17 +181,17 @@ async function saveProfile() {
 
     try {
         await updateSettings(data);
-        statusEl.textContent = '✓ Perfil guardado';
-        setTimeout(() => statusEl.textContent = '', 2000);
+        statusElement.textContent = '✓ Perfil guardado';
+        setTimeout(() => statusElement.textContent = '', 2000);
     } catch (error) {
-        statusEl.textContent = 'Error guardando';
+        statusElement.textContent = 'Error guardando';
         console.error(error);
     }
 }
 
 async function saveNotifications() {
-    const statusEl = document.getElementById('save-status');
-    statusEl.textContent = 'Guardando...';
+    const statusElement = document.getElementById('save-status');
+    statusElement.textContent = 'Guardando...';
     
     const data = {
         notificationsExpenses: document.getElementById('notif-expenses').checked,
@@ -201,10 +201,10 @@ async function saveNotifications() {
 
     try {
         await updateSettings(data);
-        statusEl.textContent = '✓ Notificaciones guardadas';
-        setTimeout(() => statusEl.textContent = '', 2000);
+        statusElement.textContent = '✓ Notificaciones guardadas';
+        setTimeout(() => statusElement.textContent = '', 2000);
     } catch (error) {
-        statusEl.textContent = 'Error guardando';
+        statusElement.textContent = 'Error guardando';
         console.error(error);
     }
 }

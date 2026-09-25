@@ -85,7 +85,7 @@ async function loadCategoriesSelect() {
     try {
         categories = await getCategories();
         const select = document.getElementById('recurring-category');
-        select.innerHTML = '<option value="">Sin categoría</option>' + categories.map(cat => `<option value="${cat.id}">${escapeHtml(cat.nom)}</option>`).join('');
+        select.innerHTML = '<option value="">Sin categoría</option>' + categories.map(category => `<option value="${category.id}">${escapeHtml(category.nom)}</option>`).join('');
     } catch (error) {
         console.error('Error loading categories:', error);
     }
@@ -209,8 +209,8 @@ async function handleListClick(event) {
     }
 }
 
-async function handleSubmit(e) {
-    e.preventDefault();
+async function handleSubmit(event) {
+    event.preventDefault();
     const id = document.getElementById('recurring-id').value;
     const categoryId = document.getElementById('recurring-category').value;
 
