@@ -31,7 +31,7 @@ docker compose up -d --build backend  # aplicar cambios de Java
 docker compose logs -f backend        # logs
 
 cd backend-java && ./gradlew test              # 98 unitarios, sin Docker
-cd backend-java && ./gradlew integrationTest   # 86, requieren Docker
+cd backend-java && ./gradlew integrationTest   # 91, requieren Docker
 cd frontend && npm test                        # 17
 ```
 
@@ -187,6 +187,10 @@ cero.
 bloque de ingreso más. Cada hoja aporta el **mayor** entre su previsión y lo
 recibido — sumarlos contaría la misma nómina dos veces. El sueldo de referencia
 solo actúa de respaldo cuando no hay sección de ingresos.
+
+**Fijar el sueldo de un mes pone la misma cifra como previsión de la nómina**
+de ese mes (la hoja de ingresos llamada «Nòmina», «Sou», «Sueldo»…). Si ya hay
+un presupuesto de la nómina más largo que cubre el mes, no se toca: se sumaría.
 
 El reparto es **en cascada**: un `percentatge` es del bote del nivel de encima,
 **no del total**. Ver [ARQUITECTURA.md](ARQUITECTURA.md).
