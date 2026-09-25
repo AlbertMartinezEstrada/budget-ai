@@ -29,6 +29,7 @@ Backend en el puerto **8000** (no 8080). Frontend en el 3000.
 docker compose up -d --build          # levantar todo
 docker compose up -d --build backend  # aplicar cambios de Java
 docker compose logs -f backend        # logs
+scripts\backup.bat                    # copia de la base de datos (backup.sh fuera de Windows)
 
 cd backend-java && ./gradlew test              # 100 unitarios, sin Docker
 cd backend-java && ./gradlew integrationTest   # 99, requieren Docker
@@ -278,6 +279,9 @@ un fichero con un token y hubo que deshacerlo.
 ## Trampas conocidas
 
 - El backend escucha en el **8000**. El `EXPOSE 8080` del Dockerfile es residual.
+- PostgreSQL solo se publica en `127.0.0.1:5432`: se llega desde la propia
+  máquina (DBeaver, copias), no desde la red. El backend no pasa por ahí, entra
+  por `db:5432` dentro de Docker. No vuelvas a `"5432:5432"`.
 - El `Dockerfile` usa `gradle assemble`, no `gradle build`: `build` arrastra
   `check`, que arrastra los tests de integración, y estos necesitan Docker.
 - Los ficheros estáticos van con `Cache-Control: no-cache`. Sin eso el navegador
@@ -296,3 +300,4 @@ un fichero con un token y hubo que deshacerlo.
 | [HISTORIAL.md](HISTORIAL.md) | Los fallos corregidos y por qué existen estas reglas |
 | [AUTENTICACION.md](AUTENTICACION.md) | La sesión y sus límites |
 | [TESTING.md](TESTING.md) | Qué cubre cada test |
+| [COPIAS_DE_SEGURIDAD.md](COPIAS_DE_SEGURIDAD.md) | Copias de la base de datos y cómo restaurarlas |
