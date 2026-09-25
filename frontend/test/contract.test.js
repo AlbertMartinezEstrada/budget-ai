@@ -16,13 +16,13 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const JS_DIR = path.join(__dirname, '..', 'public', 'js');
 
-function jsFiles(dir = JS_DIR, acc = []) {
+function jsFiles(dir = JS_DIR, found = []) {
     for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
         const full = path.join(dir, entry.name);
-        if (entry.isDirectory()) jsFiles(full, acc);
-        else if (entry.name.endsWith('.js')) acc.push(full);
+        if (entry.isDirectory()) jsFiles(full, found);
+        else if (entry.name.endsWith('.js')) found.push(full);
     }
-    return acc;
+    return found;
 }
 
 // Els comentaris s'eliminen abans d'analitzar: aquest fitxer busca patrons
@@ -41,8 +41,8 @@ const files = jsFiles().map(file => ({
 
 function findAll(pattern) {
     return files
-        .filter(f => pattern.test(f.source))
-        .map(f => f.path);
+        .filter(file => pattern.test(file.source))
+        .map(file => file.path);
 }
 
 test('hi ha fitxers per analitzar', () => {
@@ -74,7 +74,7 @@ test('analytics no tracta la categoria com un objecte', () => {
     // Només a la vista d'anàlisi: /analytics/category-breakdown retorna
     // "category" com a cadena. En canvi, un Budget sí que porta l'objecte
     // Category anidat, i allà budget.category.nom és correcte.
-    const analytics = files.find(f => f.path.includes('Analytics.js'));
+    const analytics = files.find(file => file.path.includes('Analytics.js'));
     assert.ok(analytics, 'no s\'ha trobat Analytics.js');
     assert.ok(
         !/cat\.category\s*\?\./.test(analytics.source),
@@ -86,7 +86,7 @@ test('cap crida a l\'API es fa sense la cookie de sessió', () => {
     // Totes les crides han de passar per apiFetch, que hi posa
     // credentials: 'include'. Un fetch directe cap al backend no enviaria la
     // cookie i rebria un 401.
-    const api = files.find(f => f.path.endsWith(path.join('js', 'api.js')));
+    const api = files.find(file => file.path.endsWith(path.join('js', 'api.js')));
     assert.ok(api, 'no s\'ha trobat api.js');
 
     // L'única línia que pot cridar fetch() amb la URL del backend és la del
@@ -105,9 +105,9 @@ test('només api.js sap on viu el backend', () => {
     // Budgets i Recurring cridaven http://localhost:8000 a pèl, de manera que
     // només funcionaven obrint l'aplicació des de la mateixa màquina.
     const offenders = files
-        .filter(f => !f.path.endsWith(path.join('js', 'api.js')))
-        .filter(f => /https?:\/\/localhost:\d+/.test(f.source))
-        .map(f => f.path);
+        .filter(file => !file.path.endsWith(path.join('js', 'api.js')))
+        .filter(file => /https?:\/\/localhost:\d+/.test(file.source))
+        .map(file => file.path);
 
     assert.deepEqual(offenders, [], `URL del backend fora d'api.js: ${offenders.join(', ')}`);
 });
@@ -122,15 +122,15 @@ test('cap vista fa servir onclick amb dades interpolades', () => {
 test('les vistes que interpolen dades a l\'HTML importen escapeHtml', () => {
     // Una plantilla totalment estàtica (com la de Configuració) no necessita
     // escapat; el criteri és si hi ha interpolació dins de l'HTML.
-    const interpolatesIntoHtml = files.filter(f =>
-        f.path.includes('features') &&
-        /innerHTML\s*=/.test(f.source) &&
-        /\$\{/.test(f.source)
+    const interpolatesIntoHtml = files.filter(file =>
+        file.path.includes('features') &&
+        /innerHTML\s*=/.test(file.source) &&
+        /\$\{/.test(file.source)
     );
 
     const missing = interpolatesIntoHtml
-        .filter(f => !/escapeHtml/.test(f.source))
-        .map(f => f.path);
+        .filter(file => !/escapeHtml/.test(file.source))
+        .map(file => file.path);
 
     assert.deepEqual(missing, [], `vistes sense escapat: ${missing.join(', ')}`);
 });
@@ -141,18 +141,34 @@ test('no es construeixen noms de classe de Tailwind en temps d\'execució', () =
     assert.deepEqual(offenders, [], `classes dinàmiques a: ${offenders.join(', ')}`);
 });
 
+test('cap variable es diu amb una sola lletra', () => {
+    // `t`, `c` o `e` obliguen a buscar d'on surten per saber què són. El nom
+    // ha de dir-ho sol: `transaction`, `category`, `event`.
+    const singleLetter = [
+        /\b(?:const|let|var)\s+[a-z]\b/,          // const t = ...
+        /(?:^|[^\w.$])[a-z]\s*=>/m,               // t => ...
+        /\(\s*[a-z](?:\s*,\s*[a-z])*\s*\)\s*=>/,  // (a, b) => ...
+        /\bcatch\s*\(\s*[a-z]\s*\)/,               // catch (e)
+        /\bfunction\s*\w*\s*\([^)]*\b[a-z]\s*[,)]/ // function f(e)
+    ];
+    const offenders = files
+        .filter(file => singleLetter.some(pattern => pattern.test(file.source)))
+        .map(file => file.path);
+    assert.deepEqual(offenders, [], `variables d'una lletra a: ${offenders.join(', ')}`);
+});
+
 test('app.js coneix totes les vistes que sap renderitzar', () => {
-    const app = files.find(f => f.path.endsWith(path.join('js', 'app.js')));
+    const app = files.find(file => file.path.endsWith(path.join('js', 'app.js')));
     assert.ok(app, 'no s\'ha trobat app.js');
 
     // Les vistes del switch i les de la llista VIEWS han de coincidir: si una
     // vista no és a VIEWS, el routing per hash la ignora en silenci.
-    const cases = [...app.source.matchAll(/case\s+'([a-z]+)':/g)].map(m => m[1]);
+    const cases = [...app.source.matchAll(/case\s+'([a-z]+)':/g)].map(match => match[1]);
     const viewsList = app.source.match(/const VIEWS\s*=\s*\[([\s\S]*?)\]/);
     assert.ok(viewsList, 'no s\'ha trobat la llista VIEWS');
 
-    const declared = [...viewsList[1].matchAll(/'([a-z]+)'/g)].map(m => m[1]);
+    const declared = [...viewsList[1].matchAll(/'([a-z]+)'/g)].map(match => match[1]);
 
-    const missing = cases.filter(c => !declared.includes(c));
+    const missing = cases.filter(viewName => !declared.includes(viewName));
     assert.deepEqual(missing, [], `vistes al switch però no a VIEWS: ${missing.join(', ')}`);
 });

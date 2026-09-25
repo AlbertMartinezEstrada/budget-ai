@@ -75,7 +75,7 @@ class PersistenceIntegrationTest extends AbstractIntegrationTest {
         Long id = accountRepository.save(account).getId();
 
         // Cent sumes de 0,01: amb double el resultat no seria exactament 1,00.
-        for (int i = 0; i < 100; i++) {
+        for (int addition = 0; addition < 100; addition++) {
             accountService.updateAccountBalance(id, new BigDecimal("0.01"), "ADD");
         }
 
@@ -172,13 +172,13 @@ class PersistenceIntegrationTest extends AbstractIntegrationTest {
     }
 
     private Transaction statementLine(String hash, Account account) {
-        Transaction t = new Transaction();
-        t.setAmount(new BigDecimal("10.00"));
-        t.setDate(LocalDate.of(2026, 2, 15));
-        t.setType("EXPENSE");
-        t.setVerificationHash(hash);
-        t.setAccount(account);
-        return t;
+        Transaction transaction = new Transaction();
+        transaction.setAmount(new BigDecimal("10.00"));
+        transaction.setDate(LocalDate.of(2026, 2, 15));
+        transaction.setType("EXPENSE");
+        transaction.setVerificationHash(hash);
+        transaction.setAccount(account);
+        return transaction;
     }
 
     @Test
@@ -208,7 +208,7 @@ class PersistenceIntegrationTest extends AbstractIntegrationTest {
         transactionRepository.saveAndFlush(statementLine("hash-traspas", destination));
 
         assertThat(transactionRepository.findAll())
-                .filteredOn(t -> "hash-traspas".equals(t.getVerificationHash()))
+                .filteredOn(transaction -> "hash-traspas".equals(transaction.getVerificationHash()))
                 .hasSize(2);
     }
 

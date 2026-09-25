@@ -71,7 +71,7 @@ export async function initBudgets(container) {
             <div class="flex items-center gap-2">
                 <select id="budget-year" class="px-3 py-2 border rounded-lg bg-white dark:bg-slate-800 dark:border-slate-600"></select>
                 <select id="budget-month" class="px-3 py-2 border rounded-lg bg-white dark:bg-slate-800 dark:border-slate-600">
-                    ${MONTH_NAMES.map((m, i) => `<option value="${i + 1}">${m}</option>`).join('')}
+                    ${MONTH_NAMES.map((monthName, monthIndex) => `<option value="${monthIndex + 1}">${monthName}</option>`).join('')}
                 </select>
                 <button id="copy-month-btn" class="px-3 py-2 border rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700 dark:border-slate-600 flex items-center gap-2"
                         title="Duplicar aquí las asignaciones del mes anterior">
@@ -141,10 +141,10 @@ export async function initBudgets(container) {
     `;
 
     const yearSelect = document.getElementById('budget-year');
-    for (let y = now.getFullYear(); y >= now.getFullYear() - 5; y--) {
+    for (let year = now.getFullYear(); year >= now.getFullYear() - 5; year--) {
         const option = document.createElement('option');
-        option.value = y;
-        option.textContent = y;
+        option.value = year;
+        option.textContent = year;
         yearSelect.appendChild(option);
     }
     // El valor s'assigna després de crear les opcions, no abans.
@@ -162,8 +162,8 @@ export async function initBudgets(container) {
     document.getElementById('salary-header').addEventListener('click', handleHeaderClick);
     document.getElementById('budget-year').addEventListener('change', loadSummary);
     document.getElementById('budget-month').addEventListener('change', loadSummary);
-    document.getElementById('budget-modal').addEventListener('click', (e) => {
-        if (e.target.id === 'budget-modal') closeModal();
+    document.getElementById('budget-modal').addEventListener('click', (event) => {
+        if (event.target.id === 'budget-modal') closeModal();
     });
     document.getElementById('budget-mode').addEventListener('change', applyModeToForm);
     document.getElementById('budget-category').addEventListener('change', refreshPot);
@@ -178,14 +178,14 @@ function selectedPeriod() {
     };
 }
 
-const num = (value) => {
+const toNumber = (value) => {
     const parsed = Number.parseFloat(value);
     return Number.isFinite(parsed) ? parsed : null;
 };
 
 // "de" + "el sueldo" es "del sueldo". Los nombres de los botes se guardan como
 // sintagma ("el sueldo", "Gast mensual") porque también se usan sueltos.
-const de = (label) => label.startsWith('el ') ? `del ${label.slice(3)}` : `de ${label}`;
+const prefixDe = (label) => label.startsWith('el ') ? `del ${label.slice(3)}` : `de ${label}`;
 
 /**
  * Si un presupuesto está vigente en el mes que se está mirando.
@@ -206,14 +206,14 @@ async function loadCategories() {
 
         // Al desplegable, les subcategories surten indentades sota el seu bloc
         // perquè es vegi l'estructura sense haver-la de recordar.
-        const groups = categories.filter(c => categories.some(x => x.parent_id === c.id));
-        const groupIds = new Set(groups.map(g => g.id));
-        const orphans = categories.filter(c => !groupIds.has(c.id) && !c.parent_id);
+        const groups = categories.filter(category => categories.some(child => child.parent_id === category.id));
+        const groupIds = new Set(groups.map(group => group.id));
+        const orphans = categories.filter(category => !groupIds.has(category.id) && !category.parent_id);
 
         const options = [];
         for (const group of groups) {
             options.push(`<option value="${group.id}">${escapeHtml(group.nom)} (bloque)</option>`);
-            for (const child of categories.filter(c => c.parent_id === group.id)) {
+            for (const child of categories.filter(category => category.parent_id === group.id)) {
                 options.push(`<option value="${child.id}">&nbsp;&nbsp;&nbsp;${escapeHtml(child.nom)}</option>`);
             }
         }
@@ -273,7 +273,7 @@ function indexPots(summary) {
 function walkPots(node, potLabel, potAmount) {
     potByCategory.set(node.categoria.id, {
         label: potLabel,
-        base: num(node.base_assignacio) ?? potAmount
+        base: toNumber(node.base_assignacio) ?? potAmount
     });
 
     // Els fills es reparteixen el que li ha tocat al pare, sempre que el pare
@@ -286,7 +286,7 @@ function walkPots(node, potLabel, potAmount) {
         ? node.base_assignacio != null
         : node.quantitat_limit != null;
     const childLabel = explicit ? node.categoria.nom : potLabel;
-    const childPot = explicit ? num(node.cost_vida_pla) : potAmount;
+    const childPot = explicit ? toNumber(node.cost_vida_pla) : potAmount;
 
     for (const child of node.subcategories || []) {
         walkPots(child, childLabel, childPot);
@@ -300,15 +300,15 @@ function walkPots(node, potLabel, potAmount) {
  * sense la base, cap percentatge de la pantalla es pot interpretar.
  */
 function renderHeader(summary) {
-    const real = num(summary.ingressos_reals) || 0;
-    const forecast = num(summary.ingressos_previstos) || 0;
+    const real = toNumber(summary.ingressos_reals) || 0;
+    const forecast = toNumber(summary.ingressos_previstos) || 0;
     // Lo que hay para repartir es la suma de los ingresos. El sueldo no es la
     // base del presupuesto: es uno de los bloques de ingreso, al lado de un
     // regalo o de un trabajo puntual.
-    const base = num(summary.total_disponible);
+    const base = toNumber(summary.total_disponible);
     const fromIncome = summary.total_disponible_origen === 'INGRESSOS';
-    const assigned = num(summary.total_assignat) || 0;
-    const share = num(summary.percentatge_assignat);
+    const assigned = toNumber(summary.total_assignat) || 0;
+    const share = toNumber(summary.percentatge_assignat);
     const free = base != null ? base - assigned : null;
 
     if (base == null || base <= 0) {
@@ -396,7 +396,7 @@ function renderSections(summary, budgets) {
     }
 
     container.innerHTML = sections
-        .map(section => renderSection(section, budgetByCategory, num(summary.total_disponible)))
+        .map(section => renderSection(section, budgetByCategory, toNumber(summary.total_disponible)))
         .join('');
 }
 
@@ -407,11 +407,11 @@ function renderSections(summary, budgets) {
  */
 function renderSection(section, budgetByCategory, available) {
     const style = SECTIONS[section.tipus] || SECTIONS.VARIABLE;
-    const pot = num(section.base);
-    const assigned = num(section.assignat) || 0;
-    const real = num(section.real) || 0;
-    const share = num(section.percentatge_del_sou);
-    const left = num(section.restant);
+    const pot = toNumber(section.base);
+    const assigned = toNumber(section.assignat) || 0;
+    const real = toNumber(section.real) || 0;
+    const share = toNumber(section.percentatge_del_sou);
+    const left = toNumber(section.restant);
     const nodes = section.grups || [];
 
     const width = pot > 0 ? Math.min((assigned / pot) * 100, 100) : 0;
@@ -469,11 +469,11 @@ function renderSection(section, budgetByCategory, available) {
 /** Un bloc de primer nivell: Trade Republic, Gast mensual, Allotjament… */
 function renderBlock(node, budgetByCategory, style) {
     const category = node.categoria;
-    const plan = num(node.cost_vida_pla) || 0;
-    const real = num(node.cost_vida_real) || 0;
+    const plan = toNumber(node.cost_vida_pla) || 0;
+    const real = toNumber(node.cost_vida_real) || 0;
     const children = node.subcategories || [];
     const expanded = expandedGroups.has(category.id);
-    const left = num(node.restant);
+    const left = toNumber(node.restant);
 
     const percent = plan > 0 ? Math.min((real / plan) * 100, 100) : 0;
     const level = plan > 0 && real > plan ? 'high' : percent > 80 ? 'medium' : 'low';
@@ -533,7 +533,7 @@ function renderBlock(node, budgetByCategory, style) {
                                     ? `${formatCurrency(-left)} repartidos de más entre las subsecciones`
                                     : `${formatCurrency(left)} sin repartir dentro`}
                            </span>`
-                        : `<span class="text-gray-500 dark:text-slate-400">caja ${formatCurrency(num(node.caixa_real) || 0)}</span>`}
+                        : `<span class="text-gray-500 dark:text-slate-400">caja ${formatCurrency(toNumber(node.caixa_real) || 0)}</span>`}
                 </div>` : style.esIngres ? `
                 <p class="text-xs text-gray-500 dark:text-slate-400">
                     Lo que entra por este bloque. Cuenta lo recibido o lo previsto, lo que sea mayor.
@@ -555,8 +555,8 @@ function renderBlock(node, budgetByCategory, style) {
 /** Una subsecció dins d'un bloc: Bars i restaurants, Oci… */
 function renderLeaf(node, budgetByCategory, style) {
     const category = node.categoria;
-    const plan = num(node.cost_vida_pla) || 0;
-    const real = num(node.cost_vida_real) || 0;
+    const plan = toNumber(node.cost_vida_pla) || 0;
+    const real = toNumber(node.cost_vida_real) || 0;
     const fixed = category.tipus_cost === 'FIXED';
 
     const percent = plan > 0 ? Math.min((real / plan) * 100, 100) : 0;
@@ -573,10 +573,10 @@ function renderLeaf(node, budgetByCategory, style) {
                     <span class="text-sm truncate">${escapeHtml(category.nom)}</span>
                     ${fixed ? '<span class="text-xs px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300">fijo</span>' : ''}
                     ${shareBadge(node, style)}
-                    ${num(node.aporta_al_disponible) > 0
+                    ${toNumber(node.aporta_al_disponible) > 0
                         ? `<span class="text-xs px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-300"
                                  title="Lo que esta categoría pone en el total a repartir: lo recibido o lo previsto, lo que sea mayor.">
-                               aporta ${formatCurrency(num(node.aporta_al_disponible))}
+                               aporta ${formatCurrency(toNumber(node.aporta_al_disponible))}
                            </span>`
                         : ''}
                 </div>
@@ -615,13 +615,13 @@ function renderLeaf(node, budgetByCategory, style) {
  * enterrades enmig de la llista.
  */
 function byRelevance(nodes) {
-    return [...(nodes || [])].sort((a, b) => {
-        const planA = num(a.cost_vida_pla) || 0;
-        const planB = num(b.cost_vida_pla) || 0;
-        if (planA !== planB) return planB - planA;
+    return [...(nodes || [])].sort((firstNode, secondNode) => {
+        const firstPlan = toNumber(firstNode.cost_vida_pla) || 0;
+        const secondPlan = toNumber(secondNode.cost_vida_pla) || 0;
+        if (firstPlan !== secondPlan) return secondPlan - firstPlan;
         // A igualtat, el que s'hi ha gastat: un gasto sense pla és justament
         // el que val la pena mirar.
-        return (num(b.cost_vida_real) || 0) - (num(a.cost_vida_real) || 0);
+        return (toNumber(secondNode.cost_vida_real) || 0) - (toNumber(firstNode.cost_vida_real) || 0);
     });
 }
 
@@ -632,8 +632,8 @@ function byRelevance(nodes) {
  * sou, del bot de variables o del bloc que té a sobre.
  */
 function shareBadge(node, style) {
-    const declared = num(node.percentatge);
-    const effective = num(node.percentatge_efectiu);
+    const declared = toNumber(node.percentatge);
+    const effective = toNumber(node.percentatge_efectiu);
     const share = declared ?? effective;
     // Un "≈0% de Gast mensual" a cada categoria buida no informa de res i tapa
     // les que sí que tenen diners.
@@ -645,7 +645,7 @@ function shareBadge(node, style) {
     // El "≈" distingeix el percentatge que ha triat l'usuari del que surt de
     // dividir un import exacte: el primer es manté si canvia el sou, el segon no.
     return `<span class="text-xs px-2 py-0.5 rounded-full ${style.pastilla}">
-                ${declared == null ? '≈' : ''}${share.toFixed(share % 1 === 0 ? 0 : 1)}% ${escapeHtml(de(label))}
+                ${declared == null ? '≈' : ''}${share.toFixed(share % 1 === 0 ? 0 : 1)}% ${escapeHtml(prefixDe(label))}
             </span>`;
 }
 
@@ -698,8 +698,8 @@ function updateHints() {
     const percentHint = document.getElementById('budget-percent-hint');
     const amountHint = document.getElementById('budget-limit-hint');
 
-    const percent = num(document.getElementById('budget-percent').value);
-    const amount = num(document.getElementById('budget-limit').value);
+    const percent = toNumber(document.getElementById('budget-percent').value);
+    const amount = toNumber(document.getElementById('budget-limit').value);
 
     if (pot.base == null) {
         percentHint.textContent = 'Sin ingresos definidos no se puede calcular el importe.';
@@ -709,11 +709,11 @@ function updateHints() {
 
     percentHint.textContent = percent == null
         ? ''
-        : `Son ${formatCurrency(pot.base * percent / 100)} ${de(pot.label)} (${formatCurrency(pot.base)}).`;
+        : `Son ${formatCurrency(pot.base * percent / 100)} ${prefixDe(pot.label)} (${formatCurrency(pot.base)}).`;
 
     amountHint.textContent = amount == null || pot.base <= 0
         ? ''
-        : `Es el ${(amount / pot.base * 100).toFixed(1)}% ${de(pot.label)}.`;
+        : `Es el ${(amount / pot.base * 100).toFixed(1)}% ${prefixDe(pot.label)}.`;
 }
 
 /**
@@ -750,7 +750,7 @@ async function editMonthlyIncome() {
     const { year, month } = selectedPeriod();
     const period = `${year}-${String(month).padStart(2, '0')}`;
     const current = lastSummary?.sou_base_origen === 'MES'
-        ? num(lastSummary.sou_base)
+        ? toNumber(lastSummary.sou_base)
         : '';
 
     const input = prompt(
@@ -879,11 +879,11 @@ async function handleListClick(event) {
     }
 }
 
-async function handleSubmit(e) {
-    e.preventDefault();
+async function handleSubmit(event) {
+    event.preventDefault();
     const id = document.getElementById('budget-id').value;
     const byPercent = document.getElementById('budget-mode').value === 'PERCENT';
-    const percent = num(document.getElementById('budget-percent').value);
+    const percent = toNumber(document.getElementById('budget-percent').value);
     const pot = selectedPot();
 
     if (byPercent && (percent == null || percent < 0 || percent > 100)) {
@@ -897,7 +897,7 @@ async function handleSubmit(e) {
     // en cada consulta.
     const limit = byPercent
         ? (pot.base != null && pot.base > 0 ? Number((pot.base * percent / 100).toFixed(2)) : 0)
-        : num(document.getElementById('budget-limit').value);
+        : toNumber(document.getElementById('budget-limit').value);
 
     if (!byPercent && (limit == null || limit < 0)) {
         alert('Introduce un importe positivo.');

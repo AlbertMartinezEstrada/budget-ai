@@ -80,16 +80,16 @@ class TraspassosIntegrationTest extends AbstractIntegrationTest {
 
     private Transaction movement(String concept, String amount, String type,
                                  Account account, boolean excluded) {
-        Transaction t = new Transaction();
-        t.setOriginalConcept(concept);
-        t.setCompanyName(concept);
-        t.setCategoryName("Inversió de risc");
-        t.setAmount(new BigDecimal(amount));
-        t.setDate(LocalDate.of(2026, 3, 10));
-        t.setType(type);
-        t.setAccount(account);
-        t.setExcludedFromBudget(excluded);
-        return t;
+        Transaction transaction = new Transaction();
+        transaction.setOriginalConcept(concept);
+        transaction.setCompanyName(concept);
+        transaction.setCategoryName("Inversió de risc");
+        transaction.setAmount(new BigDecimal(amount));
+        transaction.setDate(LocalDate.of(2026, 3, 10));
+        transaction.setType(type);
+        transaction.setAccount(account);
+        transaction.setExcludedFromBudget(excluded);
+        return transaction;
     }
 
     private BigDecimal balanceOf(Account account) {
@@ -103,8 +103,8 @@ class TraspassosIntegrationTest extends AbstractIntegrationTest {
         List<Map<String, Object>> groups = (List<Map<String, Object>>) summary.get("grups");
 
         return groups.stream()
-                .filter(g -> "Inversió de risc".equals(((Category) g.get("categoria")).getName()))
-                .map(g -> (BigDecimal) g.get("cost_vida_real"))
+                .filter(group -> "Inversió de risc".equals(((Category) group.get("categoria")).getName()))
+                .map(group -> (BigDecimal) group.get("cost_vida_real"))
                 .findFirst().orElseThrow();
     }
 
@@ -228,7 +228,7 @@ class TraspassosIntegrationTest extends AbstractIntegrationTest {
         ));
 
         assertThat(transactionRepository.findAll())
-                .filteredOn(t -> "Revolut".equals(t.getAccount().getName()))
+                .filteredOn(transaction -> "Revolut".equals(transaction.getAccount().getName()))
                 .singleElement()
                 .extracting(Transaction::getOriginalConcept)
                 .isEqualTo("Compra accions");

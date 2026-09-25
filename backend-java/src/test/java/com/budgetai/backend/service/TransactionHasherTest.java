@@ -23,12 +23,12 @@ class TransactionHasherTest {
     private final TransactionHasher hasher = new TransactionHasher();
 
     private Transaction movement(String concept, String amount) {
-        Transaction t = new Transaction();
-        t.setDate(LocalDate.of(2026, 2, 15));
-        t.setOriginalConcept(concept);
-        t.setAmount(new BigDecimal(amount));
-        t.setType("EXPENSE");
-        return t;
+        Transaction transaction = new Transaction();
+        transaction.setDate(LocalDate.of(2026, 2, 15));
+        transaction.setOriginalConcept(concept);
+        transaction.setAmount(new BigDecimal(amount));
+        transaction.setType("EXPENSE");
+        return transaction;
     }
 
     @Test

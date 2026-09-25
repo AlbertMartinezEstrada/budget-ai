@@ -40,8 +40,8 @@ public class CategoryController {
     public ResponseEntity<?> create(@RequestBody Category category) {
         try {
             return ResponseEntity.ok(categoryService.create(category));
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        } catch (IllegalArgumentException exception) {
+            return ResponseEntity.badRequest().body(Map.of("error", exception.getMessage()));
         }
     }
 
@@ -49,8 +49,8 @@ public class CategoryController {
     public ResponseEntity<?> update(@PathVariable Long id, @RequestBody Category category) {
         try {
             return ResponseEntity.ok(categoryService.update(id, category));
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        } catch (IllegalArgumentException exception) {
+            return ResponseEntity.badRequest().body(Map.of("error", exception.getMessage()));
         }
     }
 
@@ -59,8 +59,8 @@ public class CategoryController {
         try {
             categoryService.delete(id);
             return ResponseEntity.ok(Map.of("message", "Categoria esborrada"));
-        } catch (IllegalStateException e) {
-            return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("error", e.getMessage()));
+        } catch (IllegalStateException exception) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("error", exception.getMessage()));
         }
     }
 }

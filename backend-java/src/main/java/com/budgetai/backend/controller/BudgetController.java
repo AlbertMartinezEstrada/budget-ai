@@ -117,7 +117,7 @@ public class BudgetController {
         try {
             YearMonth.parse(period);
             return true;
-        } catch (DateTimeParseException e) {
+        } catch (DateTimeParseException exception) {
             return false;
         }
     }
@@ -140,7 +140,7 @@ public class BudgetController {
         try {
             Budget updated = budgetService.updateBudget(id, budget);
             return ResponseEntity.ok(updated);
-        } catch (RuntimeException e) {
+        } catch (RuntimeException exception) {
             return ResponseEntity.notFound().build();
         }
     }
