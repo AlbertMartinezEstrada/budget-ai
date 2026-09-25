@@ -1,21 +1,11 @@
 plugins {
     id 'java'
-    id 'org.springframework.boot' version '3.2.2'
-    id 'io.spring.dependency-management' version '1.1.4'
+    id 'org.springframework.boot' version '3.5.16'
+    id 'io.spring.dependency-management' version '1.1.7'
 }
 
 group = 'com.budgetai'
 version = '0.0.1-SNAPSHOT'
-
-// Testcontainers per davant de la versió que fixa el BOM de Spring Boot.
-//
-// El BOM en porta la 1.19.3, que arrossega docker-java 3.3.4. Aquell client
-// demana la versió 1.43 de l'API de Docker, i els Docker Desktop recents
-// exigeixen com a mínim la 1.44: el dimoni respon 400 i Testcontainers conclou
-// que no hi ha cap entorn de Docker vàlid. Els tests d'integració fallaven
-// tots alhora en local, abans d'executar ni una línia de codi del projecte, i
-// només es podien comprovar al CI.
-ext['testcontainers.version'] = '1.20.4'
 
 java {
     sourceCompatibility = '17'
@@ -35,10 +25,10 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
     implementation 'org.springframework.boot:spring-boot-starter-web'
     implementation 'org.springframework.boot:spring-boot-starter-security'
-    implementation 'org.apache.commons:commons-csv:1.10.0'
-    implementation 'io.jsonwebtoken:jjwt-api:0.12.5'
-    runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.12.5'
-    runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.12.5'
+    implementation 'org.apache.commons:commons-csv:1.14.1'
+    implementation 'io.jsonwebtoken:jjwt-api:0.12.7'
+    runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.12.7'
+    runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.12.7'
     compileOnly 'org.projectlombok:lombok'
     runtimeOnly 'org.postgresql:postgresql'
     annotationProcessor 'org.projectlombok:lombok'
