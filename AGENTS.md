@@ -30,8 +30,8 @@ docker compose up -d --build          # levantar todo
 docker compose up -d --build backend  # aplicar cambios de Java
 docker compose logs -f backend        # logs
 
-cd backend-java && ./gradlew test              # 99 unitarios, sin Docker
-cd backend-java && ./gradlew integrationTest   # 91, requieren Docker
+cd backend-java && ./gradlew test              # 100 unitarios, sin Docker
+cd backend-java && ./gradlew integrationTest   # 99, requieren Docker
 cd frontend && npm test                        # 18
 ```
 
@@ -194,6 +194,13 @@ un presupuesto de la nómina más largo que cubre el mes, no se toca: se sumarí
 
 El reparto es **en cascada**: un `percentatge` es del bote del nivel de encima,
 **no del total**. Ver [ARQUITECTURA.md](ARQUITECTURA.md).
+
+**Los costes fijos son las recurrentes de las hojas fijas**, y hacen de
+plantilla de cada mes. Un cambio vale **desde un mes en adelante**: no se
+modifica la fila, se cierra la versión vieja (`vigent_fins`) y se abre otra
+(`vigent_des_de`). Todo lo que lea recurrentes para un mes tiene que filtrar
+por esa vigencia; si no, las dos versiones sumarían. Un importe puesto en el
+presupuesto de un mes solo vale para ese mes.
 
 ### 8. El dinero que se mueve entre tus cuentas solo se cuenta una vez
 

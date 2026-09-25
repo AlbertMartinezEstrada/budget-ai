@@ -24,8 +24,18 @@ public class RecurringTransactionService {
     @Autowired
     private AccountService accountService;
 
+    /**
+     * Els recurrents que encara compten.
+     *
+     * Les versions tancades d'un cost fix (el lloguer d'abans de la pujada) es
+     * guarden perquè els mesos passats no canviïn, però a la llista sortirien
+     * com a duplicats del que hi ha ara.
+     */
     public List<RecurringTransaction> getAllRecurringTransactions() {
-        return recurringTransactionRepository.findAll();
+        LocalDate today = LocalDate.now();
+        return recurringTransactionRepository.findAll().stream()
+                .filter(recurring -> recurring.getValidUntil() == null || !recurring.getValidUntil().isBefore(today))
+                .toList();
     }
 
     public List<RecurringTransaction> getActiveRecurringTransactions() {

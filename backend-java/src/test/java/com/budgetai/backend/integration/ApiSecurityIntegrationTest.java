@@ -29,7 +29,7 @@ class ApiSecurityIntegrationTest extends AbstractIntegrationTest {
 
     private static final String[] PROTECTED_ENDPOINTS = {
             "/accounts", "/gastos", "/categories", "/companies",
-            "/budgets", "/goals", "/transfers", "/recurring", "/settings",
+            "/budgets", "/goals", "/transfers", "/recurring", "/fixed-costs", "/settings",
             "/analytics/monthly-trend"
     };
 

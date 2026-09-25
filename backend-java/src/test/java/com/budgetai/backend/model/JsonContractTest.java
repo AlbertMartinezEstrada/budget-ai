@@ -253,6 +253,20 @@ class JsonContractTest {
     }
 
     @Test
+    @DisplayName("RecurringTransaction exposa la vigència com a vigent_des_de i vigent_fins")
+    void recurringExposesValidity() throws Exception {
+        RecurringTransaction recurring = new RecurringTransaction();
+        recurring.setValidFrom(java.time.LocalDate.of(2026, 3, 1));
+        recurring.setValidUntil(java.time.LocalDate.of(2026, 4, 30));
+
+        JsonNode json = mapper.valueToTree(recurring);
+
+        // El menú de costos fixos les llegeix per dir des de quan val cada import.
+        assertThat(json.get("vigent_des_de").asText()).isEqualTo("2026-03-01");
+        assertThat(json.get("vigent_fins").asText()).isEqualTo("2026-04-30");
+    }
+
+    @Test
     @DisplayName("Settings és l'única entitat en camelCase; queda documentat aquí")
     void settingsKeysAreCamelCase() throws Exception {
         Settings settings = new Settings();

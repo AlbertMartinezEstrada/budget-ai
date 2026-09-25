@@ -64,6 +64,24 @@ public class RecurringTransaction {
     @JsonProperty("descripcio")
     private String description;
 
+    /**
+     * Primer dia en què aquest import compta. Null vol dir "des de sempre".
+     *
+     * Un cost fix que canvia (el lloguer puja a l'octubre) no es modifica: es
+     * tanca la versió vella el mes anterior i se'n crea una de nova. Si es
+     * modifiqués, els mesos passats canviarien de xifra retroactivament.
+     */
+    @Column(name = "vigent_des_de")
+    @JsonFormat(pattern = "yyyy-MM-dd")
+    @JsonProperty("vigent_des_de")
+    private LocalDate validFrom;
+
+    /** Últim dia en què compta. Null vol dir que continua vigent. */
+    @Column(name = "vigent_fins")
+    @JsonFormat(pattern = "yyyy-MM-dd")
+    @JsonProperty("vigent_fins")
+    private LocalDate validUntil;
+
     @Column(name = "created_at", updatable = false)
     @JsonProperty("created_at")
     private LocalDateTime createdAt;
@@ -72,6 +90,12 @@ public class RecurringTransaction {
     void applyDefaults() {
         if (active == null) active = Boolean.TRUE;
         if (createdAt == null) createdAt = LocalDateTime.now();
+    }
+
+    /** Si compta en algun dia del rang, ambdós inclosos. */
+    public boolean isValidDuring(LocalDate from, LocalDate to) {
+        return (validFrom == null || !validFrom.isAfter(to))
+                && (validUntil == null || !validUntil.isBefore(from));
     }
 
     /**

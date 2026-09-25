@@ -14,6 +14,9 @@ public interface RecurringTransactionRepository extends JpaRepository<RecurringT
 
     List<RecurringTransaction> findByActiveTrue();
 
-    @Query("SELECT rt FROM RecurringTransaction rt WHERE rt.active = true AND rt.nextDate <= :date")
+    // Una versió tancada no genera càrrecs de després del seu tancament: ja
+    // els genera la versió que la substitueix.
+    @Query("SELECT recurring FROM RecurringTransaction recurring WHERE recurring.active = true AND recurring.nextDate <= :date " +
+           "AND (recurring.validUntil IS NULL OR recurring.nextDate <= recurring.validUntil)")
     List<RecurringTransaction> findDueRecurringTransactions(@Param("date") LocalDate date);
 }
