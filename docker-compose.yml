@@ -10,11 +10,18 @@ services:
       POSTGRES_PASSWORD: ${DB_PASSWORD}
       POSTGRES_DB: ${DB_NAME}
       POSTGRES_HOST_AUTH_METHOD: md5
+    # Només des d'aquesta màquina (DBeaver, còpies de seguretat). Amb
+    # "5432:5432" el port quedava obert a tota la xarxa, i qualsevol aparell
+    # podia provar d'entrar a la base de dades saltant-se el login de l'app.
+    # El backend no passa per aquí: dins de Docker hi arriba per db:5432.
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./backend-java/init.sql:/docker-entrypoint-initdb.d/init.sql
+    # Dins del contenidor ha d'escoltar a totes les interfícies: el backend hi
+    # arriba per la xarxa de Docker. Qui limita l'accés des de fora és el
+    # "ports" de dalt, no això.
     command: postgres -c listen_addresses='*'
 
   backend:
