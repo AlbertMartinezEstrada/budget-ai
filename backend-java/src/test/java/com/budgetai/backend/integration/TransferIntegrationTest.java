@@ -112,7 +112,9 @@ class TransferIntegrationTest extends AbstractIntegrationTest {
         // arribaven enlloc.
         assertThatThrownBy(() ->
                 transferController.createTransfer(transferRequest(sourceId, 999_999L, "25.50")))
-                .isInstanceOf(RuntimeException.class);
+                .isInstanceOf(RuntimeException.class)
+                // El motiu arriba a la pantalla; abans sortia "Error 500".
+                .hasMessage("El compte de destí no existeix");
 
         assertThat(balanceOf(sourceId)).isEqualByComparingTo("100.00");
         assertThat(transferRepository.findAll()).isEmpty();

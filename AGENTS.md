@@ -31,7 +31,7 @@ docker compose up -d --build backend  # aplicar cambios de Java
 docker compose logs -f backend        # logs
 scripts\backup.bat                    # copia de la base de datos (backup.sh fuera de Windows)
 
-cd backend-java && ./gradlew test              # 100 unitarios, sin Docker
+cd backend-java && ./gradlew test              # 103 unitarios, sin Docker
 cd backend-java && ./gradlew integrationTest   # 99, requieren Docker
 cd frontend && npm test                        # 22
 ```
@@ -123,6 +123,13 @@ Tres sitios tocan saldos: `POST /transfers`, `DELETE /transfers/{id}` y
 
 Capturar la excepción y devolver un `ResponseEntity` **impide el rollback**,
 que es justo lo que hace falta cuando el dinero ya se movió.
+
+**Qué mensaje de error llega al navegador.** Las validaciones propias se lanzan
+como `IllegalArgumentException` o `IllegalStateException`, con un texto pensado
+para el usuario, y ese texto llega. Cualquier otra excepción lleva detalles
+internos (tablas, consultas, clases): va al log del backend y al navegador le
+llega un mensaje genérico. No devuelvas `exception.getMessage()` directamente
+desde un `catch (Exception)`; pasa por `ClientErrors.messageFor`.
 
 Borrar una transferencia **revierte** los saldos; no basta con borrar la fila.
 
@@ -304,3 +311,4 @@ un fichero con un token y hubo que deshacerlo.
 | [AUTENTICACION.md](AUTENTICACION.md) | La sesión y sus límites |
 | [TESTING.md](TESTING.md) | Qué cubre cada test |
 | [COPIAS_DE_SEGURIDAD.md](COPIAS_DE_SEGURIDAD.md) | Copias de la base de datos y cómo restaurarlas |
+| [ACCESO_DESDE_EL_MOVIL.md](ACCESO_DESDE_EL_MOVIL.md) | Usar la aplicación desde el móvil con Tailscale |
