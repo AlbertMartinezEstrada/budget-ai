@@ -3,17 +3,28 @@ rem Copia de seguretat de la base de dades de Budget AI (Windows).
 rem
 rem   scripts\backup.bat [carpeta]
 rem
-rem La carpeta de desti, per ordre: l'argument, la variable BUDGET_BACKUP_DIR,
+rem La carpeta de desti, per ordre: l'argument, BUDGET_BACKUP_DIR del .env,
 rem o "backups" a l'arrel del projecte. Val la pena que sigui una carpeta
 rem sincronitzada (OneDrive, Google Drive...): una copia al mateix disc no
 rem salva res si el disc falla.
+rem
+rem   BUDGET_BACKUP_DIR=G:\Mi unidad\BudgetAI\copias
 rem
 rem Es conserven les copies dels ultims 30 dies.
 
 setlocal EnableExtensions
 
 set "BACKUP_DIR=%~1"
-if "%BACKUP_DIR%"=="" set "BACKUP_DIR=%BUDGET_BACKUP_DIR%"
+
+rem Es llegeix del .env com la resta de la configuracio. Es busca al costat
+rem de l'script i no a la carpeta actual, perque el Programador de tasques
+rem l'executa des d'on vol. %%~b treu les cometes si n'hi ha.
+if "%BACKUP_DIR%"=="" if exist "%~dp0..\.env" (
+    for /f "usebackq eol=# tokens=1,* delims==" %%a in ("%~dp0..\.env") do (
+        if /i "%%a"=="BUDGET_BACKUP_DIR" set "BACKUP_DIR=%%~b"
+    )
+)
+
 if "%BACKUP_DIR%"=="" set "BACKUP_DIR=%~dp0..\backups"
 if not exist "%BACKUP_DIR%" mkdir "%BACKUP_DIR%"
 
