@@ -141,6 +141,15 @@ test('no es construeixen noms de classe de Tailwind en temps d\'execució', () =
     assert.deepEqual(offenders, [], `classes dinàmiques a: ${offenders.join(', ')}`);
 });
 
+test('pressupostos compara el pla amb els moviments, no amb el cost de vida', () => {
+    // cost_vida_real compta un fix pel seu prorrateig encara que no hi hagi cap
+    // moviment: un lloguer de 800 € sortia "gastat 800 de 800" abans de pujar
+    // l'extracte. El gasto del pressupost és caixa_real.
+    const budgets = files.find(file => file.path.includes(path.join('budgets', 'Budgets.js')));
+    assert.ok(budgets, 'no s\'ha trobat Budgets.js');
+    assert.ok(!/cost_vida_real/.test(budgets.source), 'Budgets.js llegeix cost_vida_real');
+});
+
 test('cap variable es diu amb una sola lletra', () => {
     // `t`, `c` o `e` obliguen a buscar d'on surten per saber què són. El nom
     // ha de dir-ho sol: `transaction`, `category`, `event`.

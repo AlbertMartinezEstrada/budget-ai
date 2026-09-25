@@ -536,11 +536,21 @@ function renderSection(section, budgetByCategory, available) {
     `;
 }
 
+/**
+ * El que s'ha gastat de debò: els moviments importats del mes.
+ *
+ * No és cost_vida_real. Aquell compta un fix pel seu prorrateig encara que no
+ * hi hagi cap moviment, així que un lloguer de 800 € sortia "gastat 800 de 800"
+ * abans de pujar l'extracte. Aquí el cost fix és el pla, i el gasto el posa el
+ * CSV. Als ingressos, caixa_real és el que ha entrat.
+ */
+const spentOf = (node) => toNumber(node.caixa_real) || 0;
+
 /** Un bloc de primer nivell: Trade Republic, Gast mensual, Allotjament… */
 function renderBlock(node, budgetByCategory, style) {
     const category = node.categoria;
     const plan = toNumber(node.cost_vida_pla) || 0;
-    const real = toNumber(node.cost_vida_real) || 0;
+    const real = spentOf(node);
     const children = node.subcategories || [];
     const expanded = expandedGroups.has(category.id);
     const left = toNumber(node.restant);
@@ -603,7 +613,7 @@ function renderBlock(node, budgetByCategory, style) {
                                     ? `${formatCurrency(-left)} repartidos de más entre las subsecciones`
                                     : `${formatCurrency(left)} sin repartir dentro`}
                            </span>`
-                        : `<span class="text-gray-500 dark:text-slate-400">caja ${formatCurrency(toNumber(node.caixa_real) || 0)}</span>`}
+                        : ''}
                 </div>` : style.esIngres ? `
                 <p class="text-xs text-gray-500 dark:text-slate-400">
                     Lo que entra por este bloque. Cuenta lo recibido o lo previsto, lo que sea mayor.
@@ -626,7 +636,7 @@ function renderBlock(node, budgetByCategory, style) {
 function renderLeaf(node, budgetByCategory, style) {
     const category = node.categoria;
     const plan = toNumber(node.cost_vida_pla) || 0;
-    const real = toNumber(node.cost_vida_real) || 0;
+    const real = spentOf(node);
     const fixed = category.tipus_cost === 'FIXED';
 
     const percent = plan > 0 ? Math.min((real / plan) * 100, 100) : 0;
@@ -691,7 +701,7 @@ function byRelevance(nodes) {
         if (firstPlan !== secondPlan) return secondPlan - firstPlan;
         // A igualtat, el que s'hi ha gastat: un gasto sense pla és justament
         // el que val la pena mirar.
-        return (toNumber(secondNode.cost_vida_real) || 0) - (toNumber(firstNode.cost_vida_real) || 0);
+        return spentOf(secondNode) - spentOf(firstNode);
     });
 }
 
