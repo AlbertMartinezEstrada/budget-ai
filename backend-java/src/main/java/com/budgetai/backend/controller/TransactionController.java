@@ -485,7 +485,7 @@ public class TransactionController {
 
         if (categoryId != null || companyId != null || accountId != null
                 || (type != null && !type.isBlank()) || startDate != null || endDate != null) {
-            Specification<Transaction> specification = Specification.where(null);
+            Specification<Transaction> specification = Specification.unrestricted();
 
             if (categoryId != null) {
                 specification = specification.and((root, query, criteriaBuilder) ->

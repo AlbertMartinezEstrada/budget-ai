@@ -6,7 +6,7 @@ más se rompen.
 
 ## Stack
 
-Java 17 · Spring Boot 3.2.2 · Gradle · PostgreSQL 17
+Java 17 · Spring Boot 3.5.16 · Gradle · PostgreSQL 17
 
 Dependencias que conviene conocer: `spring-boot-starter-security` y
 `jjwt` (sesión), `commons-csv` (extractos), `lombok`, y `testcontainers` en el
