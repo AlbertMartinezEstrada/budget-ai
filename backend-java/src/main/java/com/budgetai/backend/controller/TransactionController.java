@@ -124,8 +124,13 @@ public class TransactionController {
             ));
 
         } catch (Exception exception) {
-            exception.printStackTrace();
-            return ResponseEntity.internalServerError().body("Error processant el fitxer: " + exception.getMessage());
+            // Un CSV il·legible és culpa del fitxer (400) i el motiu ha
+            // d'arribar; qualsevol altra cosa és nostra (500) i va al log.
+            HttpStatus status = ClientErrors.isForTheUser(exception)
+                    ? HttpStatus.BAD_REQUEST
+                    : HttpStatus.INTERNAL_SERVER_ERROR;
+            return ResponseEntity.status(status).body(Map.of("error",
+                    "Error processant el fitxer: " + ClientErrors.messageFor(exception, "Pujar extracte")));
         }
     }
 
@@ -436,10 +441,15 @@ public class TransactionController {
                     "saved", toPersist.size(),
                     "skipped", skipped
             ));
+        } catch (ConfirmUploadException exception) {
+            // Ja porta un missatge pensat per a l'usuari (una categoria que és
+            // un grup): es rellança tal qual.
+            throw exception;
         } catch (Exception exception) {
             // Es rellança perquè la transacció faci rollback: capturar-la i
             // retornar un ResponseEntity deixaria els saldos ja modificats.
-            throw new ConfirmUploadException("Error guardant: " + exception.getMessage(), exception);
+            throw new ConfirmUploadException(
+                    "Error guardant: " + ClientErrors.messageFor(exception, "Confirmar importació"), exception);
         }
     }
 
