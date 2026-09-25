@@ -118,11 +118,19 @@ Guàrdia contra patrons concrets que ja han fallat: noms de camp inexistents,
 URLs del backend escrites a mà fora d'`api.js`, `onclick` amb dades
 interpolades, classes de Tailwind construïdes en temps d'execució i vistes que
 interpolen dades sense escapar-les. També que cap variable es digui amb una
-sola lletra.
+sola lletra, i que la pàgina no carregui res d'un altre domini (CDN).
 
 No comprova que el codi sigui correcte; comprova que no tornin errors coneguts.
 Analitza el codi amb els comentaris eliminats, perquè uns quants comentaris
 expliquen precisament aquests errors i en citen els noms.
+
+### `frontend/test/assets.test.js`
+
+Tailwind i les fonts es generen amb `npm run build:assets` i es desen a
+`public/`. Aquest test torna a compilar Tailwind i compara el resultat amb
+`public/css/tailwind.css`, i comprova que les fonts de `public/vendor/` siguin
+les dels paquets instal·lats. Una classe nova sense regenerar el CSS no dona
+cap error: simplement no té estil. Necessita `npm ci` abans.
 
 ## Tests d'integració
 

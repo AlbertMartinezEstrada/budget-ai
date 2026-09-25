@@ -10,43 +10,21 @@
     <link rel="stylesheet" href="css/layout.css">
     <link rel="stylesheet" href="css/components.css">
 
-    <!-- Fonts -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-
-    <!-- Icons (Phosphor Icons) -->
-    <script src="https://unpkg.com/@phosphor-icons/web"></script>
-
-    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet"/>
-    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght@100..700,0..1&amp;display=swap" rel="stylesheet"/>
-    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
-    <script id="tailwind-config">
-        tailwind.config = {
-            darkMode: "class",
-            theme: {
-                extend: {
-                    colors: {
-                        "primary": "#1152d4",
-                        "background-light": "#f6f6f8",
-                        "background-dark": "#101622",
-                    },
-                    fontFamily: {
-                        "display": ["Inter", "sans-serif"]
-                    },
-                    borderRadius: { "DEFAULT": "0.5rem", "lg": "1rem", "xl": "1.5rem", "full": "9999px" },
-                },
-            },
-        }
-    </script>
+    <!-- Tot es serveix des de l'aplicació, res des d'un CDN: un script de
+         tercers té accés a tota la pàgina, i sense internet l'aplicació es
+         quedava sense estils. Es genera amb "npm run build:assets".
+         tailwind.css va després dels CSS propis, com abans anava el del CDN,
+         perquè a igual especificitat manin les mateixes regles. -->
+    <link rel="stylesheet" href="vendor/inter/inter.css">
+    <link rel="stylesheet" href="vendor/material-symbols/outlined.css">
+    <link rel="stylesheet" href="css/tailwind.css">
 </head>
 <body>
     <div class="app-container">
         <!-- Sidebar -->
         <nav class="sidebar">
             <div class="sidebar-header">
-                <i class="ph ph-wallet" style="font-size: 2rem; color: #4f46e5;"></i>
+                <span class="material-symbols-outlined" style="font-size: 2rem; color: #4f46e5;">account_balance_wallet</span>
                 <span class="sidebar-logo">Budget AI</span>
             </div>
             <nav class="nav-links flex-1 px-4 space-y-1">
@@ -114,7 +92,7 @@
                     </button>
 
                     <div class="user-profile cursor-pointer">
-                        <i class="ph ph-user-circle" style="font-size: 2rem; color: #6b7280;"></i>
+                        <span class="material-symbols-outlined" style="font-size: 2rem; color: #6b7280;">account_circle</span>
                     </div>
 
                     <button id="logout-btn" title="Tancar sessió"

@@ -243,7 +243,9 @@
     color: var(--text-main);
 }
 
-.login-brand i {
+/* Abans era una icona de Phosphor dins d'un <i>. Les icones són ara totes de
+   Material Symbols, que se serveixen des de l'aplicació. */
+.login-brand .material-symbols-outlined {
     font-size: 1.75rem;
     color: var(--primary-color);
 }

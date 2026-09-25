@@ -13,7 +13,7 @@ export function showLogin({ onSuccess, message } = {}) {
     screen.innerHTML = `
         <form class="login-card" id="login-form" autocomplete="on">
             <div class="login-brand">
-                <i class="ph ph-wallet"></i>
+                <span class="material-symbols-outlined">account_balance_wallet</span>
                 <span>Budget AI</span>
             </div>
             <p class="login-subtitle">Inicia sessió per continuar</p>
