@@ -62,6 +62,25 @@ Con el **Programador de tareas**:
 Docker Desktop tiene que estar abierto para que la copia funcione. Si no lo
 está, el script falla sin dejar ningún fichero a medias.
 
+### Si la tarea falla o no termina
+
+Desde el Programador de tareas no se ve ningún mensaje. Por eso cada ejecución
+deja una línea en **`logs\backup.log`**, dentro del proyecto, con la fecha, la
+carpeta de destino y si ha ido bien o por qué ha fallado:
+
+```
+[25/09/2026 19:00:02,15] Inici. Carpeta de desti: G:\Mi unidad\BudgetAI\copias
+[25/09/2026 19:00:05,40] Copia feta: G:\Mi unidad\BudgetAI\copias\budget_2026-09-25_190002.sql
+```
+
+Los fallos habituales:
+
+- `Docker no esta en marxa`: Docker Desktop estaba cerrado.
+- `no es pot crear la carpeta`: Google Drive no estaba abierto, o la ruta del
+  `.env` no es correcta.
+- Una tarea que se queda «En ejecución» y no termina: clic derecho →
+  **Finalizar**, y mira la última línea del registro.
+
 ## Restaurar una copia
 
 ```cmd

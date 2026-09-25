@@ -7,12 +7,21 @@
 # "backups" a l'arrel del projecte. Val la pena que sigui fora del disc on
 # viu la base de dades: una còpia al mateix disc no salva res si el disc falla.
 #
-# Es conserven les còpies dels últims 30 dies. Mateix comportament que
+# Es conserven les còpies dels últims 30 dies. Cada execució queda apuntada a
+# logs/backup.log: des de cron no es veu cap missatge. Mateix comportament que
 # backup.bat; si en canvies un, canvia l'altre.
 
 set -euo pipefail
 
 script_dir="$(cd "$(dirname "$0")" && pwd)"
+mkdir -p "$script_dir/../logs"
+log_file="$script_dir/../logs/backup.log"
+
+# Escriu el missatge a la pantalla i al registre, amb data i hora.
+log() {
+    echo "$1"
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" >> "$log_file"
+}
 
 # Es llegeix del .env com la resta de la configuració, buscant-lo al costat de
 # l'script i no a la carpeta actual. Sense carregar-lo sencer: només cal aquesta
@@ -24,13 +33,25 @@ if [ -f "$script_dir/../.env" ]; then
 fi
 
 backup_dir="${1:-${env_backup_dir:-$script_dir/../backups}}"
-mkdir -p "$backup_dir"
+log "Inici. Carpeta de destí: $backup_dir"
+
+# Sense Docker en marxa, docker exec pot quedar-se esperant: millor fallar de
+# seguida i amb un missatge clar.
+if ! docker info > /dev/null 2>&1; then
+    log "ERROR: Docker no està en marxa."
+    exit 1
+fi
+
+if ! mkdir -p "$backup_dir" 2> /dev/null; then
+    log "ERROR: no es pot crear la carpeta $backup_dir"
+    exit 1
+fi
 
 backup_file="$backup_dir/budget_$(date +%Y-%m-%d_%H%M%S).sql"
 
 fail() {
     rm -f "$backup_file"
-    echo "ERROR: no s'ha pogut fer la còpia. Està en marxa el contenidor budget_db?" >&2
+    log "ERROR: no s'ha pogut fer la còpia. Està en marxa el contenidor budget_db?" >&2
     exit 1
 }
 
@@ -40,12 +61,12 @@ fail() {
 # servidor amb un altre usuari.
 docker exec budget_db sh -c \
     'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" --clean --if-exists --no-owner --no-privileges' \
-    > "$backup_file" || fail
+    > "$backup_file" 2>> "$log_file" < /dev/null || fail
 
 # pg_dump acaba sempre amb aquesta línia. Si no hi és, la còpia s'ha tallat pel
 # camí i no serveix: restaurar-la esborraria les taules sense tornar-les a crear.
 grep -q "PostgreSQL database dump complete" "$backup_file" || fail
 
-echo "Còpia feta: $backup_file"
+log "Còpia feta: $backup_file"
 
 find "$backup_dir" -maxdepth 1 -name 'budget_*.sql' -mtime +30 -delete
