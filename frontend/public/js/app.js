@@ -113,10 +113,10 @@ async function startApp() {
         // als enllaços que existien en carregar la pàgina, així que qualsevol
         // botó creat després dins d'una vista (com el "Veure tot" del tauler)
         // no feia res en clicar-lo.
-        document.addEventListener('click', (e) => {
-            const trigger = e.target.closest('[data-view]');
+        document.addEventListener('click', (event) => {
+            const trigger = event.target.closest('[data-view]');
             if (trigger) {
-                e.preventDefault();
+                event.preventDefault();
                 const view = trigger.dataset.view;
                 if (!VIEWS.includes(view)) return;
 
@@ -129,8 +129,8 @@ async function startApp() {
                 return;
             }
 
-            if (e.target.closest('#logout-btn')) {
-                e.preventDefault();
+            if (event.target.closest('#logout-btn')) {
+                event.preventDefault();
                 handleLogout();
             }
         });

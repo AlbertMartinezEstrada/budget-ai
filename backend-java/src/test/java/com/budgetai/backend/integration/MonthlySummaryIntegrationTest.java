@@ -73,25 +73,25 @@ class MonthlySummaryIntegrationTest extends AbstractIntegrationTest {
     }
 
     private void saveRecurring(String name, String amount, String frequency, Long categoryId) {
-        RecurringTransaction rt = new RecurringTransaction();
-        rt.setName(name);
-        rt.setAmount(new BigDecimal(amount));
-        rt.setFrequency(frequency);
-        rt.setType("EXPENSE");
-        rt.setNextDate(LocalDate.of(2026, 3, 15));
-        rt.setCategory(categoryRepository.findById(categoryId).orElseThrow());
-        rt.setActive(true);
-        recurringRepository.save(rt);
+        RecurringTransaction recurring = new RecurringTransaction();
+        recurring.setName(name);
+        recurring.setAmount(new BigDecimal(amount));
+        recurring.setFrequency(frequency);
+        recurring.setType("EXPENSE");
+        recurring.setNextDate(LocalDate.of(2026, 3, 15));
+        recurring.setCategory(categoryRepository.findById(categoryId).orElseThrow());
+        recurring.setActive(true);
+        recurringRepository.save(recurring);
     }
 
     private void saveTransaction(String amount, LocalDate date, Long categoryId, String hash) {
-        Transaction t = new Transaction();
-        t.setAmount(new BigDecimal(amount));
-        t.setDate(date);
-        t.setType("EXPENSE");
-        t.setCategory(categoryRepository.findById(categoryId).orElseThrow());
-        t.setVerificationHash(hash);
-        transactionRepository.save(t);
+        Transaction transaction = new Transaction();
+        transaction.setAmount(new BigDecimal(amount));
+        transaction.setDate(date);
+        transaction.setType("EXPENSE");
+        transaction.setCategory(categoryRepository.findById(categoryId).orElseThrow());
+        transaction.setVerificationHash(hash);
+        transactionRepository.save(transaction);
     }
 
     @SuppressWarnings("unchecked")
@@ -101,7 +101,7 @@ class MonthlySummaryIntegrationTest extends AbstractIntegrationTest {
 
     private Map<String, Object> groupNode() {
         return groupsOf(2026, 3).stream()
-                .filter(n -> "Cotxe".equals(((Category) n.get("categoria")).getName()))
+                .filter(node -> "Cotxe".equals(((Category) node.get("categoria")).getName()))
                 .findFirst()
                 .orElseThrow();
     }
@@ -109,7 +109,7 @@ class MonthlySummaryIntegrationTest extends AbstractIntegrationTest {
     @SuppressWarnings("unchecked")
     private Map<String, Object> leafNode(String name) {
         return ((List<Map<String, Object>>) groupNode().get("subcategories")).stream()
-                .filter(n -> name.equals(((Category) n.get("categoria")).getName()))
+                .filter(node -> name.equals(((Category) node.get("categoria")).getName()))
                 .findFirst()
                 .orElseThrow();
     }
@@ -161,7 +161,7 @@ class MonthlySummaryIntegrationTest extends AbstractIntegrationTest {
     void quietMonthKeepsTheProratedCost() {
         // L'abril no cau l'assegurança i no hi ha combustible.
         Map<String, Object> april = groupsOf(2026, 4).stream()
-                .filter(n -> "Cotxe".equals(((Category) n.get("categoria")).getName()))
+                .filter(node -> "Cotxe".equals(((Category) node.get("categoria")).getName()))
                 .findFirst().orElseThrow();
 
         // El cost de viure no canvia perquè el rebut caigui un altre mes.
@@ -198,7 +198,7 @@ class MonthlySummaryIntegrationTest extends AbstractIntegrationTest {
         budgetRepository.save(budget);
 
         Budget stored = budgetService.getAllBudgets().stream()
-                .filter(b -> b.getCategory().getId().equals(groupId))
+                .filter(candidate -> candidate.getCategory().getId().equals(groupId))
                 .findFirst().orElseThrow();
 
         // 600 + 45: el grup no té moviments propis, els hereta de les fulles.
@@ -299,7 +299,7 @@ class MonthlySummaryIntegrationTest extends AbstractIntegrationTest {
 
     private Map<String, Object> section(String type) {
         return sectionsOf(2026, 3).stream()
-                .filter(s -> type.equals(s.get("tipus")))
+                .filter(section -> type.equals(section.get("tipus")))
                 .findFirst()
                 .orElseThrow();
     }
@@ -408,13 +408,13 @@ class MonthlySummaryIntegrationTest extends AbstractIntegrationTest {
     }
 
     private void saveIncome(String amount, Long categoryId, String hash) {
-        Transaction t = new Transaction();
-        t.setAmount(new BigDecimal(amount));
-        t.setDate(LocalDate.of(2026, 3, 10));
-        t.setType("INCOME");
-        t.setCategory(categoryRepository.findById(categoryId).orElseThrow());
-        t.setVerificationHash(hash);
-        transactionRepository.save(t);
+        Transaction transaction = new Transaction();
+        transaction.setAmount(new BigDecimal(amount));
+        transaction.setDate(LocalDate.of(2026, 3, 10));
+        transaction.setType("INCOME");
+        transaction.setCategory(categoryRepository.findById(categoryId).orElseThrow());
+        transaction.setVerificationHash(hash);
+        transactionRepository.save(transaction);
     }
 
     @Test
@@ -490,7 +490,7 @@ class MonthlySummaryIntegrationTest extends AbstractIntegrationTest {
 
         // El percentatge viatja; l'import el recalcula el mes destí.
         assertThat(budgetService.getAllBudgets())
-                .filteredOn(b -> b.getPeriodStart().equals(LocalDate.of(2026, 4, 1)))
+                .filteredOn(budget -> budget.getPeriodStart().equals(LocalDate.of(2026, 4, 1)))
                 .singleElement()
                 .extracting(Budget::getPercentage)
                 .isEqualTo(new BigDecimal("10.00"));
@@ -544,12 +544,12 @@ class MonthlySummaryIntegrationTest extends AbstractIntegrationTest {
 
         assertThat(budgetRepository.findAll())
                 .singleElement()
-                .satisfies(b -> {
-                    assertThat(b.getCategory().getId()).isEqualTo(payroll);
-                    assertThat(b.getLimitAmount()).isEqualByComparingTo("2500.00");
-                    assertThat(b.getPercentage()).isNull();
-                    assertThat(b.getPeriodStart()).isEqualTo(LocalDate.of(2026, 3, 1));
-                    assertThat(b.getPeriodEnd()).isEqualTo(LocalDate.of(2026, 3, 31));
+                .satisfies(budget -> {
+                    assertThat(budget.getCategory().getId()).isEqualTo(payroll);
+                    assertThat(budget.getLimitAmount()).isEqualByComparingTo("2500.00");
+                    assertThat(budget.getPercentage()).isNull();
+                    assertThat(budget.getPeriodStart()).isEqualTo(LocalDate.of(2026, 3, 1));
+                    assertThat(budget.getPeriodEnd()).isEqualTo(LocalDate.of(2026, 3, 31));
                 });
         // I el que es reparteix ja surt de la secció d'ingressos.
         Map<String, Object> summary = budgetService.getMonthlySummary(2026, 3);

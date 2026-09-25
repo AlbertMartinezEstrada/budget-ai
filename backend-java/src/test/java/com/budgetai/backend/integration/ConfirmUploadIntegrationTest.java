@@ -62,14 +62,14 @@ class ConfirmUploadIntegrationTest extends AbstractIntegrationTest {
      * l'ha de calcular el controlador a partir dels camps del moviment.
      */
     private Transaction movement(String concept, String amount, String type) {
-        Transaction t = new Transaction();
-        t.setOriginalConcept(concept);
-        t.setCompanyName(concept);
-        t.setCategoryName("Altres");
-        t.setAmount(new BigDecimal(amount));
-        t.setDate(LocalDate.of(2026, 2, 15));
-        t.setType(type);
-        return t;
+        Transaction transaction = new Transaction();
+        transaction.setOriginalConcept(concept);
+        transaction.setCompanyName(concept);
+        transaction.setCategoryName("Altres");
+        transaction.setAmount(new BigDecimal(amount));
+        transaction.setDate(LocalDate.of(2026, 2, 15));
+        transaction.setType(type);
+        return transaction;
     }
 
     private BigDecimal balance() {

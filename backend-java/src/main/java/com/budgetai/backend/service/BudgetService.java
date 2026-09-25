@@ -237,15 +237,15 @@ public class BudgetService {
     /** El pressupost d'una categoria que és exactament d'aquest mes. */
     private Optional<Budget> monthlyBudgetOf(Category category, YearMonth month) {
         return activeBudgetsOverlapping(month.atDay(1), month.atEndOfMonth()).stream()
-                .filter(b -> b.getCategory().getId().equals(category.getId()))
-                .filter(b -> b.getPeriodStart().equals(month.atDay(1))
-                        && b.getPeriodEnd().equals(month.atEndOfMonth()))
+                .filter(budget -> budget.getCategory().getId().equals(category.getId()))
+                .filter(budget -> budget.getPeriodStart().equals(month.atDay(1))
+                        && budget.getPeriodEnd().equals(month.atEndOfMonth()))
                 .findFirst();
     }
 
     private boolean coveredByLongerBudget(Category category, YearMonth month) {
         return activeBudgetsOverlapping(month.atDay(1), month.atEndOfMonth()).stream()
-                .anyMatch(b -> b.getCategory().getId().equals(category.getId()));
+                .anyMatch(budget -> budget.getCategory().getId().equals(category.getId()));
     }
 
     /**
@@ -268,14 +268,14 @@ public class BudgetService {
         if (categoryIds.isEmpty()) return BigDecimal.ZERO;
 
         return transactionRepository.findAll().stream()
-                .filter(t -> "EXPENSE".equals(t.getType()))
+                .filter(transaction -> "EXPENSE".equals(transaction.getType()))
                 // Els diners que ja es van comptar en sortir del compte
                 // principal no tornen a comptar en gastar-se al compte destí.
-                .filter(t -> !t.isExcludedFromBudget())
-                .filter(t -> t.getCategory() != null && categoryIds.contains(t.getCategory().getId()))
-                .filter(t -> t.getDate() != null
-                        && !t.getDate().isBefore(from) && !t.getDate().isAfter(to))
-                .map(t -> t.getAmount() != null ? t.getAmount() : BigDecimal.ZERO)
+                .filter(transaction -> !transaction.isExcludedFromBudget())
+                .filter(transaction -> transaction.getCategory() != null && categoryIds.contains(transaction.getCategory().getId()))
+                .filter(transaction -> transaction.getDate() != null
+                        && !transaction.getDate().isBefore(from) && !transaction.getDate().isAfter(to))
+                .map(transaction -> transaction.getAmount() != null ? transaction.getAmount() : BigDecimal.ZERO)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
@@ -531,15 +531,15 @@ public class BudgetService {
     /** @param categoryId null per sumar-los tots, sigui quina sigui la categoria. */
     private BigDecimal incomeIn(Long categoryId, LocalDate from, LocalDate to) {
         return transactionRepository.findAll().stream()
-                .filter(t -> "INCOME".equals(t.getType()))
+                .filter(transaction -> "INCOME".equals(transaction.getType()))
                 // Una entrada per traspàs no són diners nous: eixamplaria el
                 // bot a repartir amb els mateixos euros que ja hi eren.
-                .filter(t -> !t.isExcludedFromBudget())
-                .filter(t -> categoryId == null
-                        || (t.getCategory() != null && categoryId.equals(t.getCategory().getId())))
-                .filter(t -> t.getDate() != null
-                        && !t.getDate().isBefore(from) && !t.getDate().isAfter(to))
-                .map(t -> t.getAmount() != null ? t.getAmount() : BigDecimal.ZERO)
+                .filter(transaction -> !transaction.isExcludedFromBudget())
+                .filter(transaction -> categoryId == null
+                        || (transaction.getCategory() != null && categoryId.equals(transaction.getCategory().getId())))
+                .filter(transaction -> transaction.getDate() != null
+                        && !transaction.getDate().isBefore(from) && !transaction.getDate().isAfter(to))
+                .map(transaction -> transaction.getAmount() != null ? transaction.getAmount() : BigDecimal.ZERO)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
@@ -716,16 +716,16 @@ public class BudgetService {
     /** Prorrateig mensual de les despeses fixes lligades a una fulla. */
     private BigDecimal proratedFor(Category leaf, Map<Long, List<RecurringTransaction>> recurring) {
         return recurring.getOrDefault(leaf.getId(), List.of()).stream()
-                .filter(rt -> "EXPENSE".equals(rt.getType()))
+                .filter(recurringTransaction -> "EXPENSE".equals(recurringTransaction.getType()))
                 .map(RecurringTransaction::getMonthlyAmount)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
     private Map<Long, List<RecurringTransaction>> activeRecurringByCategory() {
         Map<Long, List<RecurringTransaction>> byCategory = new HashMap<>();
-        for (RecurringTransaction rt : recurringTransactionRepository.findByActiveTrue()) {
-            if (rt.getCategory() == null) continue;
-            byCategory.computeIfAbsent(rt.getCategory().getId(), k -> new ArrayList<>()).add(rt);
+        for (RecurringTransaction recurring : recurringTransactionRepository.findByActiveTrue()) {
+            if (recurring.getCategory() == null) continue;
+            byCategory.computeIfAbsent(recurring.getCategory().getId(), missingCategoryId -> new ArrayList<>()).add(recurring);
         }
         return byCategory;
     }

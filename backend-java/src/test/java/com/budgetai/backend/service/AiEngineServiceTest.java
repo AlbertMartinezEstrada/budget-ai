@@ -32,13 +32,13 @@ class AiEngineServiceTest {
     }
 
     private Transaction original(String concept, String amount) {
-        Transaction t = new Transaction();
-        t.setOriginalConcept(concept);
-        t.setAmount(new BigDecimal(amount));
-        t.setDate(LocalDate.of(2026, 2, 15));
-        t.setType("EXPENSE");
-        t.setVerificationHash("hash-" + concept);
-        return t;
+        Transaction transaction = new Transaction();
+        transaction.setOriginalConcept(concept);
+        transaction.setAmount(new BigDecimal(amount));
+        transaction.setDate(LocalDate.of(2026, 2, 15));
+        transaction.setType("EXPENSE");
+        transaction.setVerificationHash("hash-" + concept);
+        return transaction;
     }
 
     @Test
@@ -46,8 +46,8 @@ class AiEngineServiceTest {
     void withoutApiKeyReturnsOriginals() {
         ReflectionTestUtils.setField(service, "apiKey", "");
 
-        Transaction t = original("CONDIS", "45.30");
-        List<Transaction> result = service.classifyTransactions(List.of(t));
+        Transaction transaction = original("CONDIS", "45.30");
+        List<Transaction> result = service.classifyTransactions(List.of(transaction));
 
         assertThat(result).hasSize(1);
         assertThat(result.get(0).getAmount()).isEqualByComparingTo("45.30");
@@ -95,9 +95,9 @@ class AiEngineServiceTest {
         assertThat(result).hasSize(2);
         assertThat(result.get(0).getAmount()).isEqualByComparingTo("45.30");
         assertThat(result.get(1).getAmount()).isEqualByComparingTo("60.00");
-        assertThat(result).allSatisfy(t -> {
-            assertThat(t.getVerificationHash()).isNotNull();
-            assertThat(t.getType()).isEqualTo("EXPENSE");
+        assertThat(result).allSatisfy(transaction -> {
+            assertThat(transaction.getVerificationHash()).isNotNull();
+            assertThat(transaction.getType()).isEqualTo("EXPENSE");
         });
     }
 
@@ -115,18 +115,18 @@ class AiEngineServiceTest {
         List<Transaction> result = invokeParseAndMerge(aiResponse, originals);
 
         assertThat(result).hasSize(1);
-        Transaction t = result.get(0);
+        Transaction transaction = result.get(0);
 
         // El que sí que pot decidir:
-        assertThat(t.getCompanyName()).isEqualTo("Condis");
-        assertThat(t.getCategoryName()).isEqualTo("Menjar i supermercat");
-        assertThat(t.getShortDescription()).isEqualTo("Compra setmanal");
+        assertThat(transaction.getCompanyName()).isEqualTo("Condis");
+        assertThat(transaction.getCategoryName()).isEqualTo("Menjar i supermercat");
+        assertThat(transaction.getShortDescription()).isEqualTo("Compra setmanal");
 
         // El que no ha de poder tocar mai:
-        assertThat(t.getAmount()).isEqualByComparingTo("45.30");
-        assertThat(t.getDate()).isEqualTo(LocalDate.of(2026, 2, 15));
-        assertThat(t.getType()).isEqualTo("EXPENSE");
-        assertThat(t.getVerificationHash()).isEqualTo("hash-CONDIS");
+        assertThat(transaction.getAmount()).isEqualByComparingTo("45.30");
+        assertThat(transaction.getDate()).isEqualTo(LocalDate.of(2026, 2, 15));
+        assertThat(transaction.getType()).isEqualTo("EXPENSE");
+        assertThat(transaction.getVerificationHash()).isEqualTo("hash-CONDIS");
     }
 
     @Test

@@ -43,7 +43,7 @@ public class FinancialGoalController {
         try {
             FinancialGoal updated = financialGoalService.updateGoal(id, goal);
             return ResponseEntity.ok(updated);
-        } catch (RuntimeException e) {
+        } catch (RuntimeException exception) {
             return ResponseEntity.notFound().build();
         }
     }
@@ -58,7 +58,7 @@ public class FinancialGoalController {
 
             FinancialGoal updated = financialGoalService.addToGoal(id, amount);
             return ResponseEntity.ok(updated);
-        } catch (RuntimeException e) {
+        } catch (RuntimeException exception) {
             return ResponseEntity.notFound().build();
         }
     }

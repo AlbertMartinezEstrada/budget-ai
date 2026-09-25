@@ -30,15 +30,15 @@ public class ImportRuleService {
         List<ImportRule> rules = ruleRepository.findByActiveTrue();
         if (rules.isEmpty()) return transactions;
 
-        for (Transaction t : transactions) {
+        for (Transaction transaction : transactions) {
             for (ImportRule rule : rules) {
-                if (!matches(rule, t)) continue;
+                if (!matches(rule, transaction)) continue;
 
                 if (Boolean.TRUE.equals(rule.getMarksExcluded())) {
-                    t.setExcludedFromBudget(true);
+                    transaction.setExcludedFromBudget(true);
                 }
                 if (rule.getCategoryName() != null && !rule.getCategoryName().isBlank()) {
-                    t.setCategoria(rule.getCategoryName());
+                    transaction.setCategoria(rule.getCategoryName());
                 }
             }
         }

@@ -14,7 +14,7 @@ const TYPES = {
     INCOME:  { etiqueta: 'Ingrés',  signe: '+', classe: 'text-success' }
 };
 
-const typeOf = (t) => TYPES[t.type] ? t.type : 'EXPENSE';
+const typeOf = (transaction) => TYPES[transaction.type] ? transaction.type : 'EXPENSE';
 
 const MONTH_FORMATTER = new Intl.DateTimeFormat('ca-ES', {
     month: 'long',
@@ -168,28 +168,28 @@ export async function initTransactions(container) {
     const categories = await getCategories();
     const companies = await getCompanies();
     
-    const catSelect = document.getElementById('filter-category');
-    categories.forEach(c => {
+    const categorySelect = document.getElementById('filter-category');
+    categories.forEach(category => {
         const option = document.createElement('option');
-        option.value = c.id;
-        option.textContent = c.nom;
-        catSelect.appendChild(option);
+        option.value = category.id;
+        option.textContent = category.nom;
+        categorySelect.appendChild(option);
     });
 
-    const accSelect = document.getElementById('filter-account');
-    (await getAccounts()).forEach(a => {
+    const accountSelect = document.getElementById('filter-account');
+    (await getAccounts()).forEach(account => {
         const option = document.createElement('option');
-        option.value = a.id;
-        option.textContent = a.nom;
-        accSelect.appendChild(option);
+        option.value = account.id;
+        option.textContent = account.nom;
+        accountSelect.appendChild(option);
     });
 
-    const compSelect = document.getElementById('filter-company');
-    companies.forEach(c => {
+    const companySelect = document.getElementById('filter-company');
+    companies.forEach(company => {
         const option = document.createElement('option');
-        option.value = c.id;
-        option.textContent = c.nom;
-        compSelect.appendChild(option);
+        option.value = company.id;
+        option.textContent = company.nom;
+        companySelect.appendChild(option);
     });
 
     try {
@@ -239,7 +239,7 @@ async function handleRowAction(event) {
     if (!Number.isInteger(id)) return;
 
     if (button.dataset.action === 'edit-transaction') {
-        const transaction = currentTransactions.find(t => t.id === id);
+        const transaction = currentTransactions.find(candidate => candidate.id === id);
         if (transaction) openEditor(transaction);
         return;
     }
@@ -271,21 +271,21 @@ function setUpManualEntry(categories, companies) {
     const form = document.getElementById('transaction-form');
     const error = document.getElementById('transaction-form-error');
 
-    const parents = new Set(categories.map(c => c.parent_id).filter(Boolean));
-    const leaves = categories.filter(c => !parents.has(c.id));
+    const parents = new Set(categories.map(category => category.parent_id).filter(Boolean));
+    const leaves = categories.filter(category => !parents.has(category.id));
 
     getAccounts().then(accounts => {
         document.getElementById('new-account').innerHTML = accounts
-            .map(a => `<option value="${a.id}">${escapeHtml(a.nom)}</option>`)
+            .map(account => `<option value="${account.id}">${escapeHtml(account.nom)}</option>`)
             .join('');
     }).catch(error => console.error('Error loading accounts:', error));
 
     document.getElementById('new-category').innerHTML = leaves
-        .map(c => `<option value="${escapeHtml(c.nom)}">${escapeHtml(c.nom)}</option>`)
+        .map(category => `<option value="${escapeHtml(category.nom)}">${escapeHtml(category.nom)}</option>`)
         .join('');
 
     document.getElementById('company-suggestions').innerHTML = companies
-        .map(c => `<option value="${escapeHtml(c.nom)}"></option>`)
+        .map(category => `<option value="${escapeHtml(category.nom)}"></option>`)
         .join('');
 
     const close = () => {
@@ -341,8 +341,8 @@ function setUpManualEntry(categories, companies) {
     };
 
     document.getElementById('transaction-cancel').addEventListener('click', close);
-    modal.addEventListener('click', (e) => {
-        if (e.target.id === 'transaction-modal') close();
+    modal.addEventListener('click', (event) => {
+        if (event.target.id === 'transaction-modal') close();
     });
 
     form.addEventListener('submit', async (event) => {
@@ -381,8 +381,8 @@ function setUpManualEntry(categories, companies) {
             }
             close();
             await loadData();
-        } catch (e) {
-            error.textContent = e.message || 'No s\'ha pogut afegir el moviment.';
+        } catch (failure) {
+            error.textContent = failure.message || 'No s\'ha pogut afegir el moviment.';
             error.classList.remove('hidden');
         } finally {
             // Es rehabilita sempre: si fallava, el botó quedava bloquejat i

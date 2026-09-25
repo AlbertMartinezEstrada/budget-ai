@@ -70,7 +70,7 @@ public class JwtService {
                     .getPayload();
 
             return Optional.ofNullable(claims.getSubject());
-        } catch (JwtException | IllegalArgumentException e) {
+        } catch (JwtException | IllegalArgumentException exception) {
             return Optional.empty();
         }
     }

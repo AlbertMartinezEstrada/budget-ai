@@ -46,9 +46,9 @@ public final class AuthCookies {
         if (cookies == null) return Optional.empty();
 
         return Arrays.stream(cookies)
-                .filter(c -> COOKIE_NAME.equals(c.getName()))
+                .filter(cookie -> COOKIE_NAME.equals(cookie.getName()))
                 .map(Cookie::getValue)
-                .filter(v -> v != null && !v.isBlank())
+                .filter(cookieValue -> cookieValue != null && !cookieValue.isBlank())
                 .findFirst();
     }
 }

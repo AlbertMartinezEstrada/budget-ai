@@ -40,12 +40,12 @@ class ImportRulesIntegrationTest extends AbstractIntegrationTest {
     }
 
     private Transaction movement(String concept) {
-        Transaction t = new Transaction();
-        t.setOriginalConcept(concept);
-        t.setAmount(new BigDecimal("10.00"));
-        t.setDate(LocalDate.of(2026, 8, 5));
-        t.setType("INCOME");
-        return t;
+        Transaction transaction = new Transaction();
+        transaction.setOriginalConcept(concept);
+        transaction.setAmount(new BigDecimal("10.00"));
+        transaction.setDate(LocalDate.of(2026, 8, 5));
+        transaction.setType("INCOME");
+        return transaction;
     }
 
     @Test
@@ -97,10 +97,10 @@ class ImportRulesIntegrationTest extends AbstractIntegrationTest {
     void rulesLookAtTheBankConcept() {
         rule("*9469", null);
 
-        Transaction t = movement("Carregamento com Apple Pay através de *9469");
+        Transaction transaction = movement("Carregamento com Apple Pay através de *9469");
         // La IA reescriu l'empresa a alguna cosa neta; el patró no la ha de mirar.
-        t.setEmpresa("Apple Pay");
+        transaction.setEmpresa("Apple Pay");
 
-        assertThat(ruleService.apply(List.of(t)).get(0).isExcludedFromBudget()).isTrue();
+        assertThat(ruleService.apply(List.of(transaction)).get(0).isExcludedFromBudget()).isTrue();
     }
 }

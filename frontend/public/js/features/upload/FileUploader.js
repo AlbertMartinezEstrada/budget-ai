@@ -16,7 +16,7 @@ const TYPES = {
     INCOME:  { etiqueta: 'Ingrés',  signe: '+', classe: 'text-success' }
 };
 
-const typeOf = (t) => TYPES[t.type] ? t.type : 'EXPENSE';
+const typeOf = (transaction) => TYPES[transaction.type] ? transaction.type : 'EXPENSE';
 
 export async function initUpload(container) {
     container.innerHTML = `
@@ -114,12 +114,12 @@ export async function initUpload(container) {
 
     const dropZone = document.getElementById('drop-zone');
     const fileInput = document.getElementById('file-input');
-    const uploadBtn = document.getElementById('upload-btn');
+    const uploadButton = document.getElementById('upload-btn');
     const statusDiv = document.getElementById('upload-status');
     const reviewSection = document.getElementById('review-section');
     const reviewBody = document.getElementById('review-body');
-    const confirmBtn = document.getElementById('confirm-review');
-    const cancelBtn = document.getElementById('cancel-review');
+    const confirmButton = document.getElementById('confirm-review');
+    const cancelButton = document.getElementById('cancel-review');
 
     let currentReviewData = [];
     let categoriesList = [];
@@ -136,7 +136,7 @@ export async function initUpload(container) {
     try {
         const accounts = await getAccounts();
         document.getElementById('upload-account').innerHTML = accounts
-            .map(a => `<option value="${a.id}">${escapeHtml(a.nom)}</option>`)
+            .map(account => `<option value="${account.id}">${escapeHtml(account.nom)}</option>`)
             .join('');
     } catch (error) {
         console.error('Error loading accounts:', error);
@@ -168,10 +168,10 @@ export async function initUpload(container) {
     // Només fulles: una regla que assignés un grup faria que el moviment es
     // rebutgés en confirmar.
     const ruleCategorySelect = document.getElementById('rule-category');
-    const parentIds = new Set(categoriesList.map(c => c.parent_id).filter(Boolean));
+    const parentIds = new Set(categoriesList.map(category => category.parent_id).filter(Boolean));
     ruleCategorySelect.innerHTML = '<option value="">— No la toquis —</option>'
-        + categoriesList.filter(c => !parentIds.has(c.id))
-            .map(c => `<option value="${escapeHtml(c.nom)}">${escapeHtml(c.nom)}</option>`)
+        + categoriesList.filter(category => !parentIds.has(category.id))
+            .map(category => `<option value="${escapeHtml(category.nom)}">${escapeHtml(category.nom)}</option>`)
             .join('');
 
     document.getElementById('rule-form').addEventListener('submit', async (event) => {
@@ -208,20 +208,20 @@ export async function initUpload(container) {
 
     fileInput.addEventListener('change', () => {
         if (fileInput.files.length > 0) {
-            uploadBtn.disabled = false;
+            uploadButton.disabled = false;
             statusDiv.textContent = `Fitxer seleccionat: ${fileInput.files[0].name}`;
             statusDiv.classList.remove('hidden');
         } else {
-            uploadBtn.disabled = true;
+            uploadButton.disabled = true;
             statusDiv.classList.add('hidden');
         }
     });
 
-    uploadBtn.addEventListener('click', async () => {
+    uploadButton.addEventListener('click', async () => {
         const file = fileInput.files[0];
         if (!file) return;
 
-        uploadBtn.disabled = true;
+        uploadButton.disabled = true;
         statusDiv.innerHTML = '<div class="spinner"></div> Analitzant amb IA...';
         statusDiv.classList.remove('hidden', 'text-error', 'text-success');
 
@@ -230,7 +230,7 @@ export async function initUpload(container) {
             if (result.status === 'review') {
                 // Tot entra marcat: el cas normal és importar-ho sencer i
                 // descartar-ne quatre, no al revés.
-                currentReviewData = result.data.map(t => ({ ...t, inclos: true }));
+                currentReviewData = result.data.map(transaction => ({ ...transaction, inclos: true }));
                 document.getElementById('review-search').value = '';
                 renderReviewTable();
                 reviewSection.classList.remove('hidden');
@@ -242,7 +242,7 @@ export async function initUpload(container) {
         } catch (error) {
             statusDiv.textContent = `❌ Error: ${error.message}`;
             statusDiv.classList.add('text-error');
-            uploadBtn.disabled = false;
+            uploadButton.disabled = false;
         }
     });
 
@@ -255,29 +255,29 @@ export async function initUpload(container) {
      */
     function visibleRows() {
         const query = document.getElementById('review-search').value.trim().toLowerCase();
-        const rows = currentReviewData.map((t, index) => ({ t, index }));
+        const rows = currentReviewData.map((transaction, index) => ({ transaction, index }));
         if (!query) return rows;
 
-        return rows.filter(({ t }) => [
-            t.empresa, t.concepte_original, t.categoria, t.cost,
+        return rows.filter(({ transaction }) => [
+            transaction.empresa, transaction.concepte_original, transaction.categoria, transaction.cost,
             // També pel tipus, per poder aïllar d'un cop tot el que entra.
-            TYPES[typeOf(t)].etiqueta
+            TYPES[typeOf(transaction)].etiqueta
         ].some(field => String(field ?? '').toLowerCase().includes(query)));
     }
 
     function renderReviewTable() {
         const rows = visibleRows();
 
-        reviewBody.innerHTML = rows.map(({ t, index }) => {
+        reviewBody.innerHTML = rows.map(({ transaction, index }) => {
             // Si la categoria que proposa la IA no és a la llista oficial, el
             // navegador seleccionava la primera opció sense dir res i el
             // moviment s'acabava desant com a "Menjar i supermercat". Ara es
             // marca explícitament perquè es vegi que cal revisar-la.
-            const known = categoriesList.some(c => c.nom === t.categoria);
+            const known = categoriesList.some(category => category.nom === transaction.categoria);
 
-            const options = categoriesList.map(c => {
-                const isSelected = known && t.categoria === c.nom;
-                return `<option value="${escapeHtml(c.nom)}" ${isSelected ? 'selected' : ''}>${escapeHtml(c.nom)}</option>`;
+            const options = categoriesList.map(category => {
+                const isSelected = known && transaction.categoria === category.nom;
+                return `<option value="${escapeHtml(category.nom)}" ${isSelected ? 'selected' : ''}>${escapeHtml(category.nom)}</option>`;
             }).join('');
 
             const unknownOption = known
@@ -286,19 +286,19 @@ export async function initUpload(container) {
 
             // Un moviment descartat no s'ha de revisar: ni cal categoria ni ha
             // de cridar l'atenció com si li faltés alguna cosa.
-            const needsReview = t.inclos && !known;
+            const needsReview = transaction.inclos && !known;
 
-            const type = typeOf(t);
+            const type = typeOf(transaction);
             const style = TYPES[type];
 
             return `
             <tr data-index="${index}" class="${needsReview ? 'row-needs-review' : ''}"
-                style="${t.inclos ? '' : 'opacity: 0.45;'}">
+                style="${transaction.inclos ? '' : 'opacity: 0.45;'}">
                 <td>
-                    <input type="checkbox" name="inclos" ${t.inclos ? 'checked' : ''}
+                    <input type="checkbox" name="inclos" ${transaction.inclos ? 'checked' : ''}
                            title="Desmarca'l per no importar aquest moviment">
                 </td>
-                <td>${escapeHtml(t.data)}</td>
+                <td>${escapeHtml(transaction.data)}</td>
                 <td>
                     <select class="input input-sm" name="type"
                             title="El CSV el dedueix del signe de l'import. Si el banc el porta al revés, corregeix-lo aquí.">
@@ -306,17 +306,17 @@ export async function initUpload(container) {
                         <option value="INCOME" ${type === 'INCOME' ? 'selected' : ''}>Ingrés</option>
                     </select>
                 </td>
-                <td><input type="text" class="input input-sm w-full" value="${escapeHtml(t.empresa || '')}" name="empresa"></td>
+                <td><input type="text" class="input input-sm w-full" value="${escapeHtml(transaction.empresa || '')}" name="empresa"></td>
                 <td>
                     <select class="input input-sm w-full" name="categoria" ${needsReview ? 'required' : ''}>
                         ${unknownOption}${options}
                     </select>
                 </td>
                 <td class="text-right ${style.classe}" style="white-space: nowrap;">
-                    ${style.signe}${formatCurrency(t.cost)}
+                    ${style.signe}${formatCurrency(transaction.cost)}
                 </td>
                 <td class="text-center">
-                    <input type="checkbox" name="exclos" ${t.exclos_pressupost ? 'checked' : ''}
+                    <input type="checkbox" name="exclos" ${transaction.exclos_pressupost ? 'checked' : ''}
                            title="Marca'l si aquests diners ja es van comptar en sortir del compte principal: una entrada per traspàs, o una compra feta amb diners ja traspassats.">
                 </td>
             </tr>
@@ -328,14 +328,14 @@ export async function initUpload(container) {
     }
 
     function updateSummary() {
-        const chosen = currentReviewData.filter(t => t.inclos);
+        const chosen = currentReviewData.filter(transaction => transaction.inclos);
         const hidden = currentReviewData.length - visibleRows().length;
 
         // Els dos costats van separats: sumar-los en una sola xifra restaria
         // els ingressos de les despeses i no voldria dir res.
         const sumOf = (type) => chosen
-            .filter(t => typeOf(t) === type)
-            .reduce((sum, t) => sum + (Number.parseFloat(t.cost) || 0), 0);
+            .filter(transaction => typeOf(transaction) === type)
+            .reduce((sum, transaction) => sum + (Number.parseFloat(transaction.cost) || 0), 0);
 
         const spent = sumOf('EXPENSE');
         const earned = sumOf('INCOME');
@@ -346,10 +346,10 @@ export async function initUpload(container) {
             + (earned > 0 ? ` · +${formatCurrency(earned)} d'ingrés` : '')
             + (hidden > 0 ? ` · ${hidden} amagats per la cerca` : '');
 
-        confirmBtn.textContent = chosen.length === currentReviewData.length
+        confirmButton.textContent = chosen.length === currentReviewData.length
             ? 'Confirmar tot'
             : `Confirmar ${chosen.length}`;
-        confirmBtn.disabled = chosen.length === 0;
+        confirmButton.disabled = chosen.length === 0;
     }
 
     /**
@@ -407,23 +407,23 @@ export async function initUpload(container) {
     // Marquen i desmarquen el lot sencer, també el que la cerca amaga: així
     // "desmarcar-ho tot" sempre deixa zero, es miri el que es miri.
     document.getElementById('select-all').addEventListener('click', () => {
-        currentReviewData.forEach(t => { t.inclos = true; });
+        currentReviewData.forEach(transaction => { transaction.inclos = true; });
         renderReviewTable();
     });
 
     document.getElementById('select-none').addEventListener('click', () => {
-        currentReviewData.forEach(t => { t.inclos = false; });
+        currentReviewData.forEach(transaction => { transaction.inclos = false; });
         renderReviewTable();
     });
 
-    confirmBtn.addEventListener('click', async () => {
+    confirmButton.addEventListener('click', async () => {
         // Les dades surten de currentReviewData i no del DOM: amb la cerca
         // activa, la taula només ensenya una part i llegir-ne les files
         // n'importaria una part.
         const accountId = Number.parseInt(document.getElementById('upload-account').value, 10);
 
         const confirmedData = currentReviewData
-            .filter(t => t.inclos)
+            .filter(transaction => transaction.inclos)
             // `inclos` és de la pantalla, no del model: el backend no l'espera.
             .map(({ inclos, ...transaction }) => ({
                 ...transaction,
@@ -440,7 +440,7 @@ export async function initUpload(container) {
 
         // Només es valida el que s'importa: un moviment descartat pot quedar
         // sense categoria i no ha de bloquejar la resta.
-        const missingCategory = confirmedData.some(t => !t.categoria);
+        const missingCategory = confirmedData.some(transaction => !transaction.categoria);
         if (missingCategory) {
             const search = document.getElementById('review-search');
             if (search.value) {
@@ -453,7 +453,7 @@ export async function initUpload(container) {
             return;
         }
 
-        confirmBtn.disabled = true;
+        confirmButton.disabled = true;
         statusDiv.textContent = 'Guardant...';
 
         try {
@@ -468,7 +468,7 @@ export async function initUpload(container) {
             reviewBody.innerHTML = '';
             document.getElementById('review-search').value = '';
             fileInput.value = '';
-            uploadBtn.disabled = true;
+            uploadButton.disabled = true;
             setTimeout(() => {
                 statusDiv.classList.add('hidden');
             }, 4000);
@@ -476,26 +476,26 @@ export async function initUpload(container) {
             statusDiv.textContent = `❌ Error guardant: ${error.message}`;
         } finally {
             // Es rehabilita sempre: si fallava, el botó quedava bloquejat.
-            confirmBtn.disabled = false;
+            confirmButton.disabled = false;
         }
     });
 
-    cancelBtn.addEventListener('click', () => {
+    cancelButton.addEventListener('click', () => {
         reviewSection.classList.add('hidden');
         currentReviewData = [];
         reviewBody.innerHTML = '';
         document.getElementById('review-search').value = '';
         statusDiv.textContent = 'Operació cancel·lada.';
         statusDiv.classList.remove('hidden');
-        confirmBtn.disabled = false;
-        uploadBtn.disabled = !fileInput.files.length;
+        confirmButton.disabled = false;
+        uploadButton.disabled = !fileInput.files.length;
     });
 
     // Arrossegar i deixar anar: la zona ho anunciava però no estava implementat.
     ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-        dropZone.addEventListener(eventName, (e) => {
-            e.preventDefault();
-            e.stopPropagation();
+        dropZone.addEventListener(eventName, (event) => {
+            event.preventDefault();
+            event.stopPropagation();
         });
     });
 
@@ -507,8 +507,8 @@ export async function initUpload(container) {
         dropZone.addEventListener(eventName, () => dropZone.classList.remove('drag-over'));
     });
 
-    dropZone.addEventListener('drop', (e) => {
-        const file = e.dataTransfer?.files?.[0];
+    dropZone.addEventListener('drop', (event) => {
+        const file = event.dataTransfer?.files?.[0];
         if (!file) return;
 
         if (!file.name.toLowerCase().endsWith('.csv')) {
@@ -517,7 +517,7 @@ export async function initUpload(container) {
             return;
         }
 
-        fileInput.files = e.dataTransfer.files;
+        fileInput.files = event.dataTransfer.files;
         fileInput.dispatchEvent(new Event('change'));
     });
 }

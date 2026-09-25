@@ -93,7 +93,7 @@ class TransferIntegrationTest extends AbstractIntegrationTest {
     @Test
     @DisplayName("Crear i esborrar diverses vegades deixa els saldos com al principi")
     void repeatedCyclesLeaveNoDrift() {
-        for (int i = 0; i < 5; i++) {
+        for (int round = 0; round < 5; round++) {
             var created = transferController.createTransfer(
                     transferRequest(sourceId, destinationId, "33.33"));
             transferController.deleteTransfer(((Transfer) created.getBody()).getId());

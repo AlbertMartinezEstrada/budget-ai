@@ -57,7 +57,7 @@ class FinancialGoalServiceTest {
     @DisplayName("Afegir una quantitat suma sobre el que ja hi havia")
     void addAmountAccumulates() {
         when(repository.findById(1L)).thenReturn(Optional.of(goal));
-        when(repository.save(any(FinancialGoal.class))).thenAnswer(i -> i.getArgument(0));
+        when(repository.save(any(FinancialGoal.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         FinancialGoal result = service.addToGoal(1L, new BigDecimal("250.00"));
 
@@ -69,7 +69,7 @@ class FinancialGoalServiceTest {
     @DisplayName("En arribar a l'objectiu es marca com a completat")
     void reachingTargetCompletesGoal() {
         when(repository.findById(1L)).thenReturn(Optional.of(goal));
-        when(repository.save(any(FinancialGoal.class))).thenAnswer(i -> i.getArgument(0));
+        when(repository.save(any(FinancialGoal.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         FinancialGoal result = service.addToGoal(1L, new BigDecimal("1250.00"));
 
@@ -81,7 +81,7 @@ class FinancialGoalServiceTest {
     @DisplayName("Actualitzar sense enviar quantitat_actual no esborra els diners estalviats")
     void partialUpdateKeepsSavedAmount() {
         when(repository.findById(1L)).thenReturn(Optional.of(goal));
-        when(repository.save(any(FinancialGoal.class))).thenAnswer(i -> i.getArgument(0));
+        when(repository.save(any(FinancialGoal.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         // El formulari només envia nom, objectiu i data.
         FinancialGoal partial = new FinancialGoal();

@@ -44,7 +44,7 @@ public class RecurringTransactionController {
         try {
             RecurringTransaction updated = recurringTransactionService.updateRecurringTransaction(id, recurring);
             return ResponseEntity.ok(updated);
-        } catch (RuntimeException e) {
+        } catch (RuntimeException exception) {
             return ResponseEntity.notFound().build();
         }
     }
@@ -60,8 +60,8 @@ public class RecurringTransactionController {
         try {
             recurringTransactionService.processDueRecurringTransactions();
             return ResponseEntity.ok(Map.of("message", "Recurring transactions processed successfully"));
-        } catch (Exception e) {
-            return ResponseEntity.internalServerError().body(Map.of("error", e.getMessage()));
+        } catch (Exception exception) {
+            return ResponseEntity.internalServerError().body(Map.of("error", exception.getMessage()));
         }
     }
 }

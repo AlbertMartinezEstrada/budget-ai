@@ -21,10 +21,10 @@ class CategoryHierarchyServiceTest {
     @InjectMocks private CategoryHierarchyService service;
 
     private Category category(long id, String name, Long parentId) {
-        Category c = new Category(name);
-        c.setId(id);
-        c.setParentId(parentId);
-        return c;
+        Category category = new Category(name);
+        category.setId(id);
+        category.setParentId(parentId);
+        return category;
     }
 
     /**
