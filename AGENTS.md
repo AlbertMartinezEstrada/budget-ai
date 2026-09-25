@@ -33,7 +33,7 @@ scripts\backup.bat                    # copia de la base de datos (backup.sh fue
 
 cd backend-java && ./gradlew test              # 100 unitarios, sin Docker
 cd backend-java && ./gradlew integrationTest   # 99, requieren Docker
-cd frontend && npm test                        # 19
+cd frontend && npm test                        # 22
 ```
 
 **Ejecuta los tests antes de dar nada por terminado.** El backend hay que
@@ -143,7 +143,10 @@ Los datos vienen del CSV del banco y de la respuesta de Gemini: **no son de
 confianza**.
 
 Tampoco construyas clases de Tailwind en tiempo de ejecución: `bg-${color}-500`
-no existe, hay que enumerarlas.
+no existe, hay que enumerarlas. Y si usas una clase nueva, ejecuta
+`npm run build:assets`: Tailwind está compilado en `public/css/tailwind.css`, y
+sin regenerarlo la clase no tiene estilo (lo vigila `test/assets.test.js`).
+Nada se carga desde un CDN.
 
 `frontend/test/contract.test.js` vigila estas cuatro reglas y falla si vuelven.
 
