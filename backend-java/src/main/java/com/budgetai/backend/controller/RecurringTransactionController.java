@@ -61,7 +61,8 @@ public class RecurringTransactionController {
             recurringTransactionService.processDueRecurringTransactions();
             return ResponseEntity.ok(Map.of("message", "Recurring transactions processed successfully"));
         } catch (Exception exception) {
-            return ResponseEntity.internalServerError().body(Map.of("error", exception.getMessage()));
+            return ResponseEntity.internalServerError().body(Map.of("error",
+                    ClientErrors.messageFor(exception, "Processar recurrents")));
         }
     }
 }
