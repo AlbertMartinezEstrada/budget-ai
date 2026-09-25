@@ -39,6 +39,10 @@ services:
       - AUTH_PASSWORD=${AUTH_PASSWORD}
       - AUTH_PASSWORD_HASH=${AUTH_PASSWORD_HASH:-}
       - JWT_SECRET=${JWT_SECRET}
+      # Des d'on es pot obrir l'aplicació. Per entrar des del mòbil (Tailscale)
+      # cal afegir-hi l'adreça del PC: veure ACCESO_DESDE_EL_MOVIL.md. Sense
+      # passar-la aquí, posar-la al .env no feia res.
+      - CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}
     depends_on:
       - db
 

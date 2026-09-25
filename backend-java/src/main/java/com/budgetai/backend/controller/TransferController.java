@@ -67,7 +67,7 @@ public class TransferController {
 
             // Verificar que la cuenta origen tenga saldo suficiente
             var sourceAccount = accountService.getAccountById(transfer.getSourceAccount().getId())
-                    .orElseThrow(() -> new RuntimeException("Source account not found"));
+                    .orElseThrow(() -> new IllegalArgumentException("El compte d'origen no existeix"));
 
             BigDecimal sourceBalance = sourceAccount.getCurrentBalance() != null
                     ? sourceAccount.getCurrentBalance()
@@ -78,7 +78,7 @@ public class TransferController {
             }
 
             var destinationAccount = accountService.getAccountById(transfer.getDestinationAccount().getId())
-                    .orElseThrow(() -> new RuntimeException("Destination account not found"));
+                    .orElseThrow(() -> new IllegalArgumentException("El compte de destí no existeix"));
 
             // Es lliguen els comptes reals: el cos de la petició només porta
             // l'id, i sense això la resposta tornava els comptes amb el nom a
@@ -96,7 +96,9 @@ public class TransferController {
             return ResponseEntity.ok(saved);
 
         } catch (Exception exception) {
-            throw new TransferFailedException(exception.getMessage());
+            // Es rellança perquè la transacció faci rollback; el missatge el
+            // tria ClientErrors perquè no arribi el text intern de Java.
+            throw new TransferFailedException(ClientErrors.messageFor(exception, "Crear transferència"), exception);
         }
     }
 
@@ -124,8 +126,19 @@ public class TransferController {
 
     @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
     private static class TransferFailedException extends RuntimeException {
-        TransferFailedException(String message) {
-            super(message);
+        TransferFailedException(String message, Throwable cause) {
+            super(message, cause);
         }
+    }
+
+    /**
+     * Sense això, Spring responia el cos d'error per defecte, sense missatge, i
+     * la pantalla deia "Error 500" fins i tot quan el motiu era un compte que no
+     * existeix. Quan arriba aquí la transacció ja s'ha desfet: l'excepció ha
+     * travessat el límit de @Transactional.
+     */
+    @ExceptionHandler(TransferFailedException.class)
+    public ResponseEntity<Map<String, String>> handleTransferFailed(TransferFailedException exception) {
+        return ResponseEntity.internalServerError().body(Map.of("error", exception.getMessage()));
     }
 }
