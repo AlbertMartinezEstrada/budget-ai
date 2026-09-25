@@ -53,11 +53,17 @@ public class BankReaderService {
     }
 
     private CSVParser parse(String content, char delimiter) throws IOException {
-        return new CSVParser(new BufferedReader(new StringReader(content)), CSVFormat.DEFAULT
-                .withDelimiter(delimiter)
-                .withFirstRecordAsHeader()
-                .withIgnoreHeaderCase()
-                .withTrim());
+        CSVFormat format = CSVFormat.DEFAULT.builder()
+                .setDelimiter(delimiter)
+                .setHeader()
+                .setSkipHeaderRecord(true)
+                .setIgnoreHeaderCase(true)
+                .setTrim(true)
+                .get();
+        return CSVParser.builder()
+                .setReader(new BufferedReader(new StringReader(content)))
+                .setFormat(format)
+                .get();
     }
 
     /** El format de sempre: Fecha;Concepto;Importe. */
