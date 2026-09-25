@@ -61,3 +61,7 @@ Presupost 2026.xlsx
 # Windows
 Thumbs.db
 desktop.ini
+
+# Còpies de seguretat de la base de dades (scripts/backup.*): dades
+# financeres reals, mai al repositori.
+backups/
