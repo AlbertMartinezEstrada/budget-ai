@@ -166,6 +166,22 @@ test('cap variable es diu amb una sola lletra', () => {
     assert.deepEqual(offenders, [], `variables d'una lletra a: ${offenders.join(', ')}`);
 });
 
+test('la pàgina no carrega res des d\'un altre domini', () => {
+    // Tailwind, les fonts i les icones venien de CDNs. Un script de tercers té
+    // accés a tota la pàgina i a les dades que s'hi veuen, i sense internet
+    // l'aplicació es quedava sense estils. Ara es serveix tot des de public/.
+    const publicDir = path.join(__dirname, '..', 'public');
+    const pages = [
+        path.join(publicDir, 'index.html'),
+        ...fs.readdirSync(path.join(publicDir, 'css')).map(file => path.join(publicDir, 'css', file))
+    ];
+    const external = /(?:src|href)\s*=\s*["']?(?:https?:)?\/\/|@import\s+(?:url\()?["']?(?:https?:)?\/\/|url\(\s*["']?(?:https?:)?\/\//i;
+    const offenders = pages
+        .filter(file => external.test(fs.readFileSync(file, 'utf8')))
+        .map(file => path.relative(publicDir, file));
+    assert.deepEqual(offenders, [], `recursos externs a: ${offenders.join(', ')}`);
+});
+
 test('app.js coneix totes les vistes que sap renderitzar', () => {
     const app = files.find(file => file.path.endsWith(path.join('js', 'app.js')));
     assert.ok(app, 'no s\'ha trobat app.js');
