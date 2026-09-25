@@ -267,6 +267,12 @@ se define ahí aparece solo en cada mes, sin copiar nada.
 - Una versión cerrada no genera cargos posteriores a su cierre (`POST
   /recurring/process`), y la nueva empieza su calendario dentro de su
   vigencia: el mismo cargo no sale dos veces.
+- **En Presupuestos, el coste fijo es el plan, no el gasto.** «Gastado» sale
+  de `caixa_real`, los movimientos importados del mes, y no de
+  `cost_vida_real`, que da un fijo por su prorrateo aunque no haya ningún
+  movimiento: un alquiler salía «gastado 800 de 800» antes de subir el CSV.
+  El mes que cae un cargo anual, el gasto supera el plan de ese mes; es lo que
+  marca «cargo este mes».
 - `GET /recurring` no devuelve las versiones ya cerradas, para que la
   pantalla de Recurrentes no las muestre como duplicados. Editar desde esa
   pantalla sí modifica la fila tal cual: el historial solo se conserva
