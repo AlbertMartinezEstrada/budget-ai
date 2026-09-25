@@ -109,6 +109,10 @@ public class BudgetService {
      *
      * Es copia el percentatge tal com estava; l'import es recalcula sol sobre
      * el bot del mes nou, que és tot el sentit de repartir per percentatges.
+     *
+     * Les fulles que tenen un cost fix vigent al mes destí no es copien: el
+     * seu import ja surt del cost fix, i un canvi fet a mà en un mes només ha
+     * de valer per a aquell mes. Copiar-lo l'arrossegaria als següents.
      */
     @Transactional
     public Map<String, Object> copyFromPreviousMonth(int year, int month) {
@@ -120,8 +124,11 @@ public class BudgetService {
             alreadySet.add(budget.getCategory().getId());
         }
 
+        Set<Long> withFixedCost = activeRecurringByCategory(target.atDay(1), target.atEndOfMonth()).keySet();
+
         int copied = 0;
         for (Budget origin : activeBudgetsOverlapping(source.atDay(1), source.atEndOfMonth())) {
+            if (origin.getCategory().isFixed() && withFixedCost.contains(origin.getCategory().getId())) continue;
             if (!alreadySet.add(origin.getCategory().getId())) continue;
 
             Budget copy = new Budget();
@@ -342,7 +349,7 @@ public class BudgetService {
         CategoryHierarchyService.Tree tree = hierarchyService.loadTree();
         Map<Long, BigDecimal> amountsByCategory = monthlyAmounts(from, to);
         Map<Long, BigDecimal> percentagesByCategory = monthlyPercentages(from, to);
-        Map<Long, List<RecurringTransaction>> recurringByCategory = activeRecurringByCategory();
+        Map<Long, List<RecurringTransaction>> recurringByCategory = activeRecurringByCategory(from, to);
 
         Context context = new Context(tree, amountsByCategory, percentagesByCategory,
                 recurringByCategory, from, to, salary);
@@ -721,10 +728,17 @@ public class BudgetService {
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
-    private Map<Long, List<RecurringTransaction>> activeRecurringByCategory() {
+    /**
+     * Recurrents que compten en algun dia del mes.
+     *
+     * Filtrar per vigència és el que fa que canviar un cost fix no reescrigui
+     * els mesos passats: la versió vella segueix comptant fins al seu tancament.
+     */
+    private Map<Long, List<RecurringTransaction>> activeRecurringByCategory(LocalDate from, LocalDate to) {
         Map<Long, List<RecurringTransaction>> byCategory = new HashMap<>();
         for (RecurringTransaction recurring : recurringTransactionRepository.findByActiveTrue()) {
             if (recurring.getCategory() == null) continue;
+            if (!recurring.isValidDuring(from, to)) continue;
             byCategory.computeIfAbsent(recurring.getCategory().getId(), missingCategoryId -> new ArrayList<>()).add(recurring);
         }
         return byCategory;
