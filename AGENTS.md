@@ -17,7 +17,7 @@ presupuestos, metas, transferencias y gastos recurrentes.
 |---|---|---|
 | Frontend | JavaScript sin framework, módulos ES | `frontend/public/` |
 | Servidor estático | Express | `frontend/index.js` |
-| Backend | Java 17, Spring Boot 3.2 | `backend-java/` |
+| Backend | Java 17, Spring Boot 3.5 | `backend-java/` |
 | Base de datos | PostgreSQL 17 | `backend-java/init.sql` |
 | Legado | Python, **sin usar** | `backend-python-legacy/` |
 
