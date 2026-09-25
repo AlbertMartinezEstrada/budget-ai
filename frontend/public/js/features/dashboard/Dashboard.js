@@ -6,7 +6,7 @@ export async function initDashboard(container) {
             <div class="card">
                 <div class="card-header">
                     <h3 class="card-title">Ingressos</h3>
-                    <i class="ph ph-arrow-circle-down-right" style="font-size: 1.5rem; color: var(--secondary-color);"></i>
+                    <span class="material-symbols-outlined" style="font-size: 1.5rem; color: var(--secondary-color);">arrow_circle_down</span>
                 </div>
                 <div class="stat-value text-success" id="total-ingressos">${formatCurrency(0)}</div>
                 <div class="stat-label">Total rebut</div>
@@ -14,7 +14,7 @@ export async function initDashboard(container) {
             <div class="card">
                 <div class="card-header">
                     <h3 class="card-title">Despeses</h3>
-                    <i class="ph ph-arrow-circle-up-right" style="font-size: 1.5rem; color: #ef4444;"></i>
+                    <span class="material-symbols-outlined" style="font-size: 1.5rem; color: #ef4444;">arrow_circle_up</span>
                 </div>
                 <div class="stat-value text-error" id="total-despeses">${formatCurrency(0)}</div>
                 <div class="stat-label">Total gastat</div>
@@ -22,7 +22,7 @@ export async function initDashboard(container) {
             <div class="card">
                 <div class="card-header">
                     <h3 class="card-title">Balanç Net</h3>
-                    <i class="ph ph-scales" style="font-size: 1.5rem; color: var(--primary-color);"></i>
+                    <span class="material-symbols-outlined" style="font-size: 1.5rem; color: var(--primary-color);">balance</span>
                 </div>
                 <div class="stat-value" id="balanc-net">${formatCurrency(0)}</div>
                 <div class="stat-label">Ingressos - Despeses</div>
@@ -33,7 +33,7 @@ export async function initDashboard(container) {
              <div class="card">
                 <div class="card-header">
                     <h3 class="card-title">Top Categories</h3>
-                    <i class="ph ph-chart-pie-slice" style="font-size: 1.5rem; color: #f59e0b;"></i>
+                    <span class="material-symbols-outlined" style="font-size: 1.5rem; color: #f59e0b;">pie_chart</span>
                 </div>
                 <div id="top-categories-list" class="space-y-3">
                     <div class="text-center text-sm text-gray-500">Carregant...</div>

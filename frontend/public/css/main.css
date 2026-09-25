@@ -53,7 +53,7 @@ html.dark {
 }
 
 body {
-    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    font-family: 'Inter Variable', 'Inter', system-ui, -apple-system, sans-serif;
     /* Faltava var(): la declaració era invàlida i el fons mai s'aplicava. */
     background-color: var(--bg-body);
     color: var(--text-main);

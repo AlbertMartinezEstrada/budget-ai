@@ -23,12 +23,12 @@ export async function initUpload(container) {
         <div class="card mb-4">
             <div class="card-header">
                 <h3 class="card-title">Pujar Extracte Bancari</h3>
-                <i class="ph ph-cloud-arrow-up" style="font-size: 1.5rem; color: var(--primary-color);"></i>
+                <span class="material-symbols-outlined" style="font-size: 1.5rem; color: var(--primary-color);">cloud_upload</span>
             </div>
             <div class="upload-area" id="drop-zone">
                 <input type="file" id="file-input" accept=".csv" class="file-input">
                 <label for="file-input" class="file-label">
-                    <i class="ph ph-file-csv" style="font-size: 3rem; color: var(--text-secondary);"></i>
+                    <span class="material-symbols-outlined" style="font-size: 3rem; color: var(--text-secondary);">csv</span>
                     <span class="mt-2 text-sm text-gray-500">Arrossega un fitxer CSV o fes clic per seleccionar-lo</span>
                 </label>
                 <button id="upload-btn" class="btn btn-primary mt-4" disabled>Pujar i Analitzar</button>
