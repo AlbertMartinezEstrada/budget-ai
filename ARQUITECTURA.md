@@ -247,6 +247,31 @@ esa marca, ver 600 € de caja cuando el coste de vida dice 50 € parece un err
 **Las recurrentes no mueven dinero.** Definen cuánto cuesta algo al mes; el
 dinero real lo sigue poniendo la transacción importada del CSV.
 
+### Costes fijos: la plantilla de cada mes
+
+El menú **Costes fijos** de Presupuestos (`/fixed-costs`) no es una tabla
+aparte: son las recurrentes de gasto de las hojas fijas. Como el plan de una
+hoja fija sin importe propio ya sale del prorrateo de sus recurrentes, lo que
+se define ahí aparece solo en cada mes, sin copiar nada.
+
+- **Cambiar un importe solo en un mes** es asignarle un presupuesto a la hoja
+  para ese mes: manda sobre el coste fijo solo en ese mes. Quitarlo devuelve
+  el coste fijo. «Copiar mes anterior» no copia estos cambios puntuales en
+  hojas con coste fijo: si lo hiciera, dejarían de ser de un solo mes.
+- **Un cambio en el coste fijo vale desde el mes que se está mirando.** Las
+  recurrentes tienen `vigent_des_de` y `vigent_fins` (`NULL` = sin límite).
+  Editar una que ya contaba antes cierra la versión vieja el mes anterior y
+  crea una nueva; quitarla la cierra en vez de borrarla. Si se modificara la
+  fila, el plan de todos los meses pasados cambiaría con ella. Si empezó ese
+  mismo mes, no ha contado nunca antes y se edita o borra directamente.
+- Una versión cerrada no genera cargos posteriores a su cierre (`POST
+  /recurring/process`), y la nueva empieza su calendario dentro de su
+  vigencia: el mismo cargo no sale dos veces.
+- `GET /recurring` no devuelve las versiones ya cerradas, para que la
+  pantalla de Recurrentes no las muestre como duplicados. Editar desde esa
+  pantalla sí modifica la fila tal cual: el historial solo se conserva
+  cambiando desde el menú de Presupuestos.
+
 ### El endpoint
 
 `GET /budgets/monthly-summary?year=&month=` devuelve el árbol con

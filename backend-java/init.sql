@@ -104,6 +104,11 @@ CREATE TABLE IF NOT EXISTS recurring_transactions (
     account_id BIGINT REFERENCES accounts(id),
     activa BOOLEAN DEFAULT TRUE,
     descripcio TEXT,
+    -- Període en què l'import compta. NULL a vigent_des_de = des de sempre;
+    -- NULL a vigent_fins = encara vigent. Canviar un cost fix tanca la versió
+    -- vella i n'obre una de nova, perquè els mesos passats no canviïn.
+    vigent_des_de DATE,
+    vigent_fins DATE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
