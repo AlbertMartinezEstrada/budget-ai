@@ -32,7 +32,7 @@ docker compose logs -f backend        # logs
 
 cd backend-java && ./gradlew test              # 100 unitarios, sin Docker
 cd backend-java && ./gradlew integrationTest   # 99, requieren Docker
-cd frontend && npm test                        # 18
+cd frontend && npm test                        # 19
 ```
 
 **Ejecuta los tests antes de dar nada por terminado.** El backend hay que
