@@ -22,18 +22,19 @@ scripts\backup.bat
 Crea `backups\budget_AAAA-MM-DD_HHMMSS.sql` y borra las de más de 30 días.
 
 **Dónde guardarlas.** Una copia en el mismo disco no salva nada si el disco
-falla. Mejor una carpeta sincronizada (OneDrive, Google Drive…). Se indica como
-argumento o, para no repetirlo, con una variable de entorno:
+falla. Mejor una carpeta sincronizada (Google Drive, OneDrive…). Se configura
+en el `.env`, como el resto:
 
-```cmd
-scripts\backup.bat "C:\Users\TU_USUARIO\OneDrive\BudgetAI\copias"
+```bash
+BUDGET_BACKUP_DIR=G:\Mi unidad\BudgetAI\copias
 ```
 
-```cmd
-setx BUDGET_BACKUP_DIR "C:\Users\TU_USUARIO\OneDrive\BudgetAI\copias"
-```
-
-`setx` solo afecta a las ventanas de `cmd` que abras después.
+- Sin espacios alrededor del `=`. Las comillas son opcionales, también con
+  espacios en la ruta.
+- La carpeta se crea sola si no existe.
+- Sin esta línea, las copias van a `backups\` dentro del proyecto.
+- Para una copia puntual en otro sitio, pásale la carpeta como argumento, que
+  manda sobre el `.env`: `scripts\backup.bat "D:\otra\carpeta"`.
 
 La carpeta `backups/` del proyecto está en `.gitignore`: son datos reales y no
 deben acabar en el repositorio.
@@ -47,12 +48,16 @@ Con el **Programador de tareas**:
    la que el PC suela estar encendido.
 3. Acción: **Iniciar un programa**.
    - Programa: `C:\Projectes\budget-ai\scripts\backup.bat`
-   - Argumentos: la carpeta de destino entre comillas, por ejemplo
-     `"C:\Users\TU_USUARIO\OneDrive\BudgetAI\copias"`
+   - Argumentos: vacío (la carpeta sale del `.env`).
    - Iniciar en: `C:\Projectes\budget-ai`
-4. Al terminar, abre la tarea → **Configuración** → marca **Ejecutar la tarea
-   lo antes posible después de perder un inicio programado**. Así, si el PC
-   estaba apagado a esa hora, la copia se hace al encenderlo.
+4. Al terminar, abre la tarea:
+   - **General**: deja **Ejecutar solo cuando el usuario haya iniciado
+     sesión**. Sin sesión iniciada, ni Google Drive ni Docker están abiertos.
+   - **Configuración**: marca **Ejecutar la tarea lo antes posible después de
+     perder un inicio programado**. Así, si el PC estaba apagado a esa hora, la
+     copia se hace al encenderlo.
+5. Pruébala: clic derecho sobre la tarea → **Ejecutar**, y comprueba que
+   aparece un fichero nuevo en la carpeta.
 
 Docker Desktop tiene que estar abierto para que la copia funcione. Si no lo
 está, el script falla sin dejar ningún fichero a medias.
