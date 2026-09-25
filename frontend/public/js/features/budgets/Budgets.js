@@ -1,7 +1,8 @@
 import {
     getBudgets, getBudget, createBudget, updateBudget, deleteBudget,
     getBudgetMonthlySummary, setMonthlyIncome, deleteMonthlyIncome,
-    copyPreviousMonthBudgets, getCategories, formatCurrency, escapeHtml
+    copyPreviousMonthBudgets, getCategories, formatCurrency, escapeHtml,
+    getFixedCosts, createFixedCost, updateFixedCost, deleteFixedCost
 } from '../../api.js';
 
 // Tailwind no pot generar classes construïdes en temps d'execució
@@ -43,6 +44,14 @@ const SECTIONS = {
     }
 };
 
+const FREQUENCIES = {
+    MENSUAL: 'Mensual',
+    TRIMESTRAL: 'Trimestral',
+    ANUAL: 'Anual',
+    SETMANAL: 'Semanal',
+    DIARIA: 'Diaria'
+};
+
 const MONTH_NAMES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
     'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
 
@@ -73,6 +82,11 @@ export async function initBudgets(container) {
                 <select id="budget-month" class="px-3 py-2 border rounded-lg bg-white dark:bg-slate-800 dark:border-slate-600">
                     ${MONTH_NAMES.map((monthName, monthIndex) => `<option value="${monthIndex + 1}">${monthName}</option>`).join('')}
                 </select>
+                <button id="fixed-costs-btn" class="px-3 py-2 border rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700 dark:border-slate-600 flex items-center gap-2"
+                        title="Los gastos fijos que se copian a cada mes">
+                    <span class="material-symbols-outlined">event_repeat</span>
+                    Costes fijos
+                </button>
                 <button id="copy-month-btn" class="px-3 py-2 border rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700 dark:border-slate-600 flex items-center gap-2"
                         title="Duplicar aquí las asignaciones del mes anterior">
                     <span class="material-symbols-outlined">content_copy</span>
@@ -88,6 +102,51 @@ export async function initBudgets(container) {
         <div id="salary-header" class="bg-white dark:bg-slate-800 rounded-xl p-5 shadow-sm border border-slate-200 dark:border-slate-700 mb-6"></div>
 
         <div id="budgets-list" class="space-y-6"></div>
+
+        <!-- Costos fixos -->
+        <div id="fixed-costs-modal" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-50 p-4">
+            <div class="bg-white dark:bg-slate-800 rounded-xl p-6 w-full max-w-2xl max-h-full overflow-y-auto">
+                <div class="flex justify-between items-start gap-4 mb-1">
+                    <h3 class="text-xl font-bold">Costes fijos</h3>
+                    <button type="button" id="fixed-costs-close" class="p-1 hover:bg-gray-100 dark:hover:bg-slate-700 rounded" title="Cerrar">
+                        <span class="material-symbols-outlined">close</span>
+                    </button>
+                </div>
+                <p class="text-sm text-gray-500 dark:text-slate-400 mb-4" id="fixed-costs-subtitle"></p>
+
+                <div id="fixed-costs-list" class="space-y-2 mb-4"></div>
+
+                <form id="fixed-cost-form" class="rounded-lg bg-slate-50 dark:bg-slate-700/50 p-4 space-y-3">
+                    <input type="hidden" id="fixed-cost-id">
+                    <div class="font-semibold text-sm" id="fixed-cost-form-title">Añadir un coste fijo</div>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-sm font-medium mb-1" for="fixed-cost-name">Nombre</label>
+                            <input type="text" id="fixed-cost-name" required maxlength="150" class="w-full px-3 py-2 border rounded-lg bg-white dark:bg-slate-700 dark:border-slate-600">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium mb-1" for="fixed-cost-category">Categoría</label>
+                            <select id="fixed-cost-category" required class="w-full px-3 py-2 border rounded-lg bg-white dark:bg-slate-700 dark:border-slate-600"></select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium mb-1" for="fixed-cost-amount">Importe</label>
+                            <input type="number" id="fixed-cost-amount" required step="0.01" min="0" class="w-full px-3 py-2 border rounded-lg bg-white dark:bg-slate-700 dark:border-slate-600">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium mb-1" for="fixed-cost-frequency">Cada cuánto</label>
+                            <select id="fixed-cost-frequency" class="w-full px-3 py-2 border rounded-lg bg-white dark:bg-slate-700 dark:border-slate-600">
+                                ${Object.entries(FREQUENCIES).map(([value, label]) => `<option value="${value}">${label}</option>`).join('')}
+                            </select>
+                        </div>
+                    </div>
+                    <p class="text-xs text-gray-500 dark:text-slate-400" id="fixed-cost-hint"></p>
+                    <div class="flex gap-2 justify-end">
+                        <button type="button" id="fixed-cost-cancel" class="px-4 py-2 border rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700 dark:border-slate-600 hidden">Cancelar</button>
+                        <button type="submit" class="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/90" id="fixed-cost-submit">Añadir</button>
+                    </div>
+                </form>
+            </div>
+        </div>
 
         <!-- Modal -->
         <div id="budget-modal" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-50 p-4">
@@ -156,6 +215,14 @@ export async function initBudgets(container) {
 
     document.getElementById('add-budget-btn').addEventListener('click', () => openModal());
     document.getElementById('copy-month-btn').addEventListener('click', copyPreviousMonth);
+    document.getElementById('fixed-costs-btn').addEventListener('click', openFixedCosts);
+    document.getElementById('fixed-costs-close').addEventListener('click', closeFixedCosts);
+    document.getElementById('fixed-costs-modal').addEventListener('click', (event) => {
+        if (event.target.id === 'fixed-costs-modal') closeFixedCosts();
+    });
+    document.getElementById('fixed-costs-list').addEventListener('click', handleFixedCostListClick);
+    document.getElementById('fixed-cost-form').addEventListener('submit', handleFixedCostSubmit);
+    document.getElementById('fixed-cost-cancel').addEventListener('click', resetFixedCostForm);
     document.getElementById('cancel-btn').addEventListener('click', () => closeModal());
     document.getElementById('budget-form').addEventListener('submit', handleSubmit);
     document.getElementById('budgets-list').addEventListener('click', handleListClick);
@@ -273,7 +340,10 @@ function indexPots(summary) {
 function walkPots(node, potLabel, potAmount) {
     potByCategory.set(node.categoria.id, {
         label: potLabel,
-        base: toNumber(node.base_assignacio) ?? potAmount
+        base: toNumber(node.base_assignacio) ?? potAmount,
+        // El que val el mes segons els costos fixos. És el punt de partida
+        // quan es canvia l'import només d'aquest mes.
+        fixedCost: node.categoria.es_fix ? toNumber(node.prorrateig_mensual) : null
     });
 
     // Els fills es reparteixen el que li ha tocat al pare, sempre que el pare
@@ -651,18 +721,23 @@ function shareBadge(node, style) {
 
 function actionButtons(node, budgetByCategory) {
     const budget = budgetByCategory.get(node.categoria.id);
+    // Una fulla amb cost fix ja té import sense assignar-li res: el que es fa
+    // des d'aquí és canviar-lo només aquest mes, i treure-ho hi torna.
+    const hasFixedCost = toNumber(node.prorrateig_mensual) > 0 && node.categoria.es_fix;
     if (budget) {
         return `
             <button data-action="edit" data-id="${budget.id}" class="p-1 hover:bg-gray-100 dark:hover:bg-slate-700 rounded" title="Cambiar la asignación">
                 <span class="material-symbols-outlined text-sm">edit</span>
             </button>
-            <button data-action="delete" data-id="${budget.id}" class="p-1 hover:bg-red-50 dark:hover:bg-red-500/10 text-red-500 rounded" title="Quitar la asignación">
-                <span class="material-symbols-outlined text-sm">delete</span>
+            <button data-action="delete" data-id="${budget.id}" data-fixed="${hasFixedCost}" class="p-1 hover:bg-red-50 dark:hover:bg-red-500/10 text-red-500 rounded"
+                    title="${hasFixedCost ? 'Volver al coste fijo' : 'Quitar la asignación'}">
+                <span class="material-symbols-outlined text-sm">${hasFixedCost ? 'undo' : 'delete'}</span>
             </button>`;
     }
     return `
-        <button data-action="create" data-category="${node.categoria.id}" class="p-1 hover:bg-gray-100 dark:hover:bg-slate-700 rounded" title="Asignar dinero">
-            <span class="material-symbols-outlined text-sm">add</span>
+        <button data-action="create" data-category="${node.categoria.id}" class="p-1 hover:bg-gray-100 dark:hover:bg-slate-700 rounded"
+                title="${hasFixedCost ? 'Cambiar solo este mes' : 'Asignar dinero'}">
+            <span class="material-symbols-outlined text-sm">${hasFixedCost ? 'edit' : 'add'}</span>
         </button>`;
 }
 
@@ -808,8 +883,22 @@ function openModal(budget = null, presetCategoryId = null) {
         }
     }
 
-    document.getElementById('modal-subtitle').textContent =
-        'Un porcentaje se mide siempre sobre el nivel que tiene encima, no sobre el total de ingresos.';
+    // Si la categoria té cost fix, l'assignació d'aquí el substitueix només
+    // aquest mes. Es parteix del mateix import perquè el normal és retocar-lo,
+    // no escriure'l de nou.
+    const categoryId = Number.parseInt(document.getElementById('budget-category').value, 10);
+    const fixedCost = potByCategory.get(categoryId)?.fixedCost;
+    if (fixedCost > 0) {
+        if (!budget) {
+            document.getElementById('modal-title').textContent = 'Cambiar solo este mes';
+            document.getElementById('budget-limit').value = fixedCost.toFixed(2);
+        }
+        document.getElementById('modal-subtitle').textContent =
+            `Solo para ${MONTH_NAMES[month - 1]} ${year}. El coste fijo es ${formatCurrency(fixedCost)} y no cambia: se edita en «Costes fijos».`;
+    } else {
+        document.getElementById('modal-subtitle').textContent =
+            'Un porcentaje se mide siempre sobre el nivel que tiene encima, no sobre el total de ingresos.';
+    }
 
     refreshPot();
     applyModeToForm();
@@ -829,6 +918,181 @@ function closeModal() {
     const modal = document.getElementById('budget-modal');
     modal.classList.add('hidden');
     modal.classList.remove('flex');
+}
+
+// ============ COSTOS FIXOS ============
+//
+// La plantilla de cada mes: el que s'hi defineix arriba sol a tots els mesos
+// des del que s'està mirant. Canviar l'import d'un sol mes es fa des de la
+// fila de la categoria, no d'aquí.
+
+let loadedFixedCosts = [];
+
+/** Les fulles fixes: les úniques que poden tenir cost fix. */
+function fixedLeaves() {
+    const parentIds = new Set(categories.map(category => category.parent_id).filter(Boolean));
+    return categories.filter(category => category.es_fix && !parentIds.has(category.id));
+}
+
+async function openFixedCosts() {
+    const modal = document.getElementById('fixed-costs-modal');
+    const { year, month } = selectedPeriod();
+
+    document.getElementById('fixed-costs-subtitle').textContent =
+        `Se copian a cada mes. Los cambios valen desde ${MONTH_NAMES[month - 1]} ${year}; los meses anteriores no cambian.`;
+
+    const leaves = fixedLeaves();
+    document.getElementById('fixed-cost-category').innerHTML = leaves.length > 0
+        ? leaves.map(category => `<option value="${category.id}">${escapeHtml(category.nom)}</option>`).join('')
+        : '<option value="">No hay subcategorías fijas</option>';
+
+    resetFixedCostForm();
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+    await loadFixedCosts();
+}
+
+function closeFixedCosts() {
+    const modal = document.getElementById('fixed-costs-modal');
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+}
+
+async function loadFixedCosts() {
+    const list = document.getElementById('fixed-costs-list');
+    const { year, month } = selectedPeriod();
+    try {
+        const response = await getFixedCosts(year, month);
+        loadedFixedCosts = response.costos || [];
+        renderFixedCosts(loadedFixedCosts, toNumber(response.total_mensual) || 0);
+    } catch (error) {
+        list.innerHTML = `<p class="text-red-500 text-sm">${escapeHtml(error.message || 'Error al cargar los costes fijos')}</p>`;
+    }
+}
+
+function renderFixedCosts(fixedCosts, monthlyTotal) {
+    const list = document.getElementById('fixed-costs-list');
+    if (fixedCosts.length === 0) {
+        list.innerHTML = `
+            <p class="text-sm text-gray-500 dark:text-slate-400 text-center py-4">
+                Todavía no hay costes fijos este mes.
+            </p>`;
+        return;
+    }
+
+    const rows = fixedCosts.map(fixedCost => {
+        const frequency = FREQUENCIES[fixedCost.frequencia] || fixedCost.frequencia;
+        const monthly = toNumber(fixedCost.prorrateig_mensual) || 0;
+        const isMonthly = fixedCost.frequencia === 'MENSUAL';
+        return `
+            <div class="flex items-center justify-between gap-3 p-3 rounded-lg border border-slate-200 dark:border-slate-700">
+                <div class="min-w-0">
+                    <div class="font-medium truncate">${escapeHtml(fixedCost.nom)}</div>
+                    <div class="text-xs text-gray-500 dark:text-slate-400">
+                        ${escapeHtml(fixedCost.category?.nom || 'Sin categoría')}
+                        · ${formatCurrency(fixedCost.import)} ${escapeHtml(frequency.toLowerCase())}
+                        ${isMonthly ? '' : ` · ${formatCurrency(monthly)} al mes`}
+                    </div>
+                </div>
+                <div class="flex items-center gap-1 shrink-0">
+                    <span class="font-semibold mr-2">${formatCurrency(monthly)}</span>
+                    <button data-action="edit-fixed" data-id="${fixedCost.id}" class="p-1 hover:bg-gray-100 dark:hover:bg-slate-700 rounded" title="Cambiar desde este mes">
+                        <span class="material-symbols-outlined text-sm">edit</span>
+                    </button>
+                    <button data-action="delete-fixed" data-id="${fixedCost.id}" class="p-1 hover:bg-red-50 dark:hover:bg-red-500/10 text-red-500 rounded" title="Quitar desde este mes">
+                        <span class="material-symbols-outlined text-sm">delete</span>
+                    </button>
+                </div>
+            </div>`;
+    }).join('');
+
+    list.innerHTML = rows + `
+        <div class="flex justify-between px-3 pt-2 text-sm">
+            <span class="text-gray-500 dark:text-slate-400">Total al mes</span>
+            <span class="font-bold">${formatCurrency(monthlyTotal)}</span>
+        </div>`;
+}
+
+function resetFixedCostForm() {
+    document.getElementById('fixed-cost-form').reset();
+    document.getElementById('fixed-cost-id').value = '';
+    document.getElementById('fixed-cost-form-title').textContent = 'Añadir un coste fijo';
+    document.getElementById('fixed-cost-submit').textContent = 'Añadir';
+    document.getElementById('fixed-cost-cancel').classList.add('hidden');
+    document.getElementById('fixed-cost-frequency').value = 'MENSUAL';
+    document.getElementById('fixed-cost-hint').textContent = '';
+}
+
+async function handleFixedCostListClick(event) {
+    const button = event.target.closest('button[data-action]');
+    if (!button) return;
+
+    const id = Number.parseInt(button.dataset.id, 10);
+    const fixedCost = loadedFixedCosts.find(candidate => candidate.id === id);
+    if (!fixedCost) return;
+    const { year, month } = selectedPeriod();
+
+    if (button.dataset.action === 'edit-fixed') {
+        document.getElementById('fixed-cost-id').value = fixedCost.id;
+        document.getElementById('fixed-cost-name').value = fixedCost.nom;
+        document.getElementById('fixed-cost-category').value = fixedCost.category?.id ?? '';
+        document.getElementById('fixed-cost-amount').value = fixedCost.import;
+        document.getElementById('fixed-cost-frequency').value = fixedCost.frequencia;
+        document.getElementById('fixed-cost-form-title').textContent = `Cambiar «${fixedCost.nom}»`;
+        document.getElementById('fixed-cost-submit').textContent = 'Guardar';
+        document.getElementById('fixed-cost-cancel').classList.remove('hidden');
+        document.getElementById('fixed-cost-hint').textContent =
+            `Vale desde ${MONTH_NAMES[month - 1]} ${year}. Los meses anteriores se quedan con el importe de antes.`;
+        document.getElementById('fixed-cost-name').focus();
+        return;
+    }
+
+    if (button.dataset.action === 'delete-fixed') {
+        if (!confirm(`¿Quitar «${fixedCost.nom}» desde ${MONTH_NAMES[month - 1]} ${year}?\nLos meses anteriores lo conservan.`)) return;
+        try {
+            await deleteFixedCost(id, year, month);
+            resetFixedCostForm();
+            await Promise.all([loadFixedCosts(), loadSummary()]);
+        } catch (error) {
+            alert(error.message || 'Error al quitar el coste fijo');
+        }
+    }
+}
+
+async function handleFixedCostSubmit(event) {
+    event.preventDefault();
+    const { year, month } = selectedPeriod();
+    const id = Number.parseInt(document.getElementById('fixed-cost-id').value, 10);
+    const categoryId = Number.parseInt(document.getElementById('fixed-cost-category').value, 10);
+    const amount = toNumber(document.getElementById('fixed-cost-amount').value);
+
+    if (!Number.isInteger(categoryId)) {
+        alert('Primero marca alguna subcategoría como «fijo» en Categorías.');
+        return;
+    }
+    if (amount == null || amount < 0) {
+        alert('Introduce un importe positivo.');
+        return;
+    }
+
+    const data = {
+        nom: document.getElementById('fixed-cost-name').value.trim(),
+        category: { id: categoryId },
+        import: amount,
+        frequencia: document.getElementById('fixed-cost-frequency').value
+    };
+
+    try {
+        if (Number.isInteger(id)) {
+            await updateFixedCost(id, year, month, data);
+        } else {
+            await createFixedCost(year, month, data);
+        }
+        resetFixedCostForm();
+        await Promise.all([loadFixedCosts(), loadSummary()]);
+    } catch (error) {
+        alert(error.message || 'Error al guardar el coste fijo');
+    }
 }
 
 async function handleHeaderClick(event) {
@@ -869,7 +1133,10 @@ async function handleListClick(event) {
     }
 
     if (action === 'delete') {
-        if (!confirm('¿Quitar esta asignación?')) return;
+        const question = button.dataset.fixed === 'true'
+            ? '¿Volver al coste fijo en este mes?'
+            : '¿Quitar esta asignación?';
+        if (!confirm(question)) return;
         try {
             await deleteBudget(id);
             await loadSummary();

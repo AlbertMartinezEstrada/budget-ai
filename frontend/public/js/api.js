@@ -486,6 +486,42 @@ export async function processRecurring() {
     return handleResponse(response);
 }
 
+// ============ COSTOS FIXOS ============
+// Tots porten el mes des del qual valen: els mesos anteriors no canvien.
+function fixedCostPeriod(year, month) {
+    return new URLSearchParams({ year, month }).toString();
+}
+
+export async function getFixedCosts(year, month) {
+    const response = await apiFetch(`/fixed-costs?${fixedCostPeriod(year, month)}`);
+    return handleResponse(response);
+}
+
+export async function createFixedCost(year, month, data) {
+    const response = await apiFetch(`/fixed-costs?${fixedCostPeriod(year, month)}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+    });
+    return handleResponse(response);
+}
+
+export async function updateFixedCost(id, year, month, data) {
+    const response = await apiFetch(`/fixed-costs/${id}?${fixedCostPeriod(year, month)}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+    });
+    return handleResponse(response);
+}
+
+export async function deleteFixedCost(id, year, month) {
+    const response = await apiFetch(`/fixed-costs/${id}?${fixedCostPeriod(year, month)}`, {
+        method: 'DELETE',
+    });
+    return handleResponse(response);
+}
+
 // ============ FINANCIAL GOALS ============
 export async function getGoals() {
     const response = await apiFetch(`/goals`);
