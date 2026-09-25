@@ -34,12 +34,12 @@ export function showLogin({ onSuccess, message } = {}) {
     document.body.appendChild(screen);
 
     const form = screen.querySelector('#login-form');
-    const errorEl = screen.querySelector('#login-error');
+    const errorElement = screen.querySelector('#login-error');
     const submit = screen.querySelector('#login-submit');
 
     form.addEventListener('submit', async (event) => {
         event.preventDefault();
-        errorEl.textContent = '';
+        errorElement.textContent = '';
         submit.disabled = true;
         submit.textContent = 'Entrant…';
 
@@ -52,7 +52,7 @@ export function showLogin({ onSuccess, message } = {}) {
             onSuccess?.(user);
         } catch (error) {
             // El backend no diu mai si ha fallat l'usuari o la contrasenya.
-            errorEl.textContent = error.message || 'No s\'ha pogut iniciar la sessió';
+            errorElement.textContent = error.message || 'No s\'ha pogut iniciar la sessió';
             screen.querySelector('#login-password').value = '';
             screen.querySelector('#login-password').focus();
         } finally {

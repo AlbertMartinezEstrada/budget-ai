@@ -63,10 +63,10 @@ export async function initAnalytics(container) {
     `;
 
     const yearSelect = document.getElementById('year-select');
-    for (let y = currentYear; y >= currentYear - 5; y--) {
+    for (let year = currentYear; year >= currentYear - 5; year--) {
         const option = document.createElement('option');
-        option.value = y;
-        option.textContent = y;
+        option.value = year;
+        option.textContent = year;
         yearSelect.appendChild(option);
     }
     // El valor s'ha d'assignar després de crear les opcions, no abans.
@@ -119,20 +119,20 @@ function renderCategories(categories) {
         return;
     }
 
-    const total = categories.reduce((sum, cat) => sum + (cat.total || 0), 0);
+    const total = categories.reduce((sum, slice) => sum + (slice.total || 0), 0);
     const colors = ['#4f46e5', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#ec4899', '#84cc16'];
 
-    container.innerHTML = categories.map((cat, idx) => {
-        const percent = total > 0 ? ((cat.total || 0) / total) * 100 : 0;
-        const color = colors[idx % colors.length];
+    container.innerHTML = categories.map((slice, index) => {
+        const percent = total > 0 ? ((slice.total || 0) / total) * 100 : 0;
+        const color = colors[index % colors.length];
 
         return `
             <div class="flex items-center gap-3">
                 <div class="w-3 h-3 rounded-full" style="background-color: ${color}"></div>
                 <div class="flex-1">
                     <div class="flex justify-between text-sm">
-                        <span class="font-medium">${escapeHtml(cat.category || 'Sin categoría')}</span>
-                        <span class="text-gray-600 dark:text-slate-300">${formatCurrency(cat.total)} (${percent.toFixed(0)}%)</span>
+                        <span class="font-medium">${escapeHtml(slice.category || 'Sin categoría')}</span>
+                        <span class="text-gray-600 dark:text-slate-300">${formatCurrency(slice.total)} (${percent.toFixed(0)}%)</span>
                     </div>
                     <div class="h-2 bg-gray-200 dark:bg-slate-700 rounded-full mt-1">
                         <div class="h-full rounded-full transition-all" style="width: ${percent}%; background-color: ${color}"></div>
@@ -153,7 +153,7 @@ function renderTrend(trend) {
     // L'escala ha de contemplar ingressos i despeses: si només mira les
     // despeses, les barres d'ingressos se'n surten quan són més grans.
     const maxValue = Math.max(
-        ...trend.map(t => Math.max(t.total_income || 0, t.total_expense || 0)),
+        ...trend.map(month => Math.max(month.total_income || 0, month.total_expense || 0)),
         1
     );
 

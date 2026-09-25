@@ -95,8 +95,8 @@ public class TransferController {
 
             return ResponseEntity.ok(saved);
 
-        } catch (Exception e) {
-            throw new TransferFailedException(e.getMessage());
+        } catch (Exception exception) {
+            throw new TransferFailedException(exception.getMessage());
         }
     }
 

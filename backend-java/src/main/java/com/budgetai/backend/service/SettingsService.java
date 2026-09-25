@@ -34,21 +34,21 @@ public class SettingsService {
     public Settings updateSettings(Settings settings) {
         Optional<Settings> existing = settingsRepository.findFirstBy();
         if (existing.isPresent()) {
-            Settings s = existing.get();
-            if (settings.getUserName() != null) s.setUserName(settings.getUserName());
-            if (settings.getUserEmail() != null) s.setUserEmail(settings.getUserEmail());
-            if (settings.getCurrency() != null) s.setCurrency(settings.getCurrency());
-            if (settings.getTheme() != null) s.setTheme(settings.getTheme());
-            if (settings.getNotificationsExpenses() != null) s.setNotificationsExpenses(settings.getNotificationsExpenses());
-            if (settings.getNotificationsBudget() != null) s.setNotificationsBudget(settings.getNotificationsBudget());
-            if (settings.getNotificationsMonthly() != null) s.setNotificationsMonthly(settings.getNotificationsMonthly());
+            Settings stored = existing.get();
+            if (settings.getUserName() != null) stored.setUserName(settings.getUserName());
+            if (settings.getUserEmail() != null) stored.setUserEmail(settings.getUserEmail());
+            if (settings.getCurrency() != null) stored.setCurrency(settings.getCurrency());
+            if (settings.getTheme() != null) stored.setTheme(settings.getTheme());
+            if (settings.getNotificationsExpenses() != null) stored.setNotificationsExpenses(settings.getNotificationsExpenses());
+            if (settings.getNotificationsBudget() != null) stored.setNotificationsBudget(settings.getNotificationsBudget());
+            if (settings.getNotificationsMonthly() != null) stored.setNotificationsMonthly(settings.getNotificationsMonthly());
             // Un import negatiu vol dir "esborra'l", igual que a la resta de
             // l'API: sense això no hi hauria manera de treure el sou un cop posat.
             if (settings.getExpectedMonthlyIncome() != null) {
-                s.setExpectedMonthlyIncome(settings.getExpectedMonthlyIncome().signum() < 0
+                stored.setExpectedMonthlyIncome(settings.getExpectedMonthlyIncome().signum() < 0
                         ? null : settings.getExpectedMonthlyIncome());
             }
-            return settingsRepository.save(s);
+            return settingsRepository.save(stored);
         }
         return settingsRepository.save(settings);
     }

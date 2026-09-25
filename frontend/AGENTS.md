@@ -32,7 +32,7 @@ test/                 tests con el ejecutor integrado de Node
 ## Comandos
 
 ```bash
-npm test        # 17 tests, sin dependencias externas
+npm test        # 18 tests, sin dependencias externas
 npm ci          # instalar exactamente las versiones del lockfile
 ```
 

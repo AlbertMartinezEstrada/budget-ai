@@ -78,13 +78,13 @@ function updateStats(transactions) {
     let income = 0;
     let expense = 0;
 
-    transactions.forEach(t => {
-        const amount = parseFloat(t.cost || 0);
+    transactions.forEach(transaction => {
+        const amount = parseFloat(transaction.cost || 0);
         // Check type. If not present, assume expense if amount is positive? 
         // Usually banks give negative for expense. 
         // But our backend seems to store absolute value in 'amount' and type in 'type'.
         
-        if (t.type === 'INCOME') {
+        if (transaction.type === 'INCOME') {
             income += amount;
         } else {
             // EXPENSE or undefined (default to expense)
@@ -97,48 +97,48 @@ function updateStats(transactions) {
     document.getElementById('total-ingressos').textContent = formatCurrency(income);
     document.getElementById('total-despeses').textContent = formatCurrency(expense);
     
-    const balanceEl = document.getElementById('balanc-net');
-    balanceEl.textContent = formatCurrency(balance);
+    const balanceElement = document.getElementById('balanc-net');
+    balanceElement.textContent = formatCurrency(balance);
     
     if (balance >= 0) {
-        balanceEl.classList.add('text-success');
-        balanceEl.classList.remove('text-error');
+        balanceElement.classList.add('text-success');
+        balanceElement.classList.remove('text-error');
     } else {
-        balanceEl.classList.add('text-error');
-        balanceEl.classList.remove('text-success');
+        balanceElement.classList.add('text-error');
+        balanceElement.classList.remove('text-success');
     }
 }
 
 function renderTopCategories(transactions) {
     // Filter only expenses for categories
-    const expenses = transactions.filter(t => t.type !== 'INCOME');
+    const expenses = transactions.filter(transaction => transaction.type !== 'INCOME');
     const categories = {};
     
-    expenses.forEach(t => {
-        const cat = t.categoria || 'Altres';
-        categories[cat] = (categories[cat] || 0) + parseFloat(t.cost || 0);
+    expenses.forEach(transaction => {
+        const categoryName = transaction.categoria || 'Altres';
+        categories[categoryName] = (categories[categoryName] || 0) + parseFloat(transaction.cost || 0);
     });
 
-    const sortedCats = Object.entries(categories)
-        .sort((a, b) => b[1] - a[1])
+    const sortedCategories = Object.entries(categories)
+        .sort((firstEntry, secondEntry) => secondEntry[1] - firstEntry[1])
         .slice(0, 5);
 
     const container = document.getElementById('top-categories-list');
     
-    if (sortedCats.length === 0) {
+    if (sortedCategories.length === 0) {
         container.innerHTML = '<div class="text-center text-sm text-gray-500">No hi ha dades de despeses.</div>';
         return;
     }
 
-    const maxVal = sortedCats[0][1];
+    const maxValue = sortedCategories[0][1];
 
-    container.innerHTML = sortedCats.map(([name, value]) => `
+    container.innerHTML = sortedCategories.map(([name, value]) => `
         <div class="flex items-center justify-between text-sm">
             <span class="font-medium text-gray-700">${escapeHtml(name)}</span>
             <span class="font-bold text-gray-900">${formatCurrency(value)}</span>
         </div>
         <div class="w-full bg-gray-200 rounded-full h-2.5">
-            <div class="bg-indigo-600 h-2.5 rounded-full" style="width: ${(value / maxVal) * 100}%"></div>
+            <div class="bg-indigo-600 h-2.5 rounded-full" style="width: ${(value / maxValue) * 100}%"></div>
         </div>
     `).join('');
 }
@@ -152,16 +152,16 @@ function renderRecentTransactions(transactions) {
         return;
     }
 
-    tbody.innerHTML = recent.map(t => {
-        const isIncome = t.type === 'INCOME';
+    tbody.innerHTML = recent.map(transaction => {
+        const isIncome = transaction.type === 'INCOME';
         const amountClass = isIncome ? 'text-success' : 'text-error';
         const sign = isIncome ? '+' : '-';
         
         return `
         <tr>
-            <td class="text-sm text-gray-500">${new Date(t.data).toLocaleDateString()}</td>
-            <td class="font-medium text-gray-900">${escapeHtml(t.empresa || 'Desconegut')}</td>
-            <td class="text-right font-bold ${amountClass}">${sign}${formatCurrency(parseFloat(t.cost))}</td>
+            <td class="text-sm text-gray-500">${new Date(transaction.data).toLocaleDateString()}</td>
+            <td class="font-medium text-gray-900">${escapeHtml(transaction.empresa || 'Desconegut')}</td>
+            <td class="text-right font-bold ${amountClass}">${sign}${formatCurrency(parseFloat(transaction.cost))}</td>
         </tr>
     `}).join('');
 }

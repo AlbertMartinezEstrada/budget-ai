@@ -30,9 +30,9 @@ docker compose up -d --build          # levantar todo
 docker compose up -d --build backend  # aplicar cambios de Java
 docker compose logs -f backend        # logs
 
-cd backend-java && ./gradlew test              # 98 unitarios, sin Docker
+cd backend-java && ./gradlew test              # 99 unitarios, sin Docker
 cd backend-java && ./gradlew integrationTest   # 91, requieren Docker
-cd frontend && npm test                        # 17
+cd frontend && npm test                        # 18
 ```
 
 **Ejecuta los tests antes de dar nada por terminado.** El backend hay que
@@ -257,6 +257,16 @@ un fichero con un token y hubo que deshacerlo.
 - **Interfaz**: mezcla catalán y castellano según la vista. Es deuda conocida.
 - Los comentarios explican **por qué**, no qué. Especialmente si algo parece
   raro: casi siempre lo parece porque arregla un fallo concreto.
+- **Los nombres dicen qué es cada cosa.** El código se tiene que entender
+  leyéndolo sin los comentarios, así que nada de variables de una letra ni
+  abreviaturas: `transaction` y no `t`, `category` y no `c` ni `cat`,
+  `exception` o `error` y no `e`, `cancelButton` y no `cancelBtn`. Vale
+  también para lambdas, parámetros de `catch` y bucles: `(first, second) ->` y
+  no `(a, b) ->`. Si el nombre obvio ya está cogido en ese ámbito, busca otro
+  que diga la diferencia (`candidate`, `stored`) en vez de acortarlo.
+  `NamingConventionTest` (backend) y `contract.test.js` (frontend) fallan con
+  cualquier variable de una sola letra; las abreviaturas no las detectan, así
+  que ahí depende de quien escribe.
 
 ## Trampas conocidas
 

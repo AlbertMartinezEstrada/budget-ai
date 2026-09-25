@@ -53,13 +53,13 @@ class ManualTransactionIntegrationTest extends AbstractIntegrationTest {
     }
 
     private Transaction manual(String amount, String type) {
-        Transaction t = new Transaction();
-        t.setAmount(new BigDecimal(amount));
-        t.setDate(LocalDate.of(2026, 8, 14));
-        t.setType(type);
-        t.setCategoryName("Altres");
-        t.setCompanyName("Bar de la cantonada");
-        return t;
+        Transaction transaction = new Transaction();
+        transaction.setAmount(new BigDecimal(amount));
+        transaction.setDate(LocalDate.of(2026, 8, 14));
+        transaction.setType(type);
+        transaction.setCategoryName("Altres");
+        transaction.setCompanyName("Bar de la cantonada");
+        return transaction;
     }
 
     private BigDecimal balance() {
@@ -181,8 +181,8 @@ class ManualTransactionIntegrationTest extends AbstractIntegrationTest {
         transactionController.createTransaction(manual("33.33", "EXPENSE"));
         transactionController.createTransaction(manual("10.00", "INCOME"));
 
-        for (Transaction t : List.copyOf(transactionRepository.findAll())) {
-            transactionController.deleteTransaction(t.getId());
+        for (Transaction transaction : List.copyOf(transactionRepository.findAll())) {
+            transactionController.deleteTransaction(transaction.getId());
         }
 
         // Amb double, anar i tornar deixava restes com 999.9999999999999.
@@ -305,12 +305,12 @@ class ManualTransactionIntegrationTest extends AbstractIntegrationTest {
             categoryRepository.save(leaf);
         }
 
-        Transaction t = manual("10.00", "EXPENSE");
-        t.setCategoryName("ZZ Grup de prova");
+        Transaction transaction = manual("10.00", "EXPENSE");
+        transaction.setCategoryName("ZZ Grup de prova");
 
         // Penjat d'un grup, el moviment es comptaria dues vegades: per ell
         // mateix i en agregar els fills.
-        assertThatThrownBy(() -> transactionController.createTransaction(t))
+        assertThatThrownBy(() -> transactionController.createTransaction(transaction))
                 .hasMessageContaining("és un grup");
 
         assertThat(transactionRepository.findAll()).isEmpty();

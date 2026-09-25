@@ -63,7 +63,7 @@ public class TransactionHasher {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
             return Base64.getEncoder().encodeToString(
                     digest.digest(input.getBytes(StandardCharsets.UTF_8)));
-        } catch (NoSuchAlgorithmException e) {
+        } catch (NoSuchAlgorithmException exception) {
             // SHA-256 sempre hi és; si mai faltés, val més una identitat
             // llegible que no pas cap.
             return input;

@@ -99,6 +99,13 @@ que la contrasenya no es desi mai en clar; que faltar una credencial faci
 fallar l'arrencada en comptes de deixar l'API oberta; i que el límit d'intents
 bloquegi al cinquè error i es desbloquegi sol.
 
+### `NamingConventionTest`
+
+Recorre tot `src` i falla si hi troba una variable d'una sola lletra (`t ->`,
+`catch (Exception e)`, `Transaction t = ...`). Abans en llegir el codi calia
+buscar d'on sortia cada `t` per saber què era. Buida comentaris i literals
+abans de mirar-ho, perquè un comentari en català com "t'ho" no la faci saltar.
+
 ### `frontend/test/api.test.js`
 
 `formatCurrency` amb valors buits i `escapeHtml`. El primer llançava un
@@ -110,7 +117,8 @@ barrera contra dades del CSV del banc i de la resposta de Gemini.
 Guàrdia contra patrons concrets que ja han fallat: noms de camp inexistents,
 URLs del backend escrites a mà fora d'`api.js`, `onclick` amb dades
 interpolades, classes de Tailwind construïdes en temps d'execució i vistes que
-interpolen dades sense escapar-les.
+interpolen dades sense escapar-les. També que cap variable es digui amb una
+sola lletra.
 
 No comprova que el codi sigui correcte; comprova que no tornin errors coneguts.
 Analitza el codi amb els comentaris eliminats, perquè uns quants comentaris

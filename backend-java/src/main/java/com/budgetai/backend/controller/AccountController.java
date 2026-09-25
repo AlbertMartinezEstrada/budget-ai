@@ -44,7 +44,7 @@ public class AccountController {
         try {
             Account updated = accountService.updateAccount(id, account);
             return ResponseEntity.ok(updated);
-        } catch (RuntimeException e) {
+        } catch (RuntimeException exception) {
             return ResponseEntity.notFound().build();
         }
     }
@@ -54,10 +54,10 @@ public class AccountController {
         try {
             accountService.deleteAccount(id);
             return ResponseEntity.ok(Map.of("message", "Account deleted successfully"));
-        } catch (IllegalStateException e) {
+        } catch (IllegalStateException exception) {
             // El compte té moviments o transferències: abans això petava com a
             // violació de clau forana i arribava com un 500 sense explicació.
-            return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("error", e.getMessage()));
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("error", exception.getMessage()));
         }
     }
 
@@ -79,7 +79,7 @@ public class AccountController {
                     .orElseThrow(() -> new RuntimeException("Account not found"));
 
             return ResponseEntity.ok(updated);
-        } catch (Exception e) {
+        } catch (Exception exception) {
             return ResponseEntity.badRequest().build();
         }
     }
