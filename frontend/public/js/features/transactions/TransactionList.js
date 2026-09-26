@@ -1,5 +1,5 @@
 import {
-    getTransactions, getCategories, getCompanies, getAccounts,
+    getTransactions, getCategories, getCompanies, getAccounts, getDebts,
     createTransaction, updateTransaction, deleteTransaction, formatCurrency, escapeHtml
 } from '../../api.js';
 
@@ -16,6 +16,19 @@ const TYPES = {
 
 const typeOf = (transaction) => TYPES[transaction.type] ? transaction.type : 'EXPENSE';
 
+/**
+ * La categoria que toca a un moviment d'un deute, segons el sentit.
+ *
+ * Un préstec compta al pressupost pels moviments: el que em deixen eixampla
+ * el que es pot repartir, i el que torno n'és una despesa. Triar el deute
+ * proposa la categoria perquè no s'hagi de recordar quina és; si el moviment
+ * és una altra cosa (el sopar que un amic em va pagar), es pot canviar.
+ */
+const DEBT_CATEGORIES = {
+    DEC: { INCOME: 'Préstecs rebuts', EXPENSE: 'Pagament de deutes' },
+    EM_DEUEN: { EXPENSE: 'Préstecs fets', INCOME: 'Cobrament de préstecs' }
+};
+
 const MONTH_FORMATTER = new Intl.DateTimeFormat('ca-ES', {
     month: 'long',
     year: 'numeric'
@@ -23,6 +36,9 @@ const MONTH_FORMATTER = new Intl.DateTimeFormat('ca-ES', {
 
 let currentSortMode = 'month-desc';
 let currentTransactions = [];
+// Per posar nom a l'etiqueta dels moviments vinculats: el moviment només porta
+// l'identificador del deute.
+let debtsById = new Map();
 // La fixa setUpManualEntry, que és qui té el formulari a mà, i la crida el
 // listener de la taula, que viu fora.
 let openEditor = () => {};
@@ -141,6 +157,13 @@ export async function initTransactions(container) {
                         <select id="new-account" class="form-control"></select>
                     </div>
                     <div>
+                        <label class="block text-sm font-medium mb-1" for="new-debt">Deute</label>
+                        <select id="new-debt" class="form-control"></select>
+                        <p class="text-xs text-gray-500 dark:text-slate-400 mt-1">
+                            Si és un préstec o la seva devolució. El que queda per tornar surt d'aquí.
+                        </p>
+                    </div>
+                    <div>
                         <label class="block text-sm font-medium mb-1" for="new-description">Descripció</label>
                         <input type="text" id="new-description" class="form-control" placeholder="Opcional">
                     </div>
@@ -167,6 +190,12 @@ export async function initTransactions(container) {
     // Load Filters
     const categories = await getCategories();
     const companies = await getCompanies();
+    // Sense deutes la llista funciona igual: només es queda sense etiquetes.
+    const debts = await getDebts().catch(error => {
+        console.error('Error carregant deutes:', error);
+        return [];
+    });
+    debtsById = new Map(debts.map(debt => [debt.id, debt]));
     
     const categorySelect = document.getElementById('filter-category');
     categories.forEach(category => {
@@ -228,7 +257,7 @@ export async function initTransactions(container) {
     // interpolades, que es trenca amb un nom com O'Brien.
     document.getElementById('transactions-body').addEventListener('click', handleRowAction);
 
-    setUpManualEntry(categories, companies);
+    setUpManualEntry(categories, companies, debts);
 }
 
 async function handleRowAction(event) {
@@ -266,7 +295,7 @@ async function handleRowAction(event) {
  * seus fills, i un moviment penjat d'un grup es comptaria dues vegades: el
  * backend ho rebutja, així que val més no oferir-ho.
  */
-function setUpManualEntry(categories, companies) {
+function setUpManualEntry(categories, companies, debts) {
     const modal = document.getElementById('transaction-modal');
     const form = document.getElementById('transaction-form');
     const error = document.getElementById('transaction-form-error');
@@ -283,6 +312,25 @@ function setUpManualEntry(categories, companies) {
     document.getElementById('new-category').innerHTML = leaves
         .map(category => `<option value="${escapeHtml(category.nom)}">${escapeHtml(category.nom)}</option>`)
         .join('');
+
+    // Els saldats també hi són: un moviment antic pot ser d'un deute ja
+    // tornat, i editar-lo no l'ha de desvincular.
+    document.getElementById('new-debt').innerHTML = [
+        '<option value="">Cap</option>',
+        ...debts.map(debt => `<option value="${debt.id}">
+            ${escapeHtml(debt.nom)} (${debt.direccio === 'DEC' ? 'dec' : 'em deuen'}${debt.saldat ? ', saldat' : ''})
+        </option>`)
+    ].join('');
+
+    const leafNames = new Set(leaves.map(category => category.nom));
+    document.getElementById('new-debt').addEventListener('change', (event) => {
+        const debt = debtsById.get(Number.parseInt(event.target.value, 10));
+        if (!debt) return;
+        const suggested = DEBT_CATEGORIES[debt.direccio]?.[document.getElementById('new-type').value];
+        if (suggested && leafNames.has(suggested)) {
+            document.getElementById('new-category').value = suggested;
+        }
+    });
 
     document.getElementById('company-suggestions').innerHTML = companies
         .map(category => `<option value="${escapeHtml(category.nom)}"></option>`)
@@ -333,6 +381,7 @@ function setUpManualEntry(categories, companies) {
         document.getElementById('new-company').value = transaction.empresa || '';
         document.getElementById('new-description').value = transaction.descripcio_curta || '';
         document.getElementById('new-excluded').checked = Boolean(transaction.exclos_pressupost);
+        document.getElementById('new-debt').value = transaction.deute_id ? String(transaction.deute_id) : '';
         if (transaction.account?.id) {
             document.getElementById('new-account').value = transaction.account.id;
         }
@@ -367,7 +416,10 @@ function setUpManualEntry(categories, companies) {
             categoria: document.getElementById('new-category').value,
             empresa: document.getElementById('new-company').value.trim() || 'Desconegut',
             descripcio_curta: document.getElementById('new-description').value.trim(),
-            exclos_pressupost: document.getElementById('new-excluded').checked
+            exclos_pressupost: document.getElementById('new-excluded').checked,
+            // -1 desvincula: en una edició, no enviar-lo deixaria el vincle
+            // que hi havia.
+            deute_id: Number.parseInt(document.getElementById('new-debt').value, 10) || -1
         };
         if (Number.isInteger(accountId)) payload.account = { id: accountId };
 
@@ -513,6 +565,11 @@ function buildTransactionRow(transaction) {
                 ${escapeHtml(transaction.empresa || '-')}
                 ${transaction.exclos_pressupost
                     ? '<span class="badge badge-outline text-sm" title="Diners ja comptats en sortir del compte principal: no compten al pressupost">no compta</span>'
+                    : ''}
+                ${transaction.deute_id
+                    ? `<span class="badge badge-outline text-sm" title="Vinculat a un deute: compta per saber quant queda per tornar">
+                           deute: ${escapeHtml(debtsById.get(transaction.deute_id)?.nom || '?')}
+                       </span>`
                     : ''}
             </td>
             <td><span class="badge badge-outline">${escapeHtml(transaction.categoria || '-')}</span></td>
