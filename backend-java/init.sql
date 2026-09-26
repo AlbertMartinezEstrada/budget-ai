@@ -36,6 +36,30 @@ CREATE TABLE IF NOT EXISTS accounts (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Deutes i préstecs, en els dos sentits: el que dec i el que em deuen.
+-- No són ni un ingrés ni una despesa: quan em deixen 1.000 € el saldo puja però
+-- no soc més ric. Aquí només es porta qui deu què i com s'ha acordat tornar-ho.
+-- El que ja s'ha retornat no es desa: surt dels moviments vinculats
+-- (transactions.deute_id), perquè dues xifres acabarien no quadrant.
+CREATE TABLE IF NOT EXISTS debts (
+    id BIGSERIAL PRIMARY KEY,
+    nom VARCHAR(150) NOT NULL,
+    -- DEC: me'ls han deixat. EM_DEUEN: els he deixat jo.
+    direccio VARCHAR(10) NOT NULL CHECK (direccio IN ('DEC', 'EM_DEUEN')),
+    import DECIMAL(15, 2) NOT NULL CHECK (import > 0),
+    data DATE NOT NULL,
+    -- LLIURE: sense calendari. UNIC: tot de cop a data_primer_pagament.
+    -- QUOTES: "quota" cada "frequencia" des de data_primer_pagament.
+    forma_retorn VARCHAR(10) NOT NULL DEFAULT 'LLIURE' CHECK (forma_retorn IN ('LLIURE', 'UNIC', 'QUOTES')),
+    quota DECIMAL(15, 2) CHECK (quota IS NULL OR quota > 0),
+    frequencia VARCHAR(20) CHECK (frequencia IN ('SETMANAL', 'MENSUAL', 'TRIMESTRAL')),
+    data_primer_pagament DATE,
+    -- Fulla on el pressupost reserva les quotes d'un deute que dec.
+    category_id BIGINT REFERENCES categories(id) ON DELETE SET NULL,
+    notes TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 -- Taula de Transaccions (Evolució de 'despeses')
 CREATE TABLE IF NOT EXISTS transactions (
     id BIGSERIAL PRIMARY KEY,
@@ -54,6 +78,9 @@ CREATE TABLE IF NOT EXISTS transactions (
     -- facin després (arribar a un altre compte, comprar-hi alguna cosa) mou
     -- saldos però no torna a comptar al pressupost.
     exclos_pressupost BOOLEAN NOT NULL DEFAULT FALSE,
+    -- Deute que mou: una devolució, o l'entrada o sortida del préstec. És
+    -- independent de la categoria, que és la que diu com compta al pressupost.
+    deute_id BIGINT REFERENCES debts(id) ON DELETE SET NULL,
     hash_verificacio VARCHAR(64), -- Per evitar duplicats
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 
@@ -182,6 +209,7 @@ INSERT INTO categories (nom, tipus_cost) VALUES
 ('Trade Republic', 'VARIABLE'), ('Gastos compartits', 'VARIABLE'),
 ('Fons d''inversió', 'VARIABLE'), ('Gast mensual', 'VARIABLE'),
 ('Inversió de risc', 'VARIABLE'), ('Regals i altres', 'VARIABLE'),
+('Deutes i préstecs', 'FIXED'),
 ('Ingressos', 'INCOME')
 ON CONFLICT (nom) DO NOTHING;
 
@@ -217,10 +245,17 @@ FROM (VALUES
     ('Regals i detalls', 'Regals i altres', 'VARIABLE'),
     ('Altres', 'Regals i altres', 'VARIABLE'),
     ('Inversions', 'Fons d''inversió', 'VARIABLE'),
+    -- Tornar un préstec és un compromís de cada mes, com un cost fix: les
+    -- quotes pactades s'hi reserven soles. Deixar diners, en canvi, és puntual.
+    ('Pagament de deutes', 'Deutes i préstecs', 'FIXED'),
+    ('Préstecs fets', 'Deutes i préstecs', 'VARIABLE'),
     -- A les fulles d'ingrés, tipus_cost no vol dir res: no es prorrategen ni
     -- es comparen amb un sostre, es mesuren pel que hi ha entrat.
     ('Nòmina', 'Ingressos', NULL), ('Ingressos Altres', 'Ingressos', NULL),
-    ('Regals i premis', 'Ingressos', NULL)
+    ('Regals i premis', 'Ingressos', NULL),
+    -- Separades de la nòmina: un préstec eixampla el que es pot repartir aquell
+    -- mes, però no és sou, i barrejat amb la resta no es distingiria.
+    ('Préstecs rebuts', 'Ingressos', NULL), ('Cobrament de préstecs', 'Ingressos', NULL)
 ) AS sub(nom, bloc, natura)
 ON CONFLICT (nom) DO NOTHING;
 

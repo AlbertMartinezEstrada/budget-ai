@@ -36,6 +36,9 @@ public class BudgetService {
     @Autowired
     private IncomeBaseService incomeBaseService;
 
+    @Autowired
+    private DebtService debtService;
+
     // El gasto acumulat es calcula sempre. Abans només s'omplia a
     // getActiveBudgetsForDate, de manera que el llistat general enviava
     // "gasto_actual" a null i la barra de progrés sortia sempre al 0%.
@@ -350,9 +353,10 @@ public class BudgetService {
         Map<Long, BigDecimal> amountsByCategory = monthlyAmounts(from, to);
         Map<Long, BigDecimal> percentagesByCategory = monthlyPercentages(from, to);
         Map<Long, List<RecurringTransaction>> recurringByCategory = activeRecurringByCategory(from, to);
+        Map<Long, BigDecimal> debtInstallmentsByCategory = debtService.installmentsDueByCategory(from, to);
 
         Context context = new Context(tree, amountsByCategory, percentagesByCategory,
-                recurringByCategory, from, to, salary);
+                recurringByCategory, debtInstallmentsByCategory, from, to, salary);
 
         BigDecimal realIncome = realIncomeIn(from, to);
         // El que hi ha per repartir surt de la secció d'ingressos: la nòmina hi
@@ -571,6 +575,7 @@ public class BudgetService {
         private final Map<Long, BigDecimal> amounts;
         private final Map<Long, BigDecimal> percentages;
         private final Map<Long, List<RecurringTransaction>> recurring;
+        private final Map<Long, BigDecimal> debtInstallments;
         private final LocalDate from;
         private final LocalDate to;
         private final BigDecimal salary;
@@ -579,11 +584,13 @@ public class BudgetService {
                         Map<Long, BigDecimal> amounts,
                         Map<Long, BigDecimal> percentages,
                         Map<Long, List<RecurringTransaction>> recurring,
+                        Map<Long, BigDecimal> debtInstallments,
                         LocalDate from, LocalDate to, BigDecimal salary) {
             this.tree = tree;
             this.amounts = amounts;
             this.percentages = percentages;
             this.recurring = recurring;
+            this.debtInstallments = debtInstallments;
             this.from = from;
             this.to = to;
             this.salary = salary;
@@ -669,22 +676,30 @@ public class BudgetService {
 
             BigDecimal real = spentIn(Set.of(category.getId()), from, to);
             BigDecimal prorated = proratedFor(category, recurring);
+            // Les quotes pactades dels deutes que dec: diners que aquest mes ja
+            // estan compromesos. Van a part del prorrateig perquè no són cap
+            // cost fix: no es prorrategen ni tenen versions, s'acaben quan el
+            // deute queda saldat.
+            BigDecimal installments = debtInstallments.getOrDefault(category.getId(), BigDecimal.ZERO);
             boolean fixed = category.isFixed();
 
             node.put("caixa_real", real);
             node.put("prorrateig_mensual", prorated);
-            // Un fix compta pel prorrateig; un variable, pel que s'ha gastat.
-            node.put("cost_vida_real", fixed ? prorated : real);
+            node.put("quotes_deutes", installments);
+            // Un fix compta pel que té compromès; un variable, pel que s'ha gastat.
+            node.put("cost_vida_real", fixed ? prorated.add(installments) : real);
             // Serveix per entendre els pics de caixa: un fix anual que cau
             // aquest mes dispara la caixa sense que el cost de vida canviï.
             node.put("carrec_puntual_aquest_mes", fixed && real.signum() > 0);
 
             // El que l'usuari hagi assignat mana. Si no ha assignat res, un fix
             // val el seu prorrateig —el rebut ja diu quant costa— i un variable
-            // es queda sense pla.
+            // es queda sense pla. Les quotes de deutes s'hi sumen en tots dos
+            // casos: un compromís no deixa de ser-ho perquè la fulla sigui
+            // variable.
             BigDecimal plan = assigned != null
                     ? assigned
-                    : (fixed ? prorated : BigDecimal.ZERO);
+                    : (fixed ? prorated : BigDecimal.ZERO).add(installments);
             node.put("cost_vida_pla", plan);
             return plan;
         }

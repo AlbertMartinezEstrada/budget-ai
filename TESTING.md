@@ -59,6 +59,17 @@ Si algú reanomena una propietat, aquests tests fallen. **Quan fallin, cal
 actualitzar també el codi del frontend que la llegeix**: no n'hi ha prou
 d'ajustar l'expectativa del test.
 
+### `RepaymentScheduleTest` i `DebtServiceTest`
+
+El calendari de retorn d'un deute i com es compara amb el que s'ha retornat.
+Fixen les dues trampes del calendari —l'última quota és el que falta, i els
+mesos es compten des del primer pagament perquè el 31 no es perdi al febrer—,
+que els pagaments es cobreixen per ordre, i que només descompten els moviments
+en sentit de retorn: l'entrada del préstec no.
+
+Al servei, que la reserva del pressupost no passi mai del que quedava per
+tornar a l'inici del mes, i que els deutes que em deuen no reservin res.
+
 ### `BankReaderServiceTest`
 
 El parser d'imports. La versió antiga esborrava tots els punts abans de
@@ -169,6 +180,11 @@ nova.
 - `PersistenceIntegrationTest`: l'escala de les columnes `NUMERIC` en anar i
   tornar, els valors per defecte de `@PrePersist`, les actualitzacions parcials
   i les claus foranes.
+- `DebtIntegrationTest`: que les devolucions vinculades descomptin del pendent
+  i l'entrada del préstec no; que editar un moviment el vinculi, el conservi i
+  el desvinculi; que un deute inexistent es rebutgi abans de moure cap saldo;
+  que esborrar el deute deixi els moviments; i que el pressupost reservi la
+  quota del mes i deixi de fer-ho quan el deute ja està saldat.
 
 ## Què NO cobreixen
 

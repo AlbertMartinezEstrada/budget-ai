@@ -3,6 +3,7 @@ package com.budgetai.backend.controller;
 import com.budgetai.backend.model.Account;
 import com.budgetai.backend.model.Category;
 import com.budgetai.backend.model.Company;
+import com.budgetai.backend.model.Debt;
 import com.budgetai.backend.model.Transaction;
 import com.budgetai.backend.repository.AccountRepository;
 import com.budgetai.backend.repository.CategoryRepository;
@@ -12,6 +13,7 @@ import com.budgetai.backend.service.AccountService;
 import com.budgetai.backend.service.AiEngineService;
 import com.budgetai.backend.service.BankReaderService;
 import com.budgetai.backend.service.CategoryHierarchyService;
+import com.budgetai.backend.service.DebtService;
 import com.budgetai.backend.service.ImportRuleService;
 import com.budgetai.backend.service.TransactionHasher;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -68,6 +70,9 @@ public class TransactionController {
 
     @Autowired
     private ImportRuleService importRuleService;
+
+    @Autowired
+    private DebtService debtService;
 
     @GetMapping("/")
     public Map<String, String> readRoot() {
@@ -267,6 +272,16 @@ public class TransactionController {
         // dues fonts diguessin coses diferents amb el mateix nom.
         transaction.setBalance(null);
 
+        // Abans de tocar cap saldo: si el deute no existeix, no s'ha mogut res
+        // i es pot respondre sense haver de desfer.
+        try {
+            transaction.setDebt(debtService.resolveForLink(transaction.getDebt()));
+        } catch (IllegalArgumentException exception) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "status", "error",
+                    "message", exception.getMessage()));
+        }
+
         Account defaultAccount = accountRepository.findByName("Compte Principal")
                 .orElseGet(() -> accountRepository.findAll().stream().findFirst().orElse(null));
 
@@ -313,8 +328,23 @@ public class TransactionController {
                     "message", "L'import ha de ser més gran que zero."));
         }
 
+        // El deute es resol abans de desfer el saldo, pel mateix motiu que a
+        // l'alta. Null vol dir que no l'han enviat; un negatiu, que el volen
+        // desvincular, i resolveForLink el torna com a null.
+        Debt debt = existing.getDebt();
+        if (changes.getDebt() != null) {
+            try {
+                debt = debtService.resolveForLink(changes.getDebt());
+            } catch (IllegalArgumentException exception) {
+                return ResponseEntity.badRequest().body(Map.of(
+                        "status", "error",
+                        "message", exception.getMessage()));
+            }
+        }
+
         revertFromBalance(existing);
 
+        existing.setDebt(debt);
         if (changes.getDate() != null) existing.setDate(changes.getDate());
         if (changes.getAmount() != null) existing.setAmount(changes.getAmount());
         if (changes.getType() != null) existing.setType(changes.getType());
@@ -392,6 +422,10 @@ public class TransactionController {
                     transaction.setAccount(defaultAccount);
                 }
                 transaction.setVerificationHash(transactionHasher.hash(transaction));
+                // La pantalla de revisió no vincula deutes, però deute_id s'ha
+                // de llegir igual per les tres portes d'entrada: sense resoldre'l,
+                // un -1 arribaria a la base de dades com a clau forana.
+                transaction.setDebt(debtService.resolveForLink(transaction.getDebt()));
             }
 
             Set<String> incomingHashes = confirmedTransactions.stream()

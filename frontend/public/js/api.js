@@ -567,6 +567,39 @@ export async function addAmountToGoal(id, amount) {
     return handleResponse(response);
 }
 
+// ============ DEUTES I PRÉSTECS ============
+// Cada deute arriba amb el que s'ha retornat, el que queda i el calendari amb
+// l'estat de cada pagament: el backend ho calcula a partir dels moviments
+// vinculats, que són els que diuen el que ha passat.
+export async function getDebts() {
+    const response = await apiFetch('/debts');
+    return handleResponse(response);
+}
+
+export async function createDebt(data) {
+    const response = await apiFetch('/debts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+    });
+    return handleResponse(response);
+}
+
+export async function updateDebt(id, data) {
+    const response = await apiFetch(`/debts/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+    });
+    return handleResponse(response);
+}
+
+/** Els moviments vinculats no s'esborren: només perden el vincle. */
+export async function deleteDebt(id) {
+    const response = await apiFetch(`/debts/${id}`, { method: 'DELETE' });
+    return handleResponse(response);
+}
+
 // ============ ANALYTICS ============
 export async function getMonthlySummary(year, month) {
     const params = new URLSearchParams({ year, month });

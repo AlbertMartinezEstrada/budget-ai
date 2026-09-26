@@ -169,6 +169,101 @@ class JsonContractTest {
     }
 
     @Test
+    @DisplayName("Transaction: el deute vinculat surt com a deute_id, no com l'objecte sencer")
+    void transactionExposesDebtId() throws Exception {
+        Debt debt = new Debt();
+        debt.setId(4L);
+        debt.setName("Germà");
+        Transaction transaction = new Transaction();
+        transaction.setDebt(debt);
+
+        JsonNode json = mapper.valueToTree(transaction);
+
+        assertThat(json.get("deute_id").asLong()).isEqualTo(4L);
+        // El deute porta els seus moviments: si el moviment portés el deute
+        // sencer, la resposta seria un cercle.
+        assertThat(json.has("debt")).isFalse();
+        assertThat(json.has("debtId")).isFalse();
+    }
+
+    @Test
+    @DisplayName("Transaction: deute_id es llegeix del formulari, i un negatiu vol dir desvincular")
+    void transactionReadsDebtId() throws Exception {
+        Transaction linked = mapper.readValue("{\"deute_id\":4}", Transaction.class);
+        Transaction unlinked = mapper.readValue("{\"deute_id\":-1}", Transaction.class);
+        Transaction untouched = mapper.readValue("{\"cost\":10}", Transaction.class);
+
+        assertThat(linked.getDebt().getId()).isEqualTo(4L);
+        assertThat(unlinked.getDebt().getId()).isEqualTo(-1L);
+        assertThat(untouched.getDebt()).isNull();
+    }
+
+    @Test
+    @DisplayName("Debt: els noms que llegeix la pestanya de deutes")
+    void debtKeys() throws Exception {
+        Debt debt = new Debt();
+        debt.setName("Germà, portàtil");
+        debt.setDirection(Debt.I_OWE);
+        debt.setAmount(new BigDecimal("1000.00"));
+        debt.setDate(LocalDate.of(2026, 9, 10));
+        debt.setRepaymentPlan(Debt.PLAN_INSTALLMENTS);
+        debt.setInstallment(new BigDecimal("100.00"));
+        debt.setFrequency("MENSUAL");
+        debt.setFirstPaymentDate(LocalDate.of(2026, 10, 1));
+        debt.setRepaid(new BigDecimal("250.00"));
+        debt.setOverdue(new BigDecimal("50.00"));
+        debt.setNextPayment(new Debt.Installment(LocalDate.of(2026, 12, 1), new BigDecimal("50.00"), null));
+        debt.setSchedule(java.util.List.of(
+                new Debt.Installment(LocalDate.of(2026, 10, 1), new BigDecimal("100.00"), "PAGAT")));
+        debt.setMovements(java.util.List.of());
+
+        JsonNode json = mapper.valueToTree(debt);
+
+        for (String key : new String[] {"nom", "direccio", "import", "data", "forma_retorn", "quota",
+                "frequencia", "data_primer_pagament", "category", "notes", "retornat", "pendent",
+                "saldat", "endarrerit", "proper_pagament", "calendari", "moviments"}) {
+            assertThat(json.has(key)).as(key).isTrue();
+        }
+        assertThat(json.get("pendent").decimalValue()).isEqualByComparingTo("750.00");
+        assertThat(json.get("saldat").asBoolean()).isFalse();
+        assertThat(json.get("data_primer_pagament").asText()).isEqualTo("2026-10-01");
+
+        JsonNode installment = json.get("calendari").get(0);
+        assertThat(installment.get("data").asText()).isEqualTo("2026-10-01");
+        assertThat(installment.has("import")).isTrue();
+        assertThat(installment.get("estat").asText()).isEqualTo("PAGAT");
+        assertThat(json.get("proper_pagament").get("data").asText()).isEqualTo("2026-12-01");
+
+        // Els noms Java no s'exposen.
+        assertThat(json.has("amount")).isFalse();
+        assertThat(json.has("repaymentPlan")).isFalse();
+        assertThat(json.has("repaid")).isFalse();
+        assertThat(json.has("pending")).isFalse();
+        assertThat(json.has("owedByMe")).isFalse();
+    }
+
+    @Test
+    @DisplayName("Debt: es crea des del JSON del formulari, i el que es calcula no es pot escriure")
+    void debtDeserializesFromFormPayload() throws Exception {
+        String payload = """
+            {"nom":"Joan, sopar","direccio":"EM_DEUEN","import":45.50,"data":"2026-09-20",
+             "forma_retorn":"UNIC","data_primer_pagament":"2026-10-01","category":{"id":3},
+             "retornat":999}
+            """;
+
+        Debt debt = mapper.readValue(payload, Debt.class);
+
+        assertThat(debt.getName()).isEqualTo("Joan, sopar");
+        assertThat(debt.getDirection()).isEqualTo(Debt.OWED_TO_ME);
+        assertThat(debt.getAmount()).isEqualByComparingTo("45.50");
+        assertThat(debt.getRepaymentPlan()).isEqualTo(Debt.PLAN_SINGLE);
+        assertThat(debt.getFirstPaymentDate()).isEqualTo(LocalDate.of(2026, 10, 1));
+        assertThat(debt.getCategory().getId()).isEqualTo(3L);
+        // El retornat surt dels moviments; el que digui la petició no compta.
+        assertThat(debt.getRepaid()).isNull();
+    }
+
+    @Test
     @DisplayName("Budget: quantitat_limit i gasto_actual")
     void budgetKeys() throws Exception {
         Budget budget = new Budget();

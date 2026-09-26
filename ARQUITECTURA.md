@@ -35,7 +35,7 @@ public/
     app.js            arranque, routing y navegación
     features/
       dashboard/  transactions/  upload/  accounts/  budgets/
-      categories/  goals/  transfers/  recurring/  analytics/
+      categories/  goals/  debts/  transfers/  recurring/  analytics/
       settings/  auth/
 ```
 
@@ -282,7 +282,7 @@ se define ahí aparece solo en cada mes, sin copiar nada.
 
 `GET /budgets/monthly-summary?year=&month=` devuelve el árbol con
 `cost_vida_pla`, `cost_vida_real`, `caixa_real`, `prorrateig_mensual`,
-`carrec_puntual_aquest_mes` y `subcategories` en cada nodo.
+`quotes_deutes`, `carrec_puntual_aquest_mes` y `subcategories` en cada nodo.
 
 Los presupuestos siguen usando `periode_inici`/`periode_fi`, sin campo de mes.
 Añadir un `year`/`month` duplicaría estado que ya está en las fechas y abriría
@@ -501,6 +501,89 @@ pero no lo impide.
 `grups` mantiene la lista plana de bloques de primer nivel, para quien no
 necesite saber en qué sección cae cada uno.
 
+## Deudas y préstamos
+
+Cuando me prestan 1.000 €, el saldo sube pero no soy más rico: los debo. Un
+préstamo no es ni un ingreso ni un gasto, y la pantalla de Deudas solo lleva
+**quién debe qué y cómo se ha acordado devolverlo**. Funciona en los dos
+sentidos: `DEC` (me lo han prestado) y `EM_DEUEN` (lo he prestado yo).
+
+### Cómo cuenta en el presupuesto
+
+Un préstamo deja tres movimientos: la entrada (+1.000), lo que se compra con
+ella (−1.000) y las devoluciones (−1.000 en total). La compra cuenta siempre.
+Para que cada euro cuente una sola vez, las otras dos patas **cuentan juntas o
+no cuenta ninguna**:
+
+| Entrada | Devoluciones | Qué pasa |
+|---|---|---|
+| cuenta | cuentan | el mes del préstamo sale a 0 y el coste llega con las cuotas ✅ |
+| no cuenta | no cuentan | el mes de la compra sale en rojo; las cuotas no se ven ✅ |
+| no cuenta | cuentan | la compra cuenta dos veces ❌ |
+| cuenta | no cuentan | 1.000 € regalados ❌ |
+
+Se usa la primera. La entrada va a «Préstecs rebuts», una hoja de Ingressos
+separada de la nómina, y las devoluciones a «Pagament de deutes», dentro del
+bloque fijo «Deutes i préstecs». El presupuesto reparte el dinero que hay cada
+mes: el del préstamo sí hay más, y los de las cuotas hay menos.
+
+Lo que yo presto es el espejo: sale por «Préstecs fets» y vuelve por
+«Cobrament de préstecs». Si el dinero prestado no se va a gastar, se marcan
+como excluidas la entrada y las devoluciones, igual que un traspaso.
+
+### Lo devuelto sale de los movimientos
+
+No hay tabla de pagos. Un movimiento se vincula a su deuda con
+`transactions.deute_id`, y lo devuelto es la suma de los vinculados **en el
+sentido de devolución**: salidas si la debo, entradas si me la deben. El
+movimiento del otro sentido es el préstamo en sí y no descuenta nada. Una tabla
+de pagos aparte duplicaría cada línea del extracto y las dos copias acabarían
+diciendo cosas distintas.
+
+El vínculo es **independiente de la categoría**. Si un amigo me paga la cena y
+se la devuelvo por Bizum, ese Bizum es un gasto de «Bars i restaurants» y a la
+vez salda la deuda: el vínculo dice cuánto falta, la categoría cómo cuenta. En
+el formulario, elegir la deuda propone la categoría según el sentido, y se
+puede cambiar.
+
+Borrar una deuda **no borra sus movimientos**: pasaron de verdad y el saldo
+depende de ellos. Solo pierden el vínculo. Para desvincular un movimiento se
+envía `deute_id: -1`, por la misma razón que el `parent_id` negativo.
+
+### La forma de devolverlo
+
+`forma_retorn` es `LLIURE` (sin calendario), `UNIC` (todo de golpe un día) o
+`QUOTES` (una cuota cada semana, mes o trimestre). El calendario sale del
+importe original, no de lo que queda: es el plan pactado, y compararlo con lo
+devuelto es lo que dice si se va al día.
+
+- **La última cuota es lo que falte**: 1.000 a 300 son 300, 300, 300 y 100.
+- **Los meses se cuentan desde el primer pago**, no desde el anterior: si no,
+  un calendario que empieza el 31 de enero se quedaría en el 28 desde febrero.
+- Los pagos se cubren **por orden**: con 250 devueltos de 100 al mes, los dos
+  primeros están pagados y el tercero a medias, sin importar qué día llegó
+  cada euro. Un pago vencido que no está cubierto del todo sale como
+  `ENDARRERIT`, y `endarrerit` suma lo que falta de todos ellos.
+- Más de 600 pagos se rechaza: es una cuota mal escrita, no un plan.
+
+### La cuota se reserva sola
+
+Con la cuota pactada ya se sabe cuánto está comprometido cada mes. El resumen
+mensual lo reserva en el plan de la hoja que diga la deuda (`category_id`, por
+defecto «Pagament de deutes») y lo expone como `quotes_deutes`. Va aparte del
+prorrateo porque no es un coste fijo: no tiene versiones y se acaba al saldar
+la deuda.
+
+Cada deuda reserva **como mucho lo que le quedaba por devolver al empezar el
+mes**. Si se adelanta dinero, las últimas cuotas dejan de reservarse antes; si
+ya está saldada, no reserva nada aunque el calendario original dijera otra
+cosa. Una asignación puesta a mano en la hoja manda sobre la reserva, como con
+cualquier coste fijo.
+
+Lo que me deben **no se reserva ni se prevé**. Un dinero que aún no ha llegado
+no debe ensanchar lo que se reparte: si se retrasa, el presupuesto habría
+contado con él.
+
 ## La sesión
 
 Resumen; el detalle está en [AUTENTICACION.md](AUTENTICACION.md).
@@ -520,8 +603,9 @@ Todo requiere sesión salvo `/auth/login` y `/auth/logout`.
 
 ## El esquema
 
-Nueve tablas. `accounts`, `transactions`, `categories`, `companies`, `budgets`,
-`financial_goals`, `recurring_transactions`, `transfers` y `settings`.
+Doce tablas. `accounts`, `transactions`, `categories`, `companies`, `budgets`,
+`financial_goals`, `recurring_transactions`, `transfers`, `settings`,
+`monthly_income`, `import_rules` y `debts`.
 
 `ddl-auto` está en **`validate`**: Hibernate comprueba al arrancar que las
 tablas cuadren con las entidades y falla si no. No genera ni modifica nada.

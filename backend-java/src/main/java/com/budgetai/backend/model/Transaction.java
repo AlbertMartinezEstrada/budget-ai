@@ -5,8 +5,10 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.*;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
+import lombok.ToString;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -84,6 +86,26 @@ public class Transaction {
     @JsonProperty("exclos_pressupost")
     private Boolean excludedFromBudget;
 
+    /**
+     * El deute que mou aquest moviment: una devolució, o l'entrada o la
+     * sortida del préstec mateix.
+     *
+     * És independent de la categoria. Si un amic em paga el sopar i li torno
+     * per Bizum, aquell Bizum és una despesa de "Bars i restaurants" i alhora
+     * salda el deute: el vincle diu quant falta per tornar, la categoria diu
+     * com compta al pressupost.
+     *
+     * Al JSON surt només l'identificador, com a "deute_id": el deute sencer ja
+     * porta la llista dels seus moviments, i incloure'l aquí faria un cercle.
+     * Exclòs d'equals, hashCode i toString pel mateix motiu.
+     */
+    @ManyToOne
+    @JoinColumn(name = "deute_id")
+    @JsonIgnore
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
+    private Debt debt;
+
     @Column(name = "compte_nom")
     private String accountName;
 
@@ -119,6 +141,28 @@ public class Transaction {
     @JsonIgnore
     public boolean isExcludedFromBudget() {
         return Boolean.TRUE.equals(excludedFromBudget);
+    }
+
+    @JsonProperty("deute_id")
+    public Long getDebtId() {
+        return debt != null ? debt.getId() : null;
+    }
+
+    /**
+     * Només en guarda l'identificador: el controlador el resol contra la base
+     * de dades abans de desar. Un identificador negatiu vol dir "desvincula'l",
+     * el mateix conveni que parent_id, perquè en una actualització parcial un
+     * null vol dir "no me l'han enviat".
+     */
+    @JsonProperty("deute_id")
+    public void setDebtId(Long debtId) {
+        if (debtId == null) {
+            this.debt = null;
+            return;
+        }
+        Debt reference = new Debt();
+        reference.setId(debtId);
+        this.debt = reference;
     }
 
     // Mètodes per assegurar entrada/sortida correcta del JSON
