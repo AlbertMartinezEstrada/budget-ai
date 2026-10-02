@@ -8,6 +8,7 @@ import { initAccounts } from './features/accounts/Accounts.js';
 import { initBudgets } from './features/budgets/Budgets.js';
 import { initCategories } from './features/categories/Categories.js';
 import { initGoals } from './features/goals/FinancialGoals.js';
+import { initDebts } from './features/debts/Debts.js';
 import { initTransfers } from './features/transfers/Transfers.js';
 import { initRecurring } from './features/recurring/RecurringTransactions.js';
 import { initAnalytics } from './features/analytics/Analytics.js';
@@ -15,7 +16,7 @@ import { initSettings } from './features/settings/Settings.js';
 
 const VIEWS = [
     'dashboard', 'transactions', 'upload', 'accounts', 'budgets',
-    'categories', 'goals', 'transfers', 'recurring', 'analytics', 'settings'
+    'categories', 'goals', 'debts', 'transfers', 'recurring', 'analytics', 'settings'
 ];
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -86,6 +87,9 @@ async function startApp() {
                 break;
             case 'goals':
                 initGoals(mainContentArea);
+                break;
+            case 'debts':
+                initDebts(mainContentArea);
                 break;
             case 'transfers':
                 initTransfers(mainContentArea);

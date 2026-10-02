@@ -11,7 +11,7 @@ una vez**, y casi ninguna de esas roturas daba error. Ver
 
 Gestor de finanzas personales de **un solo usuario**. Importa extractos
 bancarios en CSV, los clasifica con Google Gemini y lleva cuentas,
-presupuestos, metas, transferencias y gastos recurrentes.
+presupuestos, metas, transferencias, gastos recurrentes y deudas.
 
 | Capa | Tecnología | Dónde |
 |---|---|---|
@@ -31,8 +31,8 @@ docker compose up -d --build backend  # aplicar cambios de Java
 docker compose logs -f backend        # logs
 scripts\backup.bat                    # copia de la base de datos (backup.sh fuera de Windows)
 
-cd backend-java && ./gradlew test              # 103 unitarios, sin Docker
-cd backend-java && ./gradlew integrationTest   # 99, requieren Docker
+cd backend-java && ./gradlew test              # 125 unitarios, sin Docker
+cd backend-java && ./gradlew integrationTest   # 106, requieren Docker
 cd frontend && npm test                        # 22
 ```
 
@@ -62,6 +62,8 @@ distintos de los campos Java:
 | `Transaction.amount` | `cost` |
 | `FinancialGoal.targetAmount` | `quantitat_objectiu` |
 | `Transfer.amount` | `import` |
+| `Debt.amount` | `import` |
+| `Transaction.debt` | `deute_id` (solo el id) |
 
 **Dos excepciones que hay que recordar:**
 
@@ -254,6 +256,29 @@ fecha, el tipo y el hash de verificación se conservan siempre del CSV.**
 Si devuelve un número de filas distinto del enviado, se descarta la
 clasificación entera. Sin `GEMINI_API_KEY` la importación funciona igual, sin
 clasificar.
+
+### 11. Un préstamo no es ni ingreso ni gasto, y cada euro cuenta una vez
+
+Un préstamo tiene tres movimientos: la entrada, lo que se compra con ella y las
+devoluciones. La compra cuenta siempre. De los otros dos, **o cuentan los dos o
+no cuenta ninguno**: excluir la entrada y contar las devoluciones cuenta la
+compra dos veces, y lo contrario regala el dinero.
+
+Se eligió que cuenten los dos. La entrada va a la hoja «Préstecs rebuts» de
+Ingressos —no a la nómina— y ensancha el bote de ese mes; las devoluciones van
+a «Pagament de deutes». Así el coste llega con las cuotas, que es cuando sale
+del sueldo. Si el dinero prestado no se gasta, se marcan como excluidas la
+entrada y las devoluciones.
+
+`debts` solo lleva quién debe qué y cómo se devuelve. **Lo devuelto no se
+guarda**: sale de los movimientos con `deute_id`, en el sentido de devolución
+(salidas si lo debo, entradas si me lo deben). Una tabla de pagos aparte
+duplicaría cada línea del extracto.
+
+Las cuotas pactadas de lo que debo se reservan solas en el plan de la hoja que
+diga la deuda (`quotes_deutes`), como mucho lo que quedaba por devolver al
+empezar el mes. Lo que me deben no se reserva ni se prevé: un dinero que no ha
+llegado no ensancha el bote.
 
 ---
 

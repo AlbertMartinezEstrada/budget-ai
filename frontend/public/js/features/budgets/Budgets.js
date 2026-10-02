@@ -652,6 +652,12 @@ function renderLeaf(node, budgetByCategory, style) {
                 <div class="flex flex-wrap items-center gap-1.5">
                     <span class="text-sm truncate">${escapeHtml(category.nom)}</span>
                     ${fixed ? '<span class="text-xs px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300">fijo</span>' : ''}
+                    ${toNumber(node.quotes_deutes) > 0
+                        ? `<span class="text-xs px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-800 dark:bg-amber-500/20 dark:text-amber-300"
+                                 title="Cuotas pactadas de deudas que vencen este mes: ya están comprometidas y se reservan solas.">
+                               cuotas de deudas ${formatCurrency(toNumber(node.quotes_deutes))}
+                           </span>`
+                        : ''}
                     ${shareBadge(node, style)}
                     ${toNumber(node.aporta_al_disponible) > 0
                         ? `<span class="text-xs px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-300"
