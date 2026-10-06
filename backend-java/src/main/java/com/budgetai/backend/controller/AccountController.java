@@ -2,6 +2,7 @@ package com.budgetai.backend.controller;
 
 import com.budgetai.backend.model.Account;
 import com.budgetai.backend.service.AccountService;
+import com.budgetai.backend.service.NotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -30,7 +31,7 @@ public class AccountController {
     public ResponseEntity<Account> getAccountById(@PathVariable Long id) {
         return accountService.getAccountById(id)
                 .map(ResponseEntity::ok)
-                .orElse(ResponseEntity.notFound().build());
+                .orElseThrow(() -> new NotFoundException("el compte", id));
     }
 
     @PostMapping
@@ -41,12 +42,10 @@ public class AccountController {
 
     @PutMapping("/{id}")
     public ResponseEntity<Account> updateAccount(@PathVariable Long id, @RequestBody Account account) {
-        try {
-            Account updated = accountService.updateAccount(id, account);
-            return ResponseEntity.ok(updated);
-        } catch (RuntimeException exception) {
-            return ResponseEntity.notFound().build();
-        }
+        // Sense try/catch: abans qualsevol error, fos el que fos, es tornava
+        // com un 404 buit i la pantalla deia "Not Found". El gestor global
+        // dona a cada error el seu codi i el seu missatge.
+        return ResponseEntity.ok(accountService.updateAccount(id, account));
     }
 
     @DeleteMapping("/{id}")
@@ -64,23 +63,19 @@ public class AccountController {
     @PostMapping("/{id}/adjust-balance")
     public ResponseEntity<Account> adjustBalance(@PathVariable Long id,
                                                    @RequestBody Map<String, Object> payload) {
-        try {
-            Object rawAmount = payload.get("amount");
-            if (!(rawAmount instanceof Number)) {
-                return ResponseEntity.badRequest().build();
-            }
-            // new BigDecimal(double) arrossega el soroll del binari; via String no.
-            BigDecimal amount = new BigDecimal(rawAmount.toString());
-            String operation = (String) payload.getOrDefault("operation", "ADD"); // ADD or SUBTRACT
-
-            accountService.updateAccountBalance(id, amount, operation);
-
-            Account updated = accountService.getAccountById(id)
-                    .orElseThrow(() -> new RuntimeException("Account not found"));
-
-            return ResponseEntity.ok(updated);
-        } catch (Exception exception) {
-            return ResponseEntity.badRequest().build();
+        Object rawAmount = payload.get("amount");
+        if (!(rawAmount instanceof Number)) {
+            throw new IllegalArgumentException("L'import ha de ser un número.");
         }
+        // new BigDecimal(double) arrossega el soroll del binari; via String no.
+        BigDecimal amount = new BigDecimal(rawAmount.toString());
+        String operation = String.valueOf(payload.getOrDefault("operation", "ADD")); // ADD or SUBTRACT
+
+        // Sense try/catch: abans qualsevol error tornava un 400 buit. El
+        // servei és @Transactional, així que si falla ja ha fet el rollback.
+        accountService.updateAccountBalance(id, amount, operation);
+
+        return ResponseEntity.ok(accountService.getAccountById(id)
+                .orElseThrow(() -> new NotFoundException("el compte", id)));
     }
 }

@@ -31,9 +31,9 @@ docker compose up -d --build backend  # aplicar cambios de Java
 docker compose logs -f backend        # logs
 scripts\backup.bat                    # copia de la base de datos (backup.sh fuera de Windows)
 
-cd backend-java && ./gradlew test              # 140 unitarios, sin Docker
-cd backend-java && ./gradlew integrationTest   # 115, requieren Docker
-cd frontend && npm test                        # 22
+cd backend-java && ./gradlew test              # 144 unitarios, sin Docker
+cd backend-java && ./gradlew integrationTest   # 126, requieren Docker
+cd frontend && npm test                        # 26
 ```
 
 **Ejecuta los tests antes de dar nada por terminado.** El backend hay que
@@ -131,8 +131,17 @@ que es justo lo que hace falta cuando el dinero ya se movió.
 como `IllegalArgumentException` o `IllegalStateException`, con un texto pensado
 para el usuario, y ese texto llega. Cualquier otra excepción lleva detalles
 internos (tablas, consultas, clases): va al log del backend y al navegador le
-llega un mensaje genérico. No devuelvas `exception.getMessage()` directamente
-desde un `catch (Exception)`; pasa por `ClientErrors.messageFor`.
+llega un mensaje genérico con una **referencia** que también sale en el log. No
+devuelvas `exception.getMessage()` directamente desde un `catch (Exception)`;
+pasa por `ClientErrors.messageFor`.
+
+Lo que no existe se lanza como **`NotFoundException("el moviment", id)`**, que
+dice qué falta. **`ApiErrorHandler`** convierte todo en el mismo JSON
+(`status`, `message`, `path`) con su código: 404, 400, 409, 500… Por eso **un
+controlador no captura `RuntimeException` para devolver un 404 vacío**: cuatro
+lo hacían, y cualquier fallo salía en pantalla como «Not Found». Una ruta que el
+backend no conoce dice que hay que reconstruirlo, que es lo que pasa cuando el
+frontend (servido desde el disco) es más nuevo que él.
 
 Borrar una transferencia **revierte** los saldos; no basta con borrar la fila.
 
@@ -299,6 +308,10 @@ tablero hace lo mismo en el navegador con `transaction.parts`.
 
 Un movimiento dividido no puede cambiar de importe sin cambiar sus partes, ni
 llevar la deuda en el movimiento: el vínculo es de la parte.
+
+Se puede dividir al importar: las partes viajan en `parts` de cada movimiento
+de `/confirm-upload` y **se validan todas antes de mover ningún saldo**. Si una
+fila no cuadra, no se importa nada y el mensaje dice cuál.
 
 ---
 

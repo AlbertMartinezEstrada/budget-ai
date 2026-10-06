@@ -1,7 +1,8 @@
 import {
-    uploadCsv, confirmTransactions, getCategories, getAccounts,
+    uploadCsv, confirmTransactions, getCategories, getAccounts, getDebts,
     getImportRules, createImportRule, deleteImportRule, formatCurrency, escapeHtml
 } from '../../api.js';
+import { setUpSplitEditor } from '../transactions/SplitEditor.js';
 
 /**
  * Ingrés o despesa.
@@ -101,6 +102,7 @@ export async function initUpload(container) {
                             <th>Categoria (Seleccionar)</th>
                             <th class="text-right">Import</th>
                             <th title="Diners que ja es van comptar en sortir del compte principal">No comptar</th>
+                            <th style="width: 3rem;"></th>
                         </tr>
                     </thead>
                     <tbody id="review-body"></tbody>
@@ -123,6 +125,7 @@ export async function initUpload(container) {
 
     let currentReviewData = [];
     let categoriesList = [];
+    let debts = [];
 
     // Load categories immediately
     try {
@@ -130,6 +133,35 @@ export async function initUpload(container) {
     } catch (error) {
         console.error('Error loading categories:', error);
     }
+
+    // Per vincular una part d'un moviment a un deute. Sense deutes la revisió
+    // funciona igual: només no se'n poden triar.
+    try {
+        debts = await getDebts();
+    } catch (error) {
+        console.error('Error loading debts:', error);
+    }
+    const debtsById = new Map(debts.map(debt => [debt.id, debt]));
+    const leafParentIds = new Set(categoriesList.map(category => category.parent_id).filter(Boolean));
+    const leaves = categoriesList.filter(category => !leafParentIds.has(category.id));
+    const leafNameById = new Map(leaves.map(category => [category.id, category.nom]));
+
+    // Dividir un moviment abans d'importar-lo: les parts es guarden a la fila
+    // i s'envien amb la confirmació. El backend les valida abans de moure cap
+    // saldo, i si alguna no quadra no s'importa res.
+    const openSplitter = setUpSplitEditor(container, {
+        leaves,
+        debts,
+        save: async (transaction, parts) => {
+            transaction.parts = parts;
+            renderReviewTable();
+        },
+        remove: async (transaction) => {
+            delete transaction.parts;
+            renderReviewTable();
+        }
+    });
+    const isSplit = (transaction) => (transaction.parts || []).length > 0;
 
     // Un extracte és d'un compte. Sense triar-lo, tot queia al principal i amb
     // tres comptes els saldos i el pressupost deixaven de voler dir res.
@@ -285,8 +317,10 @@ export async function initUpload(container) {
                 : `<option value="" selected>— Tria una categoria —</option>`;
 
             // Un moviment descartat no s'ha de revisar: ni cal categoria ni ha
-            // de cridar l'atenció com si li faltés alguna cosa.
-            const needsReview = transaction.inclos && !known;
+            // de cridar l'atenció com si li faltés alguna cosa. Un de dividit
+            // tampoc: la categoria la porta cada part.
+            const split = isSplit(transaction);
+            const needsReview = transaction.inclos && !known && !split;
 
             const type = typeOf(transaction);
             const style = TYPES[type];
@@ -308,24 +342,66 @@ export async function initUpload(container) {
                 </td>
                 <td><input type="text" class="input input-sm w-full" value="${escapeHtml(transaction.empresa || '')}" name="empresa"></td>
                 <td>
-                    <select class="input input-sm w-full" name="categoria" ${needsReview ? 'required' : ''}>
-                        ${unknownOption}${options}
-                    </select>
+                    ${split
+                        ? `<span class="badge badge-secondary" title="Cada part compta a la seva categoria">dividit en ${transaction.parts.length}</span>`
+                        : `<select class="input input-sm w-full" name="categoria" ${needsReview ? 'required' : ''}>
+                               ${unknownOption}${options}
+                           </select>`}
                 </td>
                 <td class="text-right ${style.classe}" style="white-space: nowrap;">
                     ${style.signe}${formatCurrency(transaction.cost)}
                 </td>
                 <td class="text-center">
-                    <input type="checkbox" name="exclos" ${transaction.exclos_pressupost ? 'checked' : ''}
-                           title="Marca'l si aquests diners ja es van comptar en sortir del compte principal: una entrada per traspàs, o una compra feta amb diners ja traspassats.">
+                    ${split
+                        ? '<span class="text-muted" title="Cada part diu si compta">—</span>'
+                        : `<input type="checkbox" name="exclos" ${transaction.exclos_pressupost ? 'checked' : ''}
+                                  title="Marca'l si aquests diners ja es van comptar en sortir del compte principal: una entrada per traspàs, o una compra feta amb diners ja traspassats.">`}
+                </td>
+                <td class="text-right">
+                    <button type="button" class="btn btn-sm btn-outline" data-action="split-row" data-index="${index}"
+                            title="Dividir en parts amb categories diferents">
+                        <span class="material-symbols-outlined text-sm">call_split</span>
+                    </button>
                 </td>
             </tr>
+            ${split ? transaction.parts.map(part => partRow(part, style)).join('') : ''}
             `;
         }).join('');
 
         document.getElementById('review-empty').classList.toggle('hidden', rows.length > 0);
         updateSummary();
     }
+
+    /** Una part, sota el seu moviment. Sense data-index: no és cap fila editable. */
+    function partRow(part, style) {
+        const debtName = part.deute_id > 0 ? debtsById.get(part.deute_id)?.nom : null;
+        return `
+            <tr class="text-sm">
+                <td></td>
+                <td></td>
+                <td></td>
+                <td class="text-muted">
+                    <span class="material-symbols-outlined text-sm align-middle">subdirectory_arrow_right</span>
+                    ${escapeHtml(part.descripcio || '')}
+                    ${part.exclos_pressupost ? '<span class="badge badge-outline text-sm">no compta</span>' : ''}
+                    ${debtName ? `<span class="badge badge-outline text-sm">deute: ${escapeHtml(debtName)}</span>` : ''}
+                </td>
+                <td><span class="badge badge-outline">${escapeHtml(leafNameById.get(part.category?.id) || '-')}</span></td>
+                <td class="text-right ${style.classe}" style="white-space: nowrap;">
+                    ${style.signe}${formatCurrency(part.import)}
+                </td>
+                <td></td>
+                <td></td>
+            </tr>
+        `;
+    }
+
+    reviewBody.addEventListener('click', (event) => {
+        const button = event.target.closest('button[data-action="split-row"]');
+        if (!button) return;
+        const transaction = currentReviewData[Number.parseInt(button.dataset.index, 10)];
+        if (transaction) openSplitter(transaction);
+    });
 
     function updateSummary() {
         const chosen = currentReviewData.filter(transaction => transaction.inclos);
@@ -439,8 +515,9 @@ export async function initUpload(container) {
         }
 
         // Només es valida el que s'importa: un moviment descartat pot quedar
-        // sense categoria i no ha de bloquejar la resta.
-        const missingCategory = confirmedData.some(transaction => !transaction.categoria);
+        // sense categoria i no ha de bloquejar la resta. Un de dividit porta
+        // la categoria a cada part.
+        const missingCategory = confirmedData.some(transaction => !transaction.categoria && !isSplit(transaction));
         if (missingCategory) {
             const search = document.getElementById('review-search');
             if (search.value) {

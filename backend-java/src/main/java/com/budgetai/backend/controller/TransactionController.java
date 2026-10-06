@@ -18,7 +18,7 @@ import com.budgetai.backend.service.DebtService;
 import com.budgetai.backend.service.ImportRuleService;
 import com.budgetai.backend.service.TransactionHasher;
 import com.budgetai.backend.service.TransactionPartService;
-import com.budgetai.backend.service.TransactionPartService.TransactionNotFoundException;
+import com.budgetai.backend.service.NotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
@@ -36,6 +36,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.ArrayList;
 import java.time.LocalDate;
 import java.util.HashSet;
+import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -189,7 +190,7 @@ public class TransactionController {
         if (categoryHierarchyService.isGroup(category.getId())) {
             throw new ConfirmUploadException(
                     "La categoria \"" + category.getName() + "\" és un grup: "
-                            + "tria'n una de concreta.", null);
+                            + "tria'n una de concreta.", null, HttpStatus.BAD_REQUEST);
         }
         transaction.setCategory(category);
 
@@ -280,10 +281,12 @@ public class TransactionController {
         // dues fonts diguessin coses diferents amb el mateix nom.
         transaction.setBalance(null);
 
-        // Abans de tocar cap saldo: si el deute no existeix, no s'ha mogut res
-        // i es pot respondre sense haver de desfer.
+        // Abans de tocar cap saldo: si el deute no existeix o les parts no
+        // quadren, no s'ha mogut res i es pot respondre sense haver de desfer.
+        List<TransactionPart> parts;
         try {
             transaction.setDebt(debtService.resolveForLink(transaction.getDebt()));
+            parts = splitBeforeSaving(transaction);
         } catch (IllegalArgumentException exception) {
             return ResponseEntity.badRequest().body(Map.of(
                     "status", "error",
@@ -295,6 +298,7 @@ public class TransactionController {
 
         linkAndApplyToBalance(transaction, defaultAccount);
         Transaction saved = transactionRepository.save(transaction);
+        if (!parts.isEmpty()) transactionPartService.store(saved, parts);
 
         return ResponseEntity.ok(Map.of(
                 "status", "success",
@@ -325,15 +329,22 @@ public class TransactionController {
     @Transactional
     public ResponseEntity<?> updateTransaction(@PathVariable Long id,
                                                @RequestBody Transaction changes) {
-        Transaction existing = transactionRepository.findById(id).orElse(null);
-        if (existing == null) {
-            return ResponseEntity.notFound().build();
-        }
+        // Abans de tocar cap saldo: no hi ha res a desfer.
+        Transaction existing = transactionRepository.findById(id)
+                .orElseThrow(() -> new NotFoundException("el moviment", id));
 
         if (changes.getAmount() != null && changes.getAmount().signum() <= 0) {
             return ResponseEntity.badRequest().body(Map.of(
                     "status", "error",
                     "message", "L'import ha de ser més gran que zero."));
+        }
+
+        // Les parts tenen el seu camí, que comprova que sumin el total. Si
+        // arribessin aquí, s'ignorarien sense dir res.
+        if (changes.getParts() != null) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "status", "error",
+                    "message", "Les parts d'un moviment es canvien amb el botó de dividir, no editant-lo."));
         }
 
         // Un moviment dividit no pot canviar d'import sense que les parts
@@ -407,10 +418,8 @@ public class TransactionController {
     @DeleteMapping("/gastos/{id}")
     @Transactional
     public ResponseEntity<?> deleteTransaction(@PathVariable Long id) {
-        Transaction transaction = transactionRepository.findById(id).orElse(null);
-        if (transaction == null) {
-            return ResponseEntity.notFound().build();
-        }
+        Transaction transaction = transactionRepository.findById(id)
+                .orElseThrow(() -> new NotFoundException("el moviment", id));
 
         revertFromBalance(transaction);
         transactionRepository.delete(transaction);
@@ -484,11 +493,26 @@ public class TransactionController {
                 ));
             }
 
+            // Les parts de totes les files es comproven abans de moure cap
+            // saldo: si una no quadra, no s'ha d'importar res, i el missatge ha
+            // de dir quina és.
+            Map<Transaction, List<TransactionPart>> partsByTransaction = new IdentityHashMap<>();
+            for (Transaction transaction : toPersist) {
+                List<TransactionPart> parts;
+                try {
+                    parts = splitBeforeSaving(transaction);
+                } catch (IllegalArgumentException exception) {
+                    throw new IllegalArgumentException(describe(transaction) + ": " + exception.getMessage(), exception);
+                }
+                if (!parts.isEmpty()) partsByTransaction.put(transaction, parts);
+            }
+
             for (Transaction transaction : toPersist) {
                 linkAndApplyToBalance(transaction, defaultAccount);
             }
 
             transactionRepository.saveAll(toPersist);
+            partsByTransaction.forEach(transactionPartService::store);
 
             String message = skipped > 0
                     ? toPersist.size() + " moviments guardats (" + skipped + " ja existien)"
@@ -507,15 +531,43 @@ public class TransactionController {
         } catch (Exception exception) {
             // Es rellança perquè la transacció faci rollback: capturar-la i
             // retornar un ResponseEntity deixaria els saldos ja modificats.
+            // Una validació és culpa de les dades (400); la resta, nostra (500).
             throw new ConfirmUploadException(
-                    "Error guardant: " + ClientErrors.messageFor(exception, "Confirmar importació"), exception);
+                    "No s'ha importat res. " + ClientErrors.messageFor(exception, "Confirmar importació"),
+                    exception,
+                    ClientErrors.isForTheUser(exception) ? HttpStatus.BAD_REQUEST : HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
 
-    @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
+    /**
+     * Les parts que porta un moviment que encara no s'ha desat, validades.
+     *
+     * Un moviment dividit agafa com a categoria la de la primera part: la
+     * seva ja no compta, però si es treu la divisió és la que tornarà a valer,
+     * i la que hagués proposat la IA podria ser un grup i fer fallar el desat.
+     */
+    private List<TransactionPart> splitBeforeSaving(Transaction transaction) {
+        List<TransactionPart> parts = transactionPartService.validate(transaction, transaction.getParts());
+        if (!parts.isEmpty()) {
+            transaction.setCategoryName(parts.get(0).getCategory().getName());
+            transaction.setDebt(null);
+        }
+        return parts;
+    }
+
+    /** "Moviment del 2026-10-01, Trade Republic, 500.00 €": per dir quina fila falla. */
+    private static String describe(Transaction transaction) {
+        return "Moviment del " + transaction.getDate() + ", " + transaction.getEmpresa() + ", "
+                + (transaction.getAmount() != null ? transaction.getAmount().toPlainString() : "?") + " €";
+    }
+
+    /** Un error en importar, amb el codi que toca: 400 si és de les dades, 500 si és nostre. */
     private static class ConfirmUploadException extends RuntimeException {
-        ConfirmUploadException(String message, Throwable cause) {
+        private final HttpStatus status;
+
+        ConfirmUploadException(String message, Throwable cause, HttpStatus status) {
             super(message, cause);
+            this.status = status;
         }
     }
 
@@ -533,7 +585,7 @@ public class TransactionController {
      */
     @ExceptionHandler(ConfirmUploadException.class)
     public ResponseEntity<Map<String, String>> handleConfirmUploadError(ConfirmUploadException exception) {
-        return ResponseEntity.internalServerError().body(Map.of(
+        return ResponseEntity.status(exception.status).body(Map.of(
                 "status", "error",
                 "message", exception.getMessage() != null ? exception.getMessage() : "Error desconegut"));
     }
@@ -621,15 +673,9 @@ public class TransactionController {
      */
     @PutMapping("/gastos/{id}/parts")
     public ResponseEntity<?> replaceParts(@PathVariable Long id, @RequestBody List<TransactionPart> parts) {
-        try {
-            return ResponseEntity.ok(transactionPartService.replace(id, parts));
-        } catch (TransactionNotFoundException exception) {
-            return ResponseEntity.notFound().build();
-        } catch (IllegalArgumentException exception) {
-            return ResponseEntity.badRequest().body(Map.of(
-                    "status", "error",
-                    "message", exception.getMessage()));
-        }
+        // Un moviment que no existeix o unes parts que no quadren arriben amb
+        // el seu missatge pel gestor d'errors global.
+        return ResponseEntity.ok(transactionPartService.replace(id, parts));
     }
 
     @GetMapping("/companies")

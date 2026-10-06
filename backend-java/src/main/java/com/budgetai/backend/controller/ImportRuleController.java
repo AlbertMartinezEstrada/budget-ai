@@ -2,6 +2,7 @@ package com.budgetai.backend.controller;
 
 import com.budgetai.backend.model.ImportRule;
 import com.budgetai.backend.repository.ImportRuleRepository;
+import com.budgetai.backend.service.NotFoundException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -33,7 +34,7 @@ public class ImportRuleController {
 
     @DeleteMapping("/{id}")
     public ResponseEntity<?> delete(@PathVariable Long id) {
-        if (!ruleRepository.existsById(id)) return ResponseEntity.notFound().build();
+        if (!ruleRepository.existsById(id)) throw new NotFoundException("la regla", id);
 
         ruleRepository.deleteById(id);
         return ResponseEntity.noContent().build();

@@ -1,5 +1,6 @@
 package com.budgetai.backend.integration;
 
+import com.budgetai.backend.service.NotFoundException;
 import com.budgetai.backend.controller.TransactionController;
 import com.budgetai.backend.model.Account;
 import com.budgetai.backend.model.Category;
@@ -273,18 +274,24 @@ class ManualTransactionIntegrationTest extends AbstractIntegrationTest {
         assertThat(balance()).isEqualByComparingTo("960.00");
     }
 
+    // El 404 i el seu cos els posa el gestor d'errors global; aquí, cridant
+    // el controlador directament, el que es veu és l'excepció que el provoca.
+    // ApiErrorsIntegrationTest ho comprova per HTTP.
+
     @Test
-    @DisplayName("Editar un moviment que no existeix dona 404")
-    void editingSomethingMissingIsA404() {
-        assertThat(transactionController.updateTransaction(999_999L, change())
-                .getStatusCode().value()).isEqualTo(404);
+    @DisplayName("Editar un moviment que no existeix diu quin no existeix")
+    void editingSomethingMissingSaysWhat() {
+        assertThatThrownBy(() -> transactionController.updateTransaction(999_999L, change()))
+                .isInstanceOf(NotFoundException.class)
+                .hasMessageContaining("el moviment 999999");
     }
 
     @Test
-    @DisplayName("Esborrar un moviment que no existeix dona 404 i no toca el saldo")
-    void deletingSomethingMissingIsA404() {
-        assertThat(transactionController.deleteTransaction(999_999L)
-                .getStatusCode().value()).isEqualTo(404);
+    @DisplayName("Esborrar un moviment que no existeix diu quin no existeix i no toca el saldo")
+    void deletingSomethingMissingSaysWhat() {
+        assertThatThrownBy(() -> transactionController.deleteTransaction(999_999L))
+                .isInstanceOf(NotFoundException.class)
+                .hasMessageContaining("el moviment 999999");
 
         assertThat(balance()).isEqualByComparingTo("1000.00");
     }

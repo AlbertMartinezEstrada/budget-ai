@@ -31,16 +31,28 @@ class ClientErrorsTest {
                 new SQLException("ERROR: duplicate key value violates unique constraint \"transactions_pkey\""));
 
         assertThat(ClientErrors.messageFor(database, "prova"))
-                .isEqualTo(ClientErrors.GENERIC)
+                .startsWith(ClientErrors.GENERIC)
                 .doesNotContain("transactions_pkey");
         assertThat(ClientErrors.messageFor(new NullPointerException("Cannot invoke \"Account.getId()\""), "prova"))
-                .isEqualTo(ClientErrors.GENERIC);
+                .startsWith(ClientErrors.GENERIC)
+                .doesNotContain("Account.getId");
+    }
+
+    @Test
+    @DisplayName("Un error intern porta una referència per trobar-lo al log")
+    void internalErrorsCarryAReference() {
+        String first = ClientErrors.messageFor(new RuntimeException("boom"), "prova");
+        String second = ClientErrors.messageFor(new RuntimeException("boom"), "prova");
+
+        assertThat(first).containsPattern("Referència [0-9a-f]{8}");
+        // Cada error, la seva: si no, al log no es podrien distingir.
+        assertThat(first).isNotEqualTo(second);
     }
 
     @Test
     @DisplayName("Una validació sense missatge no deixa la pantalla en blanc")
     void validationWithoutMessageFallsBackToGeneric() {
         assertThat(ClientErrors.messageFor(new IllegalArgumentException(), "prova"))
-                .isEqualTo(ClientErrors.GENERIC);
+                .startsWith(ClientErrors.GENERIC);
     }
 }

@@ -74,3 +74,44 @@ test('appState exposa els valors per defecte esperats', () => {
     assert.equal(api.appState.currency, 'EUR');
     assert.ok(api.appState.notifications);
 });
+
+test('un 404 sense missatge explica que potser cal reconstruir el backend', () => {
+    // Això és el que torna Spring quan el backend en marxa no coneix la ruta:
+    // dividir un moviment amb el backend sense reconstruir deia "Not Found".
+    const springDefault = JSON.stringify({
+        timestamp: '2026-10-06T16:00:00Z', status: 404, error: 'Not Found', path: '/gastos/12/parts'
+    });
+
+    const message = api.describeError(404, springDefault, '/gastos/12/parts');
+
+    assert.ok(message.includes('/gastos/12/parts'), message);
+    assert.ok(message.includes('docker compose up -d --build backend'), message);
+});
+
+test('el missatge del backend mana sobre l\'explicació genèrica', () => {
+    const body = JSON.stringify({ status: 'error', message: 'No existeix el moviment 12.', path: '/gastos/12/parts' });
+
+    assert.equal(api.describeError(404, body, '/gastos/12/parts'), 'No existeix el moviment 12.');
+    // Els endpoints antics encara posen el text a "error".
+    assert.equal(api.describeError(409, JSON.stringify({ error: 'El compte té moviments' })), 'El compte té moviments');
+});
+
+test('una resposta buida o en HTML es descriu pel codi', () => {
+    assert.ok(api.describeError(500, '').includes('docker compose logs backend'));
+    assert.ok(api.describeError(502, '<html><body>Bad Gateway</body></html>').includes('no respon'));
+    assert.ok(!api.describeError(502, '<html>').includes('<'));
+});
+
+test('sense connexió amb el backend, el missatge ho diu', async () => {
+    const realFetch = global.fetch;
+    global.fetch = async () => { throw new TypeError('Failed to fetch'); };
+    try {
+        await assert.rejects(api.apiFetch('/gastos'), (error) => {
+            assert.ok(error.message.includes('No es pot connectar amb el backend'), error.message);
+            assert.ok(!error.message.includes('Failed to fetch'));
+            return true;
+        });
+    } finally {
+        global.fetch = realFetch;
+    }
+});

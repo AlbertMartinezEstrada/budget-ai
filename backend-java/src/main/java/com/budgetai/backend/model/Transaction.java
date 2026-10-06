@@ -114,11 +114,14 @@ public class Transaction {
      *
      * No és una relació de JPA: el pressupost llegeix tots els moviments de
      * cop, i una col·lecció per moviment faria una consulta per cada un. Les
-     * hi posa qui les necessita ensenyar. Només de lectura: es desen per
-     * /gastos/{id}/parts, que comprova que sumin el total.
+     * hi posa qui les necessita ensenyar.
+     *
+     * Es llegeixen en importar un extracte i en l'alta manual, on un moviment
+     * es pot dividir abans de desar-lo. L'edició les rebutja: per a un moviment
+     * ja desat hi ha /gastos/{id}/parts.
      */
     @Transient
-    @JsonProperty(value = "parts", access = JsonProperty.Access.READ_ONLY)
+    @JsonProperty("parts")
     @ToString.Exclude
     @EqualsAndHashCode.Exclude
     private List<TransactionPart> parts;

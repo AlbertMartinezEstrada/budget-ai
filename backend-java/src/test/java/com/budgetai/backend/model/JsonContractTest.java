@@ -309,19 +309,24 @@ class JsonContractTest {
     }
 
     @Test
-    @DisplayName("Transaction: les parts surten com a 'parts' i no es poden escriure per l'edició")
-    void transactionExposesPartsReadOnly() throws Exception {
+    @DisplayName("Transaction: les parts surten com a 'parts' i es llegeixen de la revisió d'un extracte")
+    void transactionExposesAndReadsParts() throws Exception {
         TransactionPart part = new TransactionPart();
         part.setAmount(new BigDecimal("40.00"));
         Transaction transaction = new Transaction();
         transaction.setParts(java.util.List.of(part));
 
         JsonNode json = mapper.valueToTree(transaction);
-        Transaction fromEdit = mapper.readValue("{\"parts\":[{\"import\":40}]}", Transaction.class);
+        // El que envia la pantalla de revisió en confirmar un moviment dividit.
+        Transaction fromReview = mapper.readValue(
+                "{\"cost\":100,\"parts\":[{\"import\":60,\"category\":{\"id\":3}},"
+                        + "{\"import\":40,\"category\":{\"id\":4},\"exclos_pressupost\":true}]}",
+                Transaction.class);
 
         assertThat(json.get("parts").get(0).get("import").decimalValue()).isEqualByComparingTo("40.00");
-        // Es desen per /gastos/{id}/parts, que comprova que sumin el total.
-        assertThat(fromEdit.getParts()).isNull();
+        assertThat(fromReview.getParts()).hasSize(2);
+        assertThat(fromReview.getParts().get(1).getExcludedFromBudget()).isTrue();
+        assertThat(fromReview.getParts().get(0).getCategory().getId()).isEqualTo(3L);
     }
 
     @Test
