@@ -3,9 +3,12 @@ package com.budgetai.backend.service;
 import com.budgetai.backend.model.Category;
 import com.budgetai.backend.model.Debt;
 import com.budgetai.backend.model.Transaction;
+import com.budgetai.backend.model.TransactionPart;
 import com.budgetai.backend.repository.CategoryRepository;
 import com.budgetai.backend.repository.DebtRepository;
+import com.budgetai.backend.repository.TransactionPartRepository;
 import com.budgetai.backend.repository.TransactionRepository;
+import com.budgetai.backend.service.TransactionLines.Line;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -29,6 +32,8 @@ class DebtServiceTest {
 
     @Mock private DebtRepository debtRepository;
     @Mock private TransactionRepository transactionRepository;
+    @Mock private TransactionPartRepository partRepository;
+    @Mock private TransactionLines transactionLines;
     @Mock private CategoryRepository categoryRepository;
     @Mock private CategoryHierarchyService hierarchyService;
     @InjectMocks private DebtService service;
@@ -51,6 +56,11 @@ class DebtServiceTest {
         transaction.setAmount(new BigDecimal(amount));
         transaction.setDate(date);
         return transaction;
+    }
+
+    /** El moviment com el veu el pressupost: una sola línia, perquè no està dividit. */
+    private static Line line(Debt debt, String type, String amount, LocalDate date) {
+        return TransactionLines.expand(List.of(movement(debt, type, amount, date)), List.of()).get(0);
     }
 
     private void saveReturnsArgument() {
@@ -155,13 +165,13 @@ class DebtServiceTest {
         Debt iOwe = request(Debt.I_OWE);
         Debt owedToMe = request(Debt.OWED_TO_ME);
 
-        List<Transaction> iOweMovements = List.of(
-                movement(iOwe, "INCOME", "1000.00", LOAN_DATE),
-                movement(iOwe, "EXPENSE", "100.00", LOAN_DATE.plusMonths(1)),
-                movement(iOwe, "EXPENSE", "100.00", LOAN_DATE.plusMonths(2)));
-        List<Transaction> owedToMeMovements = List.of(
-                movement(owedToMe, "EXPENSE", "1000.00", LOAN_DATE),
-                movement(owedToMe, "INCOME", "250.00", LOAN_DATE.plusMonths(1)));
+        List<Line> iOweMovements = List.of(
+                line(iOwe, "INCOME", "1000.00", LOAN_DATE),
+                line(iOwe, "EXPENSE", "100.00", LOAN_DATE.plusMonths(1)),
+                line(iOwe, "EXPENSE", "100.00", LOAN_DATE.plusMonths(2)));
+        List<Line> owedToMeMovements = List.of(
+                line(owedToMe, "EXPENSE", "1000.00", LOAN_DATE),
+                line(owedToMe, "INCOME", "250.00", LOAN_DATE.plusMonths(1)));
 
         assertThat(DebtService.repaid(iOwe, iOweMovements, null)).isEqualByComparingTo("200.00");
         assertThat(DebtService.repaid(owedToMe, owedToMeMovements, null)).isEqualByComparingTo("250.00");
@@ -186,9 +196,9 @@ class DebtServiceTest {
 
         // A l'octubre se n'avancen 600 a més de la quota, i al novembre es
         // torna el que quedava.
-        when(transactionRepository.findByDebtIsNotNull()).thenReturn(List.of(
-                movement(debt, "EXPENSE", "900.00", LocalDate.of(2026, 10, 20)),
-                movement(debt, "EXPENSE", "100.00", LocalDate.of(2026, 11, 5))));
+        when(transactionLines.all()).thenReturn(List.of(
+                line(debt, "EXPENSE", "900.00", LocalDate.of(2026, 10, 20)),
+                line(debt, "EXPENSE", "100.00", LocalDate.of(2026, 11, 5))));
         when(debtRepository.findAll()).thenReturn(List.of(debt));
 
         Map<Long, BigDecimal> october = service.installmentsDueByCategory(
@@ -222,10 +232,44 @@ class DebtServiceTest {
         withoutCategory.setRepaymentPlan(Debt.PLAN_SINGLE);
         withoutCategory.setFirstPaymentDate(LocalDate.of(2026, 10, 1));
 
-        when(transactionRepository.findByDebtIsNotNull()).thenReturn(List.of());
+        when(transactionLines.all()).thenReturn(List.of());
         when(debtRepository.findAll()).thenReturn(List.of(owedToMe, withoutCategory));
 
         assertThat(service.installmentsDueByCategory(LocalDate.of(2026, 10, 1), LocalDate.of(2026, 10, 31)))
                 .isEmpty();
+    }
+
+    @Test
+    @DisplayName("D'un moviment dividit, la part vinculada descompta pel seu import i no pel del moviment")
+    void splitPartRepaysOnlyItsAmount() {
+        Debt debt = request(Debt.I_OWE);
+        debt.setId(1L);
+
+        // La transferència de 500 a Trade Republic: 100 tornen el préstec i
+        // 400 són estalvi. El moviment encara porta el deute d'abans de
+        // dividir-lo: no ha de comptar, manen les parts.
+        Transaction transfer = movement(debt, "EXPENSE", "500.00", LOAN_DATE.plusMonths(1));
+        transfer.setId(10L);
+        TransactionPart repayment = part(transfer, 1L, "100.00", debt);
+        TransactionPart savings = part(transfer, 2L, "400.00", null);
+
+        Debt described = service.describe(debt, LOAN_DATE.plusMonths(2),
+                TransactionLines.expand(List.of(transfer), List.of(repayment, savings)));
+
+        assertThat(described.getRepaid()).isEqualByComparingTo("100.00");
+        assertThat(described.getMovements()).hasSize(1);
+        assertThat(described.getMovements().get(0).amount()).isEqualByComparingTo("100.00");
+        assertThat(described.getMovements().get(0).part()).isTrue();
+        assertThat(described.getMovements().get(0).transactionId()).isEqualTo(10L);
+    }
+
+    private static TransactionPart part(Transaction transaction, Long id, String amount, Debt debt) {
+        TransactionPart part = new TransactionPart();
+        part.setId(id);
+        part.setTransaction(transaction);
+        part.setAmount(new BigDecimal(amount));
+        part.setDebt(debt);
+        part.setExcludedFromBudget(false);
+        return part;
     }
 }

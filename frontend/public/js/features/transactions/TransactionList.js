@@ -2,6 +2,7 @@ import {
     getTransactions, getCategories, getCompanies, getAccounts, getDebts,
     createTransaction, updateTransaction, deleteTransaction, formatCurrency, escapeHtml
 } from '../../api.js';
+import { setUpSplitEditor } from './SplitEditor.js';
 
 /**
  * Ingrés o despesa.
@@ -42,6 +43,22 @@ let debtsById = new Map();
 // La fixa setUpManualEntry, que és qui té el formulari a mà, i la crida el
 // listener de la taula, que viu fora.
 let openEditor = () => {};
+// El mateix per al formulari de dividir.
+let openSplitter = () => {};
+
+/**
+ * Les categories on poden anar diners.
+ *
+ * Al desplegable només hi van les fulles. Un grup existeix per agregar els
+ * seus fills, i un moviment penjat d'un grup es comptaria dues vegades: el
+ * backend ho rebutja, així que val més no oferir-ho.
+ */
+function leafCategories(categories) {
+    const parents = new Set(categories.map(category => category.parent_id).filter(Boolean));
+    return categories.filter(category => !parents.has(category.id));
+}
+
+const isSplit = (transaction) => (transaction.parts || []).length > 0;
 
 export async function initTransactions(container) {
     container.innerHTML = `
@@ -142,7 +159,7 @@ export async function initTransactions(container) {
                         <label class="block text-sm font-medium mb-1" for="new-date">Data</label>
                         <input type="date" id="new-date" class="form-control" required>
                     </div>
-                    <div>
+                    <div data-unsplit-only>
                         <label class="block text-sm font-medium mb-1" for="new-category">Categoria</label>
                         <select id="new-category" class="form-control" required></select>
                     </div>
@@ -156,7 +173,7 @@ export async function initTransactions(container) {
                         <label class="block text-sm font-medium mb-1" for="new-account">Compte</label>
                         <select id="new-account" class="form-control"></select>
                     </div>
-                    <div>
+                    <div data-unsplit-only>
                         <label class="block text-sm font-medium mb-1" for="new-debt">Deute</label>
                         <select id="new-debt" class="form-control"></select>
                         <p class="text-xs text-gray-500 dark:text-slate-400 mt-1">
@@ -167,7 +184,7 @@ export async function initTransactions(container) {
                         <label class="block text-sm font-medium mb-1" for="new-description">Descripció</label>
                         <input type="text" id="new-description" class="form-control" placeholder="Opcional">
                     </div>
-                    <label class="flex items-start gap-2 text-sm">
+                    <label class="flex items-start gap-2 text-sm" data-unsplit-only>
                         <input type="checkbox" id="new-excluded" class="mt-1">
                         <span>
                             No comptar al pressupost
@@ -177,6 +194,10 @@ export async function initTransactions(container) {
                             </span>
                         </span>
                     </label>
+                    <p id="transaction-split-note" class="text-sm text-gray-500 dark:text-slate-400 hidden">
+                        Aquest moviment està dividit: la categoria, el deute i si compta es decideixen a
+                        cada part. Per canviar-les, fes servir el botó de dividir.
+                    </p>
                     <p id="transaction-form-error" class="text-error text-sm hidden"></p>
                     <div class="flex gap-2 justify-end">
                         <button type="button" id="transaction-cancel" class="btn btn-outline">Cancel·lar</button>
@@ -258,6 +279,11 @@ export async function initTransactions(container) {
     document.getElementById('transactions-body').addEventListener('click', handleRowAction);
 
     setUpManualEntry(categories, companies, debts);
+    openSplitter = setUpSplitEditor(container, {
+        leaves: leafCategories(categories),
+        debts,
+        onSaved: loadData
+    });
 }
 
 async function handleRowAction(event) {
@@ -267,9 +293,11 @@ async function handleRowAction(event) {
     const id = Number.parseInt(button.dataset.id, 10);
     if (!Number.isInteger(id)) return;
 
-    if (button.dataset.action === 'edit-transaction') {
+    if (button.dataset.action === 'edit-transaction' || button.dataset.action === 'split-transaction') {
         const transaction = currentTransactions.find(candidate => candidate.id === id);
-        if (transaction) openEditor(transaction);
+        if (!transaction) return;
+        if (button.dataset.action === 'edit-transaction') openEditor(transaction);
+        else openSplitter(transaction);
         return;
     }
 
@@ -288,20 +316,20 @@ async function handleRowAction(event) {
     }
 }
 
-/**
- * Alta manual d'un moviment.
- *
- * Al desplegable només hi van les fulles. Un grup existeix per agregar els
- * seus fills, i un moviment penjat d'un grup es comptaria dues vegades: el
- * backend ho rebutja, així que val més no oferir-ho.
- */
+/** Alta i edició d'un moviment. */
 function setUpManualEntry(categories, companies, debts) {
     const modal = document.getElementById('transaction-modal');
     const form = document.getElementById('transaction-form');
     const error = document.getElementById('transaction-form-error');
 
-    const parents = new Set(categories.map(category => category.parent_id).filter(Boolean));
-    const leaves = categories.filter(category => !parents.has(category.id));
+    const leaves = leafCategories(categories);
+
+    /** En un moviment dividit, la categoria, el deute i l'exclòs són de cada part. */
+    const showSplitFields = (split) => {
+        form.querySelectorAll('[data-unsplit-only]')
+            .forEach(field => field.classList.toggle('hidden', split));
+        document.getElementById('transaction-split-note').classList.toggle('hidden', !split);
+    };
 
     getAccounts().then(accounts => {
         document.getElementById('new-account').innerHTML = accounts
@@ -355,6 +383,7 @@ function setUpManualEntry(categories, companies, debts) {
             "Per al que no surt de l'extracte: efectiu, un préstec, una devolució.";
         // Per defecte, avui: el cas normal és apuntar una cosa que acaba de passar.
         document.getElementById('new-date').value = todayInputValue();
+        showSplitFields(false);
         open();
     });
 
@@ -385,6 +414,7 @@ function setUpManualEntry(categories, companies, debts) {
         if (transaction.account?.id) {
             document.getElementById('new-account').value = transaction.account.id;
         }
+        showSplitFields(isSplit(transaction));
 
         open();
     };
@@ -553,9 +583,26 @@ function buildMonthRow(date) {
     `;
 }
 
+/** Les etiquetes de "no compta" i del deute, d'un moviment o d'una part. */
+function budgetBadges(excluded, debtId) {
+    return `
+        ${excluded
+            ? '<span class="badge badge-outline text-sm" title="Diners ja comptats en sortir del compte principal: no compten al pressupost">no compta</span>'
+            : ''}
+        ${debtId
+            ? `<span class="badge badge-outline text-sm" title="Vinculat a un deute: compta per saber quant queda per tornar">
+                   deute: ${escapeHtml(debtsById.get(debtId)?.nom || '?')}
+               </span>`
+            : ''}
+    `;
+}
+
 function buildTransactionRow(transaction) {
     const style = TYPES[typeOf(transaction)];
+    const split = isSplit(transaction);
 
+    // D'un moviment dividit manen les parts: la categoria, l'exclòs i el
+    // deute del moviment ja no compten, i ensenyar-los confondria.
     return `
         <tr>
             <td>${escapeHtml(formatTransactionDate(transaction.data))}</td>
@@ -563,21 +610,22 @@ function buildTransactionRow(transaction) {
             <td class="text-sm ${style.classe}">${style.etiqueta}</td>
             <td>
                 ${escapeHtml(transaction.empresa || '-')}
-                ${transaction.exclos_pressupost
-                    ? '<span class="badge badge-outline text-sm" title="Diners ja comptats en sortir del compte principal: no compten al pressupost">no compta</span>'
-                    : ''}
-                ${transaction.deute_id
-                    ? `<span class="badge badge-outline text-sm" title="Vinculat a un deute: compta per saber quant queda per tornar">
-                           deute: ${escapeHtml(debtsById.get(transaction.deute_id)?.nom || '?')}
-                       </span>`
-                    : ''}
+                ${split ? '' : budgetBadges(transaction.exclos_pressupost, transaction.deute_id)}
             </td>
-            <td><span class="badge badge-outline">${escapeHtml(transaction.categoria || '-')}</span></td>
+            <td>
+                ${split
+                    ? `<span class="badge badge-secondary" title="Cada part compta a la seva categoria">dividit en ${transaction.parts.length}</span>`
+                    : `<span class="badge badge-outline">${escapeHtml(transaction.categoria || '-')}</span>`}
+            </td>
             <td class="text-muted text-sm">${escapeHtml(transaction.descripcio_curta || '-')}</td>
             <td class="text-right font-bold ${style.classe}" style="white-space: nowrap;">
                 ${style.signe}${formatAmount(transaction.cost)}
             </td>
             <td class="text-right" style="white-space: nowrap;">
+                <button class="btn btn-sm btn-outline" data-action="split-transaction"
+                        data-id="${transaction.id}" title="Dividir en parts amb categories diferents">
+                    <span class="material-symbols-outlined text-sm">call_split</span>
+                </button>
                 <button class="btn btn-sm btn-outline" data-action="edit-transaction"
                         data-id="${transaction.id}" title="Editar aquest moviment">
                     <span class="material-symbols-outlined text-sm">edit</span>
@@ -587,6 +635,28 @@ function buildTransactionRow(transaction) {
                     <span class="material-symbols-outlined text-sm">delete</span>
                 </button>
             </td>
+        </tr>
+        ${split ? transaction.parts.map(part => buildPartRow(part, style)).join('') : ''}
+    `;
+}
+
+/** Una part, just a sota del seu moviment. */
+function buildPartRow(part, style) {
+    return `
+        <tr class="text-sm">
+            <td></td>
+            <td></td>
+            <td></td>
+            <td class="text-muted">
+                <span class="material-symbols-outlined text-sm align-middle">subdirectory_arrow_right</span>
+                ${budgetBadges(part.exclos_pressupost, part.deute_id)}
+            </td>
+            <td><span class="badge badge-outline">${escapeHtml(part.category?.nom || '-')}</span></td>
+            <td class="text-muted text-sm">${escapeHtml(part.descripcio || '')}</td>
+            <td class="text-right ${style.classe}" style="white-space: nowrap;">
+                ${style.signe}${formatAmount(part.import)}
+            </td>
+            <td></td>
         </tr>
     `;
 }

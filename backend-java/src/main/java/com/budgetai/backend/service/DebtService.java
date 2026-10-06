@@ -4,9 +4,12 @@ import com.budgetai.backend.model.Category;
 import com.budgetai.backend.model.Debt;
 import com.budgetai.backend.model.Debt.Installment;
 import com.budgetai.backend.model.Transaction;
+import com.budgetai.backend.model.TransactionPart;
 import com.budgetai.backend.repository.CategoryRepository;
 import com.budgetai.backend.repository.DebtRepository;
+import com.budgetai.backend.repository.TransactionPartRepository;
 import com.budgetai.backend.repository.TransactionRepository;
+import com.budgetai.backend.service.TransactionLines.Line;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -27,6 +30,10 @@ import java.util.Set;
  * quadrar. Una devolució d'un deute que dec és una sortida (EXPENSE); d'un que
  * em deuen, una entrada (INCOME). El moviment en sentit contrari és l'origen
  * del préstec i no descompta res.
+ *
+ * Es compta per línies (TransactionLines), no per moviments: una part d'un
+ * moviment dividit també pot ser una devolució, i només per l'import de la
+ * part.
  */
 @Service
 public class DebtService {
@@ -36,15 +43,21 @@ public class DebtService {
 
     private final DebtRepository debtRepository;
     private final TransactionRepository transactionRepository;
+    private final TransactionPartRepository partRepository;
+    private final TransactionLines transactionLines;
     private final CategoryRepository categoryRepository;
     private final CategoryHierarchyService hierarchyService;
 
     public DebtService(DebtRepository debtRepository,
                        TransactionRepository transactionRepository,
+                       TransactionPartRepository partRepository,
+                       TransactionLines transactionLines,
                        CategoryRepository categoryRepository,
                        CategoryHierarchyService hierarchyService) {
         this.debtRepository = debtRepository;
         this.transactionRepository = transactionRepository;
+        this.partRepository = partRepository;
+        this.transactionLines = transactionLines;
         this.categoryRepository = categoryRepository;
         this.hierarchyService = hierarchyService;
     }
@@ -53,15 +66,16 @@ public class DebtService {
     @Transactional(readOnly = true)
     public List<Debt> list() {
         LocalDate today = LocalDate.now();
+        List<Line> lines = transactionLines.all();
         List<Debt> debts = new ArrayList<>(debtRepository.findAllByOrderByDateDesc());
-        debts.forEach(debt -> describe(debt, today));
+        debts.forEach(debt -> describe(debt, today, lines));
         debts.sort(Comparator.comparing(Debt::isSettled));
         return debts;
     }
 
     @Transactional(readOnly = true)
     public Debt get(Long id) {
-        return describe(find(id), LocalDate.now());
+        return describe(find(id), LocalDate.now(), transactionLines.all());
     }
 
     @Transactional
@@ -79,7 +93,7 @@ public class DebtService {
         debt.setCategory(resolveCategory(request.getCategory()));
 
         validateAndNormalize(debt);
-        return describe(debtRepository.save(debt), LocalDate.now());
+        return describe(debtRepository.save(debt), LocalDate.now(), transactionLines.all());
     }
 
     /**
@@ -104,11 +118,11 @@ public class DebtService {
         if (changes.getCategory() != null) debt.setCategory(resolveCategory(changes.getCategory()));
 
         validateAndNormalize(debt);
-        return describe(debtRepository.save(debt), LocalDate.now());
+        return describe(debtRepository.save(debt), LocalDate.now(), transactionLines.all());
     }
 
     /**
-     * Esborra el deute i deixa els moviments sense vincle.
+     * Esborra el deute i deixa els moviments i les parts sense vincle.
      *
      * Els moviments no s'esborren: van passar de debò i el saldo del compte en
      * depèn. Només deixen de dir de quin deute són.
@@ -119,6 +133,10 @@ public class DebtService {
         for (Transaction transaction : transactionRepository.findByDebtOrderedByDate(id)) {
             transaction.setDebt(null);
             transactionRepository.save(transaction);
+        }
+        for (TransactionPart part : partRepository.findByDebt(id)) {
+            part.setDebt(null);
+            partRepository.save(part);
         }
         debtRepository.delete(debt);
     }
@@ -150,10 +168,10 @@ public class DebtService {
      */
     @Transactional(readOnly = true)
     public Map<Long, BigDecimal> installmentsDueByCategory(LocalDate from, LocalDate to) {
-        Map<Long, List<Transaction>> movementsByDebt = new HashMap<>();
-        for (Transaction transaction : transactionRepository.findByDebtIsNotNull()) {
-            movementsByDebt.computeIfAbsent(transaction.getDebt().getId(), missingDebtId -> new ArrayList<>())
-                    .add(transaction);
+        Map<Long, List<Line>> linesByDebt = new HashMap<>();
+        for (Line line : transactionLines.all()) {
+            if (line.debt() == null) continue;
+            linesByDebt.computeIfAbsent(line.debt().getId(), missingDebtId -> new ArrayList<>()).add(line);
         }
 
         Map<Long, BigDecimal> reserved = new HashMap<>();
@@ -163,7 +181,7 @@ public class DebtService {
             BigDecimal due = RepaymentSchedule.dueBetween(RepaymentSchedule.of(debt), from, to);
             if (due.signum() == 0) continue;
 
-            BigDecimal repaidBefore = repaid(debt, movementsByDebt.getOrDefault(debt.getId(), List.of()), from);
+            BigDecimal repaidBefore = repaid(debt, linesByDebt.getOrDefault(debt.getId(), List.of()), from);
             BigDecimal pendingAtStart = debt.getAmount().subtract(repaidBefore).max(BigDecimal.ZERO);
             BigDecimal reservation = due.min(pendingAtStart);
             if (reservation.signum() > 0) {
@@ -173,15 +191,23 @@ public class DebtService {
         return reserved;
     }
 
-    /** Omple el que es calcula: retornat, calendari, endarrerit, pròxim pagament i moviments. */
-    Debt describe(Debt debt, LocalDate today) {
-        List<Transaction> movements = debt.getId() != null
-                ? transactionRepository.findByDebtOrderedByDate(debt.getId())
-                : List.of();
-        BigDecimal repaid = repaid(debt, movements, null);
+    /**
+     * Omple el que es calcula: retornat, calendari, endarrerit, pròxim pagament i moviments.
+     *
+     * @param allLines les línies de tots els moviments; se'n queda les del deute
+     */
+    Debt describe(Debt debt, LocalDate today, List<Line> allLines) {
+        List<Line> lines = allLines.stream()
+                .filter(line -> line.belongsTo(debt))
+                .sorted(Comparator.comparing(Line::date, Comparator.nullsLast(Comparator.naturalOrder())))
+                .toList();
+        BigDecimal repaid = repaid(debt, lines, null);
         List<Installment> payments = RepaymentSchedule.of(debt);
 
-        debt.setMovements(movements);
+        debt.setMovements(lines.stream()
+                .map(line -> new Debt.Movement(line.transaction().getId(), line.date(), line.type(),
+                        line.amount(), line.transaction().getEmpresa(), line.description(), line.isPart()))
+                .toList());
         debt.setRepaid(repaid);
         debt.setSchedule(RepaymentSchedule.withStatus(payments, repaid, today));
         debt.setOverdue(RepaymentSchedule.overdue(payments, repaid, today));
@@ -190,17 +216,17 @@ public class DebtService {
     }
 
     /**
-     * El que s'ha retornat, comptant només els moviments en sentit de retorn.
+     * El que s'ha retornat, comptant només les línies en sentit de retorn.
      *
-     * @param before si no és null, només els d'abans d'aquest dia
+     * @param lines les del deute
+     * @param before si no és null, només les d'abans d'aquest dia
      */
-    static BigDecimal repaid(Debt debt, List<Transaction> movements, LocalDate before) {
+    static BigDecimal repaid(Debt debt, List<Line> lines, LocalDate before) {
         String repaymentType = debt.isOwedByMe() ? "EXPENSE" : "INCOME";
-        return movements.stream()
-                .filter(movement -> repaymentType.equals(movement.getType()))
-                .filter(movement -> before == null
-                        || (movement.getDate() != null && movement.getDate().isBefore(before)))
-                .map(movement -> movement.getAmount() != null ? movement.getAmount() : BigDecimal.ZERO)
+        return lines.stream()
+                .filter(line -> repaymentType.equals(line.type()))
+                .filter(line -> before == null || (line.date() != null && line.date().isBefore(before)))
+                .map(Line::amount)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 

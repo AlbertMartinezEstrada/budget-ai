@@ -13,6 +13,7 @@ import lombok.ToString;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Entity
 @Table(name = "transactions")
@@ -105,6 +106,22 @@ public class Transaction {
     @ToString.Exclude
     @EqualsAndHashCode.Exclude
     private Debt debt;
+
+    /**
+     * Les parts en què està dividit, si n'hi ha. Quan n'hi ha, manen elles:
+     * la categoria, la marca d'exclòs i el deute del moviment deixen de
+     * comptar.
+     *
+     * No és una relació de JPA: el pressupost llegeix tots els moviments de
+     * cop, i una col·lecció per moviment faria una consulta per cada un. Les
+     * hi posa qui les necessita ensenyar. Només de lectura: es desen per
+     * /gastos/{id}/parts, que comprova que sumin el total.
+     */
+    @Transient
+    @JsonProperty(value = "parts", access = JsonProperty.Access.READ_ONLY)
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
+    private List<TransactionPart> parts;
 
     @Column(name = "compte_nom")
     private String accountName;
