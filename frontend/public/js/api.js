@@ -208,6 +208,21 @@ export async function deleteTransaction(id) {
     return handleResponse(response);
 }
 
+/**
+ * Divideix un moviment en parts, o treu la divisió amb una llista buida.
+ *
+ * Les parts han de sumar exactament l'import del moviment. El saldo no es
+ * toca: el moviment ja el va moure pel total.
+ */
+export async function saveTransactionParts(id, parts) {
+    const response = await apiFetch(`/gastos/${id}/parts`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(parts),
+    });
+    return handleResponse(response);
+}
+
 // ============ REGLES D'IMPORTACIÓ ============
 // Miren el concepte original del moviment i, si hi troben el seu patró, el
 // marquen com a ja comptat i li poden posar categoria.

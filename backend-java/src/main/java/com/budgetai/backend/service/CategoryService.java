@@ -2,6 +2,7 @@ package com.budgetai.backend.service;
 
 import com.budgetai.backend.model.Category;
 import com.budgetai.backend.repository.CategoryRepository;
+import com.budgetai.backend.repository.TransactionPartRepository;
 import com.budgetai.backend.repository.TransactionRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -14,13 +15,16 @@ public class CategoryService {
 
     private final CategoryRepository categoryRepository;
     private final TransactionRepository transactionRepository;
+    private final TransactionPartRepository transactionPartRepository;
     private final CategoryHierarchyService hierarchyService;
 
     public CategoryService(CategoryRepository categoryRepository,
                            TransactionRepository transactionRepository,
+                           TransactionPartRepository transactionPartRepository,
                            CategoryHierarchyService hierarchyService) {
         this.categoryRepository = categoryRepository;
         this.transactionRepository = transactionRepository;
+        this.transactionPartRepository = transactionPartRepository;
         this.hierarchyService = hierarchyService;
     }
 
@@ -92,7 +96,9 @@ public class CategoryService {
 
     @Transactional
     public void delete(Long id) {
-        long used = transactionRepository.countByCategoryId(id);
+        // Les parts de moviments dividits també hi pengen: sense comptar-les,
+        // esborrar la categoria fallaria per la clau forana amb un error intern.
+        long used = transactionRepository.countByCategoryId(id) + transactionPartRepository.countByCategory(id);
         if (used > 0) {
             throw new IllegalStateException(
                     "No es pot esborrar la categoria: té " + used + " moviments associats");

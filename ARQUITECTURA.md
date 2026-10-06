@@ -584,6 +584,57 @@ Lo que me deben **no se reserva ni se prevé**. Un dinero que aún no ha llegado
 no debe ensanchar lo que se reparte: si se retrasa, el presupuesto habría
 contado con él.
 
+## Movimientos divididos en partes
+
+Una misma línea del extracto puede ser varias cosas. La transferencia mensual
+a Trade Republic es, a la vez:
+
+| Parte | Categoría | Cómo cuenta |
+|---|---|---|
+| 300 € de ahorro | Trade Republic | gasto de ese bloque |
+| 100 € que devuelven un autopréstamo | Pagament de deutes | gasto, y descuenta de la deuda |
+| 60 € guardados para el seguro | Assegurances | gasto del seguro |
+| 40 € que reponen lo que se cogió | Trade Republic | marcada «no cuenta»: no suma en ningún sitio |
+
+Con una sola categoría por movimiento, el presupuesto contaba los 500 € enteros
+en un sitio.
+
+### El movimiento no se toca
+
+Las partes van en `transaction_parts` y el movimiento sigue igual: el saldo se
+movió una vez, por el total, y el hash sigue identificando la línea del
+extracto. Dividir no es ningún movimiento nuevo, así que no pasa por el código
+que mueve saldos. Lo único que se exige es que **las partes sumen exactamente el
+importe** (y con dos decimales: `NUMERIC(15,2)` redondearía el tercero en
+silencio y dejarían de sumarlo).
+
+Cada parte va a una hoja, como cualquier dinero: una parte en un grupo se
+volvería a sumar por sus hijos. Una sola parte no se acepta —para cambiar la
+categoría ya está la edición— y una lista vacía quita la división.
+
+### Mandan las partes
+
+Si un movimiento tiene partes, su categoría, su «no cuenta» y su deuda dejan de
+contar. `TransactionLines` convierte los movimientos en **líneas**: una por
+movimiento sin dividir, o una por parte, con la fecha y el sentido del
+movimiento. Presupuesto, deudas y análisis suman líneas. Es la única puerta: un
+sitio que sumara movimientos contaría el dividido entero en su categoría de
+antes.
+
+Al dividir, la deuda del movimiento pasa a la parte que toca y el movimiento se
+queda sin ella; si no, la ficha de la deuda lo contaría dos veces. Por la misma
+razón, un movimiento dividido no puede cambiar de importe ni recibir una deuda
+desde la edición.
+
+`GET /gastos` devuelve cada movimiento con sus `parts`, cargadas en una sola
+consulta para toda la lista: no es una relación de JPA porque el presupuesto lee
+todos los movimientos de golpe y una colección por movimiento haría una consulta
+por cada uno. El filtro por categoría encuentra un movimiento dividido por sus
+partes, no por la categoría que aún lleva.
+
+Borrar el movimiento borra sus partes (`ON DELETE CASCADE`), y una categoría que
+solo usan partes tampoco se puede borrar.
+
 ## La sesión
 
 Resumen; el detalle está en [AUTENTICACION.md](AUTENTICACION.md).
@@ -603,9 +654,9 @@ Todo requiere sesión salvo `/auth/login` y `/auth/logout`.
 
 ## El esquema
 
-Doce tablas. `accounts`, `transactions`, `categories`, `companies`, `budgets`,
-`financial_goals`, `recurring_transactions`, `transfers`, `settings`,
-`monthly_income`, `import_rules` y `debts`.
+Trece tablas. `accounts`, `transactions`, `transaction_parts`, `categories`,
+`companies`, `budgets`, `financial_goals`, `recurring_transactions`,
+`transfers`, `settings`, `monthly_income`, `import_rules` y `debts`.
 
 `ddl-auto` está en **`validate`**: Hibernate comprueba al arrancar que las
 tablas cuadren con las entidades y falla si no. No genera ni modifica nada.

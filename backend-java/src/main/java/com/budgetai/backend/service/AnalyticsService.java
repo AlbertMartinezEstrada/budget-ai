@@ -1,7 +1,9 @@
 package com.budgetai.backend.service;
 
 import com.budgetai.backend.model.Transaction;
+import com.budgetai.backend.repository.TransactionPartRepository;
 import com.budgetai.backend.repository.TransactionRepository;
+import com.budgetai.backend.service.TransactionLines.Line;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -17,6 +19,9 @@ public class AnalyticsService {
 
     @Autowired
     private TransactionRepository transactionRepository;
+
+    @Autowired
+    private TransactionPartRepository transactionPartRepository;
 
     public Map<String, Object> getMonthlySummary(int year, int month) {
         LocalDate startDate = LocalDate.of(year, month, 1);
@@ -44,15 +49,19 @@ public class AnalyticsService {
         LocalDate startDate = LocalDate.of(year, month, 1);
         LocalDate endDate = startDate.withDayOfMonth(startDate.lengthOfMonth());
 
-        List<Transaction> expenses = transactionRepository.findAll().stream()
-                .filter(transaction -> "EXPENSE".equals(transaction.getType()))
-                .filter(transaction -> !transaction.getDate().isBefore(startDate) && !transaction.getDate().isAfter(endDate))
+        // Per línies: d'un moviment dividit, cada part va a la seva categoria.
+        // Els totals per tipus no en necessiten, perquè les parts sumen el
+        // moviment sencer.
+        List<Line> expenses = TransactionLines.expand(transactionRepository.findAll(), transactionPartRepository.findAll())
+                .stream()
+                .filter(line -> "EXPENSE".equals(line.type()))
+                .filter(line -> line.isBetween(startDate, endDate))
                 .toList();
 
         Map<String, BigDecimal> categoryTotals = expenses.stream()
                 .collect(Collectors.groupingBy(
-                        transaction -> transaction.getCategory() != null ? transaction.getCategory().getName() : "Sin categoría",
-                        Collectors.reducing(BigDecimal.ZERO, AnalyticsService::amountOf, BigDecimal::add)
+                        line -> line.category() != null ? line.category().getName() : "Sin categoría",
+                        Collectors.reducing(BigDecimal.ZERO, Line::amount, BigDecimal::add)
                 ));
 
         BigDecimal totalExpense = categoryTotals.values().stream()

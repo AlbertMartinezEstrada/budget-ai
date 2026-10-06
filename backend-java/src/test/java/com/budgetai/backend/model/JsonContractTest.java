@@ -264,6 +264,84 @@ class JsonContractTest {
     }
 
     @Test
+    @DisplayName("TransactionPart: els noms que llegeix el formulari de dividir")
+    void transactionPartKeys() throws Exception {
+        Category category = new Category("Trade Republic");
+        category.setId(3L);
+        Debt debt = new Debt();
+        debt.setId(5L);
+        TransactionPart part = new TransactionPart();
+        part.setTransaction(new Transaction());
+        part.setAmount(new BigDecimal("100.00"));
+        part.setCategory(category);
+        part.setExcludedFromBudget(true);
+        part.setDebt(debt);
+        part.setDescription("Autopréstec");
+
+        JsonNode json = mapper.valueToTree(part);
+
+        for (String key : new String[] {"import", "category", "exclos_pressupost", "deute_id", "descripcio"}) {
+            assertThat(json.has(key)).as(key).isTrue();
+        }
+        assertThat(json.get("deute_id").asLong()).isEqualTo(5L);
+        assertThat(json.get("exclos_pressupost").asBoolean()).isTrue();
+        // La part viatja dins del seu moviment: portar-lo faria un cercle.
+        assertThat(json.has("transaction")).isFalse();
+        assertThat(json.has("amount")).isFalse();
+        assertThat(json.has("debt")).isFalse();
+        assertThat(json.has("excludedFromBudget")).isFalse();
+    }
+
+    @Test
+    @DisplayName("TransactionPart: es llegeix del JSON que envia el formulari de dividir")
+    void transactionPartDeserializesFromFormPayload() throws Exception {
+        String payload = """
+            {"import":100.50,"category":{"id":3},"exclos_pressupost":true,"deute_id":5,"descripcio":"seguro"}
+            """;
+
+        TransactionPart part = mapper.readValue(payload, TransactionPart.class);
+
+        assertThat(part.getAmount()).isEqualByComparingTo("100.50");
+        assertThat(part.getCategory().getId()).isEqualTo(3L);
+        assertThat(part.getExcludedFromBudget()).isTrue();
+        assertThat(part.getDebt().getId()).isEqualTo(5L);
+        assertThat(part.getDescription()).isEqualTo("seguro");
+    }
+
+    @Test
+    @DisplayName("Transaction: les parts surten com a 'parts' i no es poden escriure per l'edició")
+    void transactionExposesPartsReadOnly() throws Exception {
+        TransactionPart part = new TransactionPart();
+        part.setAmount(new BigDecimal("40.00"));
+        Transaction transaction = new Transaction();
+        transaction.setParts(java.util.List.of(part));
+
+        JsonNode json = mapper.valueToTree(transaction);
+        Transaction fromEdit = mapper.readValue("{\"parts\":[{\"import\":40}]}", Transaction.class);
+
+        assertThat(json.get("parts").get(0).get("import").decimalValue()).isEqualByComparingTo("40.00");
+        // Es desen per /gastos/{id}/parts, que comprova que sumin el total.
+        assertThat(fromEdit.getParts()).isNull();
+    }
+
+    @Test
+    @DisplayName("Debt: els moviments vinculats porten els noms d'un moviment, i diuen si són una part")
+    void debtMovementKeys() throws Exception {
+        Debt debt = new Debt();
+        debt.setMovements(java.util.List.of(new Debt.Movement(
+                10L, LocalDate.of(2026, 10, 5), "EXPENSE", new BigDecimal("100.00"),
+                "Trade Republic", "Autopréstec", true)));
+
+        JsonNode movement = mapper.valueToTree(debt).get("moviments").get(0);
+
+        for (String key : new String[] {"id", "data", "type", "cost", "empresa", "descripcio_curta", "es_part"}) {
+            assertThat(movement.has(key)).as(key).isTrue();
+        }
+        assertThat(movement.get("data").asText()).isEqualTo("2026-10-05");
+        assertThat(movement.get("es_part").asBoolean()).isTrue();
+    }
+
+    @Test
     @DisplayName("Budget: quantitat_limit i gasto_actual")
     void budgetKeys() throws Exception {
         Budget budget = new Budget();

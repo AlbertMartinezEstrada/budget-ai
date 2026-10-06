@@ -113,10 +113,16 @@ function renderTopCategories(transactions) {
     // Filter only expenses for categories
     const expenses = transactions.filter(transaction => transaction.type !== 'INCOME');
     const categories = {};
-    
-    expenses.forEach(transaction => {
-        const categoryName = transaction.categoria || 'Altres';
-        categories[categoryName] = (categories[categoryName] || 0) + parseFloat(transaction.cost || 0);
+
+    // D'un moviment dividit, cada part va a la seva categoria: si no, la
+    // transferència a Trade Republic sortiria sencera a "Trade Republic".
+    const lines = expenses.flatMap(transaction => (transaction.parts || []).length > 0
+        ? transaction.parts.map(part => ({ categoryName: part.category?.nom, amount: part.import }))
+        : [{ categoryName: transaction.categoria, amount: transaction.cost }]);
+
+    lines.forEach(line => {
+        const categoryName = line.categoryName || 'Altres';
+        categories[categoryName] = (categories[categoryName] || 0) + parseFloat(line.amount || 0);
     });
 
     const sortedCategories = Object.entries(categories)
