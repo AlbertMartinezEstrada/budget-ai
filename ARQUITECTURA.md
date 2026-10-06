@@ -635,6 +635,55 @@ partes, no por la categoría que aún lleva.
 Borrar el movimiento borra sus partes (`ON DELETE CASCADE`), y una categoría que
 solo usan partes tampoco se puede borrar.
 
+### También al importar
+
+En la revisión de un extracto, cada fila tiene el mismo botón de dividir. Las
+partes se guardan en la fila y viajan en `parts` con la confirmación. El backend
+**valida las de todas las filas antes de mover ningún saldo**: la importación es
+todo o nada, y si una fila no cuadra el mensaje dice cuál («Moviment del
+2026-10-01, Trade Republic, 500.00 €: les parts sumen…»). La categoría del
+movimiento pasa a ser la de la primera parte, porque la que proponía la IA
+podría ser un grupo y hacer fallar el guardado.
+
+El alta manual acepta lo mismo. La edición, en cambio, rechaza `parts` con un
+400: para un movimiento ya guardado está `/gastos/{id}/parts`, y aceptarlas en
+silencio sin hacer nada sería peor que avisar.
+
+## Los errores
+
+Todos llegan al navegador con la misma forma:
+
+```json
+{"status": "error", "message": "No existeix el moviment 12. Potser s'ha esborrat…", "path": "/gastos/12/parts"}
+```
+
+Los produce `ApiErrorHandler`, un `@RestControllerAdvice`:
+
+| Excepción | Código | Mensaje |
+|---|---|---|
+| `NotFoundException` | 404 | qué no existe |
+| `IllegalArgumentException` | 400 | el de la validación |
+| `IllegalStateException` | 409 | el de la validación |
+| ruta desconocida | 404 | que el backend no la tiene y probablemente hay que reconstruirlo |
+| JSON ilegible, parámetro del tipo que no toca | 400 | qué no se ha podido leer, sin clases de Java |
+| clave foránea o única | 409 | que hay datos que dependen, con referencia |
+| cualquier otra | 500 | genérico, con una referencia que también sale en el log |
+
+Antes, lo que ningún controlador resolvía llegaba con el cuerpo de error de
+Spring, que no lleva mensaje, y la pantalla decía «Not Found» o «Bad Request».
+Cuatro controladores, además, convertían cualquier error en un 404 vacío.
+
+Llega después de que la excepción haya salido del método y de su
+`@Transactional`, así que el rollback ya se ha hecho. Los `@ExceptionHandler`
+propios de un controlador (importaciones, transferencias) tienen preferencia.
+
+El frontend completa lo que falte: `describeError` en `api.js` prefiere el
+`message` del backend y, si solo llega la frase estándar del código («Not
+Found»), explica qué puede haber pasado. Un `fetch` que no llega al servidor
+dice que el backend no está en marcha, en vez de «Failed to fetch», y si pasa al
+abrir la aplicación sale en la pantalla de entrada en lugar de una página en
+blanco.
+
 ## La sesión
 
 Resumen; el detalle está en [AUTENTICACION.md](AUTENTICACION.md).

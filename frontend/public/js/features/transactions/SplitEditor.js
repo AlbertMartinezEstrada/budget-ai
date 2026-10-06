@@ -1,4 +1,4 @@
-import { saveTransactionParts, formatCurrency, escapeHtml } from '../../api.js';
+import { formatCurrency, escapeHtml } from '../../api.js';
 
 /**
  * Dividir un moviment en parts.
@@ -11,6 +11,10 @@ import { saveTransactionParts, formatCurrency, escapeHtml } from '../../api.js';
  * El saldo no es toca: el moviment ja el va moure pel total. Per això les parts
  * han de sumar exactament l'import, i el botó de desar no s'activa fins que
  * quadren. El backend ho torna a comprovar.
+ *
+ * El fa servir Transaccions, on les parts es desen de seguida, i la revisió
+ * d'un extracte, on es guarden a la fila fins que es confirma la importació.
+ * Per això no crida l'API: qui l'obre diu què vol dir desar.
  */
 
 /** Els imports es comparen en cèntims: amb decimals, 0.1 + 0.2 no fa 0.3. */
@@ -20,10 +24,11 @@ const toCents = (value) => Math.round((Number.parseFloat(value) || 0) * 100);
  * @param container  on s'afegeix el formulari
  * @param leaves     les categories on poden anar diners (cap grup)
  * @param debts      per vincular una part a un deute
- * @param onSaved    es crida després de desar o de treure la divisió
+ * @param save       async (moviment, parts) => desa-les; si llança, el missatge surt al formulari
+ * @param remove     async (moviment) => treu la divisió
  * @returns la funció que obre el formulari per a un moviment
  */
-export function setUpSplitEditor(container, { leaves, debts, onSaved }) {
+export function setUpSplitEditor(container, { leaves, debts, save, remove }) {
     container.insertAdjacentHTML('beforeend', `
         <div id="split-modal" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-50 p-4">
             <div class="bg-white dark:bg-slate-800 rounded-xl p-6 w-full max-w-3xl max-h-full overflow-y-auto">
@@ -176,9 +181,8 @@ export function setUpSplitEditor(container, { leaves, debts, onSaved }) {
             descripcio: part.description
         }));
         try {
-            await saveTransactionParts(current.id, payload);
+            await save(current, payload);
             close();
-            await onSaved();
         } catch (failure) {
             error.textContent = failure.message || 'No s\'han pogut desar les parts.';
             error.classList.remove('hidden');
@@ -189,9 +193,8 @@ export function setUpSplitEditor(container, { leaves, debts, onSaved }) {
     document.getElementById('split-remove').addEventListener('click', async () => {
         if (!confirm('Treure la divisió? El moviment tornarà a comptar sencer amb la seva categoria.')) return;
         try {
-            await saveTransactionParts(current.id, []);
+            await remove(current);
             close();
-            await onSaved();
         } catch (failure) {
             error.textContent = failure.message || 'No s\'ha pogut treure la divisió.';
             error.classList.remove('hidden');

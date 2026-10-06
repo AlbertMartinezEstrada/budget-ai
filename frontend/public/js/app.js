@@ -24,7 +24,15 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Res no es carrega fins que hi ha sessió: si no n'hi ha, es mostra la
     // pantalla d'entrada i l'aplicació ni tan sols demana dades.
-    const user = await getCurrentUser();
+    let user;
+    try {
+        user = await getCurrentUser();
+    } catch (error) {
+        // Amb el backend aturat, la pàgina es quedava en blanc sense dir per
+        // què. La pantalla d'entrada ensenya el motiu, i entrar ho torna a provar.
+        showLogin({ onSuccess: startApp, message: error.message });
+        return;
+    }
     if (!user) {
         showLogin({ onSuccess: startApp });
         return;

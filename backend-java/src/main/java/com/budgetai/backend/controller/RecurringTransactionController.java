@@ -2,6 +2,7 @@ package com.budgetai.backend.controller;
 
 import com.budgetai.backend.model.RecurringTransaction;
 import com.budgetai.backend.service.RecurringTransactionService;
+import com.budgetai.backend.service.NotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -29,7 +30,7 @@ public class RecurringTransactionController {
     public ResponseEntity<RecurringTransaction> getRecurringTransactionById(@PathVariable Long id) {
         return recurringTransactionService.getRecurringTransactionById(id)
                 .map(ResponseEntity::ok)
-                .orElse(ResponseEntity.notFound().build());
+                .orElseThrow(() -> new NotFoundException("el moviment recurrent", id));
     }
 
     @PostMapping
@@ -41,12 +42,8 @@ public class RecurringTransactionController {
     @PutMapping("/{id}")
     public ResponseEntity<RecurringTransaction> updateRecurringTransaction(@PathVariable Long id,
                                                                              @RequestBody RecurringTransaction recurring) {
-        try {
-            RecurringTransaction updated = recurringTransactionService.updateRecurringTransaction(id, recurring);
-            return ResponseEntity.ok(updated);
-        } catch (RuntimeException exception) {
-            return ResponseEntity.notFound().build();
-        }
+        // Sense try/catch: abans qualsevol error es tornava com un 404 buit.
+        return ResponseEntity.ok(recurringTransactionService.updateRecurringTransaction(id, recurring));
     }
 
     @DeleteMapping("/{id}")

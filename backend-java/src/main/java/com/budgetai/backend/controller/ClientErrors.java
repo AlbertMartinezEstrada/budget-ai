@@ -3,6 +3,8 @@ package com.budgetai.backend.controller;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.UUID;
+
 /**
  * Quin missatge d'error pot arribar al navegador.
  *
@@ -25,13 +27,20 @@ final class ClientErrors {
     private ClientErrors() {
     }
 
-    /** Missatge per al navegador; si no és per a l'usuari, l'error sencer va al log. */
+    /**
+     * Missatge per al navegador; si no és per a l'usuari, l'error sencer va al log.
+     *
+     * Un error intern porta una referència curta que surt tant al missatge com
+     * al log. Sense ella, "el detall és al log" obligava a endevinar quina de
+     * les línies d'error era la d'aquell moment.
+     */
     static String messageFor(Exception exception, String context) {
         if (isForTheUser(exception) && exception.getMessage() != null) {
             return exception.getMessage();
         }
-        LOGGER.error("{}: error inesperat", context, exception);
-        return GENERIC;
+        String reference = UUID.randomUUID().toString().substring(0, 8);
+        LOGGER.error("{}: error inesperat [ref {}]", context, reference, exception);
+        return GENERIC + " Referència " + reference + ": busca-la amb «docker compose logs backend».";
     }
 
     static boolean isForTheUser(Exception exception) {

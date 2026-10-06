@@ -1,6 +1,6 @@
 import {
     getTransactions, getCategories, getCompanies, getAccounts, getDebts,
-    createTransaction, updateTransaction, deleteTransaction, formatCurrency, escapeHtml
+    createTransaction, updateTransaction, deleteTransaction, saveTransactionParts, formatCurrency, escapeHtml
 } from '../../api.js';
 import { setUpSplitEditor } from './SplitEditor.js';
 
@@ -279,10 +279,19 @@ export async function initTransactions(container) {
     document.getElementById('transactions-body').addEventListener('click', handleRowAction);
 
     setUpManualEntry(categories, companies, debts);
+    // Aquí les parts es desen de seguida, i la llista es torna a carregar
+    // perquè el moviment surti amb les seves.
     openSplitter = setUpSplitEditor(container, {
         leaves: leafCategories(categories),
         debts,
-        onSaved: loadData
+        save: async (transaction, parts) => {
+            await saveTransactionParts(transaction.id, parts);
+            await loadData();
+        },
+        remove: async (transaction) => {
+            await saveTransactionParts(transaction.id, []);
+            await loadData();
+        }
     });
 }
 
