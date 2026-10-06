@@ -91,7 +91,14 @@ export function escapeHtml(value) {
 // i el backend són a ports diferents, sense "credentials: include" el
 // navegador no l'enviaria.
 export async function apiFetch(path, options = {}) {
-    return fetch(`${API_URL}${path}`, { credentials: 'include', ...options });
+    try {
+        return await fetch(`${API_URL}${path}`, { credentials: 'include', ...options });
+    } catch (error) {
+        // fetch només falla així quan no arriba a parlar amb el servidor. El
+        // navegador ho diu com "Failed to fetch", que no diu res a ningú.
+        throw new Error(`No es pot connectar amb el backend (${API_URL}). `
+            + 'Comprova que està en marxa amb «docker compose ps».');
+    }
 }
 
 // Se n'avisa quan el backend respon 401 perquè app.js pugui tornar a la
@@ -143,20 +150,87 @@ export async function getCurrentUser() {
 // El backend respon els errors com a text pla en uns endpoints i com a JSON
 // en d'altres; sense això tot arribava a la UI com a "Error desconegut".
 async function extractErrorMessage(response) {
-    const fallback = `Error ${response.status}`;
-    let body;
+    let body = '';
     try {
         body = await response.text();
     } catch {
-        return fallback;
+        // Sense cos, es descriu pel codi.
     }
-    if (!body) return fallback;
-
+    let path = '';
     try {
-        const parsed = JSON.parse(body);
-        return parsed.detail || parsed.error || parsed.message || body;
+        path = new URL(response.url).pathname;
     } catch {
-        return body;
+        // Una resposta sense URL (als tests) es descriu sense ruta.
+    }
+    return describeError(response.status, body, path);
+}
+
+/**
+ * Les frases estàndard d'HTTP. Soles no expliquen res: "Not Found" no diu què
+ * no s'ha trobat ni què s'hi pot fer. És el que posa Spring quan l'error no
+ * porta missatge, per exemple quan el backend en marxa és més antic que el
+ * frontend i no coneix la ruta.
+ */
+const BARE_STATUS_PHRASES = new Set([
+    'bad request', 'unauthorized', 'forbidden', 'not found', 'method not allowed',
+    'conflict', 'payload too large', 'unsupported media type', 'internal server error',
+    'bad gateway', 'service unavailable', 'gateway timeout'
+]);
+
+/**
+ * El missatge que veu l'usuari per a una resposta d'error.
+ *
+ * Primer el que digui el backend ("message"; "detail" i "error" per als
+ * endpoints antics). Si no diu res, o només la frase estàndard del codi, una
+ * explicació pel codi que digui què pot haver passat i què fer-hi.
+ *
+ * @param status el codi HTTP
+ * @param body   el cos de la resposta, tal qual
+ * @param path   la ruta, per dir quina ha fallat
+ */
+export function describeError(status, body, path = '') {
+    let message = '';
+    const text = (body || '').trim();
+    if (text) {
+        try {
+            const parsed = JSON.parse(text);
+            message = parsed.message || parsed.detail || parsed.error || '';
+        } catch {
+            // Una pàgina d'error en HTML (d'un proxy, per exemple) no es pot
+            // ensenyar dins d'un missatge.
+            message = text.startsWith('<') ? '' : text;
+        }
+    }
+    message = String(message).trim();
+    if (message && !BARE_STATUS_PHRASES.has(message.toLowerCase())) return message;
+    return explainStatus(status, path);
+}
+
+function explainStatus(status, path) {
+    const route = path ? ` (${path})` : '';
+    const rebuild = 'Si acabes d\'actualitzar l\'aplicació, reconstrueix el backend amb '
+        + '«docker compose up -d --build backend».';
+    switch (status) {
+        case 400:
+            return `El backend ha rebutjat la petició${route} sense dir per què.`;
+        case 403:
+            return 'No tens permís per fer això.';
+        case 404:
+            return `El backend no troba el que s'ha demanat${route}. ${rebuild}`;
+        case 405:
+            return `El backend no accepta aquesta operació${route}. ${rebuild}`;
+        case 409:
+            return 'No es pot fer: hi ha dades que en depenen.';
+        case 413:
+            return 'El fitxer és massa gran.';
+        case 500:
+            return 'Error intern del backend. El detall és al log: «docker compose logs backend».';
+        case 502:
+        case 503:
+        case 504:
+            return 'El backend no respon. Comprova que està en marxa amb «docker compose ps».';
+        default:
+            return `Error ${status}${route}.`;
     }
 }
 

@@ -2,7 +2,6 @@ package com.budgetai.backend.controller;
 
 import com.budgetai.backend.model.Debt;
 import com.budgetai.backend.service.DebtService;
-import com.budgetai.backend.service.DebtService.DebtNotFoundException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -57,13 +56,12 @@ public class DebtController {
 
     /**
      * Les validacions del servei porten un text pensat per a l'usuari i ha
-     * d'arribar; un deute que no existeix és un 404.
+     * d'arribar. Un deute que no existeix ho resol el gestor d'errors global,
+     * amb un 404 que diu quin.
      */
     private static ResponseEntity<?> respond(Supplier<Object> action) {
         try {
             return ResponseEntity.ok(action.get());
-        } catch (DebtNotFoundException exception) {
-            return ResponseEntity.notFound().build();
         } catch (IllegalArgumentException exception) {
             return ResponseEntity.badRequest().body(Map.of("error", exception.getMessage()));
         }

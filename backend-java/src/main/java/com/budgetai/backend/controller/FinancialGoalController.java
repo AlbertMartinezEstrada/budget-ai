@@ -2,6 +2,7 @@ package com.budgetai.backend.controller;
 
 import com.budgetai.backend.model.FinancialGoal;
 import com.budgetai.backend.service.FinancialGoalService;
+import com.budgetai.backend.service.NotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -29,7 +30,7 @@ public class FinancialGoalController {
     public ResponseEntity<FinancialGoal> getGoalById(@PathVariable Long id) {
         return financialGoalService.getGoalById(id)
                 .map(ResponseEntity::ok)
-                .orElse(ResponseEntity.notFound().build());
+                .orElseThrow(() -> new NotFoundException("l'objectiu", id));
     }
 
     @PostMapping
@@ -40,27 +41,17 @@ public class FinancialGoalController {
 
     @PutMapping("/{id}")
     public ResponseEntity<FinancialGoal> updateGoal(@PathVariable Long id, @RequestBody FinancialGoal goal) {
-        try {
-            FinancialGoal updated = financialGoalService.updateGoal(id, goal);
-            return ResponseEntity.ok(updated);
-        } catch (RuntimeException exception) {
-            return ResponseEntity.notFound().build();
-        }
+        // Sense try/catch: abans qualsevol error es tornava com un 404 buit.
+        return ResponseEntity.ok(financialGoalService.updateGoal(id, goal));
     }
 
     @PostMapping("/{id}/add-amount")
     public ResponseEntity<FinancialGoal> addToGoal(@PathVariable Long id, @RequestBody Map<String, BigDecimal> payload) {
-        try {
-            BigDecimal amount = payload.get("amount");
-            if (amount == null || amount.signum() <= 0) {
-                return ResponseEntity.badRequest().build();
-            }
-
-            FinancialGoal updated = financialGoalService.addToGoal(id, amount);
-            return ResponseEntity.ok(updated);
-        } catch (RuntimeException exception) {
-            return ResponseEntity.notFound().build();
+        BigDecimal amount = payload.get("amount");
+        if (amount == null || amount.signum() <= 0) {
+            throw new IllegalArgumentException("La quantitat ha de ser més gran que zero.");
         }
+        return ResponseEntity.ok(financialGoalService.addToGoal(id, amount));
     }
 
     @DeleteMapping("/{id}")

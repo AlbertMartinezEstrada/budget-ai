@@ -4,6 +4,7 @@ import com.budgetai.backend.model.Budget;
 import com.budgetai.backend.model.MonthlyIncome;
 import com.budgetai.backend.service.BudgetService;
 import com.budgetai.backend.service.IncomeBaseService;
+import com.budgetai.backend.service.NotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
@@ -126,7 +127,7 @@ public class BudgetController {
     public ResponseEntity<Budget> getBudgetById(@PathVariable Long id) {
         return budgetService.getBudgetById(id)
                 .map(ResponseEntity::ok)
-                .orElse(ResponseEntity.notFound().build());
+                .orElseThrow(() -> new NotFoundException("el pressupost", id));
     }
 
     @PostMapping
@@ -137,12 +138,8 @@ public class BudgetController {
 
     @PutMapping("/{id}")
     public ResponseEntity<Budget> updateBudget(@PathVariable Long id, @RequestBody Budget budget) {
-        try {
-            Budget updated = budgetService.updateBudget(id, budget);
-            return ResponseEntity.ok(updated);
-        } catch (RuntimeException exception) {
-            return ResponseEntity.notFound().build();
-        }
+        // Sense try/catch: abans qualsevol error es tornava com un 404 buit.
+        return ResponseEntity.ok(budgetService.updateBudget(id, budget));
     }
 
     @DeleteMapping("/{id}")

@@ -82,6 +82,13 @@ missatge digui quant falta), que no n'hi hagi una de sola, que cap vagi a un
 grup, que no portin un tercer decimal, i que el deute passi del moviment a la
 part.
 
+### `ApiErrorHandlerTest` i `ClientErrorsTest`
+
+Què arriba al navegador quan alguna cosa falla: que tots els errors portin
+`status`, `message` i `path`, que un error intern no ensenyi el seu text però
+porti una referència per trobar-lo al log, i que les validacions pròpies hi
+arribin tal qual.
+
 ### `BankReaderServiceTest`
 
 El parser d'imports. La versió antiga esborrava tots els punts abans de
@@ -197,13 +204,21 @@ nova.
   el desvinculi; que un deute inexistent es rebutgi abans de moure cap saldo;
   que esborrar el deute deixi els moviments; i que el pressupost reservi la
   quota del mes i deixi de fer-ho quan el deute ja està saldat.
+- `ApiErrorsIntegrationTest`: els errors per HTTP, amb la sessió de debò. Que
+  una ruta desconeguda digui que cal reconstruir el backend, que un moviment o
+  un compte que no existeixen diguin quin, que un JSON mal escrit o un
+  paràmetre invàlid s'expliquin sense classes de Java, i que les validacions
+  que abans tornaven un 400 buit diguin què falla.
 - `TransactionPartsIntegrationTest`: la transferència a Trade Republic dividida
   en quatre parts. Que cadascuna compti a la seva categoria i l'exclosa enlloc,
   sense tornar a moure el saldo; que la part vinculada descompti del deute
   només el seu import; que unes parts que no sumen es rebutgin sense canviar
   res; que treure la divisió torni el moviment a com era; que esborrar-lo
   s'emporti les parts; i que el filtre per categoria i l'anàlisi mirin les
-  parts.
+  parts. També en importar: que una fila dividida a la revisió entri amb les
+  seves parts, que si una no quadra no s'importi res i el missatge digui quina,
+  que l'alta manual accepti parts i que l'edició les rebutgi en comptes
+  d'ignorar-les.
 
 ## Què NO cobreixen
 

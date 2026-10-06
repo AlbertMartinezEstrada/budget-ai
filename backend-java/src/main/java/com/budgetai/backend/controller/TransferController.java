@@ -3,6 +3,7 @@ package com.budgetai.backend.controller;
 import com.budgetai.backend.model.Transfer;
 import com.budgetai.backend.repository.TransferRepository;
 import com.budgetai.backend.service.AccountService;
+import com.budgetai.backend.service.NotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -36,7 +37,7 @@ public class TransferController {
     public ResponseEntity<Transfer> getTransferById(@PathVariable Long id) {
         return transferRepository.findById(id)
                 .map(ResponseEntity::ok)
-                .orElse(ResponseEntity.notFound().build());
+                .orElseThrow(() -> new NotFoundException("la transferència", id));
     }
 
     // @Transactional: els dos moviments de saldo i el desat de la
@@ -107,10 +108,9 @@ public class TransferController {
     @DeleteMapping("/{id}")
     @Transactional
     public ResponseEntity<?> deleteTransfer(@PathVariable Long id) {
-        Transfer transfer = transferRepository.findById(id).orElse(null);
-        if (transfer == null) {
-            return ResponseEntity.notFound().build();
-        }
+        // Abans de tocar cap saldo: no hi ha res a desfer.
+        Transfer transfer = transferRepository.findById(id)
+                .orElseThrow(() -> new NotFoundException("la transferència", id));
 
         if (transfer.getAmount() != null
                 && transfer.getSourceAccount() != null

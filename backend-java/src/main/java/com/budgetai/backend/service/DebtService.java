@@ -232,7 +232,7 @@ public class DebtService {
 
     private Debt find(Long id) {
         return debtRepository.findById(id)
-                .orElseThrow(() -> new DebtNotFoundException(id));
+                .orElseThrow(() -> new NotFoundException("el deute", id));
     }
 
     /**
@@ -302,13 +302,6 @@ public class DebtService {
         }
         if (debt.getFirstPaymentDate().isBefore(debt.getDate())) {
             throw new IllegalArgumentException("No es pot començar a tornar abans del préstec.");
-        }
-    }
-
-    /** No és un error de l'usuari: el deute no hi és. El controlador en fa un 404. */
-    public static class DebtNotFoundException extends RuntimeException {
-        public DebtNotFoundException(Long id) {
-            super("No existeix el deute " + id);
         }
     }
 }
