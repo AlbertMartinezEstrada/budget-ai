@@ -388,6 +388,9 @@ function renderMovement(movement) {
             <span class="shrink-0 w-24">${escapeHtml(formatDate(movement.data))}</span>
             <span class="flex-1 truncate text-slate-500 dark:text-slate-400">
                 ${escapeHtml(movement.descripcio_curta || movement.empresa || '')}
+                ${movement.es_part
+                    ? '<span class="text-xs" title="Només una part del moviment: la resta compta per a altres coses">· part</span>'
+                    : ''}
             </span>
             <span class="shrink-0 font-medium ${isIncome ? 'text-green-600' : 'text-red-600'}">
                 ${isIncome ? '+' : '−'}${formatCurrency(movement.cost)}

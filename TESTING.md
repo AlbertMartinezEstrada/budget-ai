@@ -70,6 +70,18 @@ en sentit de retorn: l'entrada del préstec no.
 Al servei, que la reserva del pressupost no passi mai del que quedava per
 tornar a l'inici del mes, i que els deutes que em deuen no reservin res.
 
+### `TransactionLinesTest` i `TransactionPartServiceTest`
+
+Un moviment dividit en parts. El primer fixa que d'un moviment dividit surt una
+línia per part i que la categoria, l'exclòs i el deute del moviment deixen de
+comptar: és el que fan servir el pressupost, els deutes i l'anàlisi, i si
+fallés, el moviment comptaria sencer a la categoria d'abans.
+
+El segon, les validacions en dividir: que les parts sumin el total (i el
+missatge digui quant falta), que no n'hi hagi una de sola, que cap vagi a un
+grup, que no portin un tercer decimal, i que el deute passi del moviment a la
+part.
+
 ### `BankReaderServiceTest`
 
 El parser d'imports. La versió antiga esborrava tots els punts abans de
@@ -185,6 +197,13 @@ nova.
   el desvinculi; que un deute inexistent es rebutgi abans de moure cap saldo;
   que esborrar el deute deixi els moviments; i que el pressupost reservi la
   quota del mes i deixi de fer-ho quan el deute ja està saldat.
+- `TransactionPartsIntegrationTest`: la transferència a Trade Republic dividida
+  en quatre parts. Que cadascuna compti a la seva categoria i l'exclosa enlloc,
+  sense tornar a moure el saldo; que la part vinculada descompti del deute
+  només el seu import; que unes parts que no sumen es rebutgin sense canviar
+  res; que treure la divisió torni el moviment a com era; que esborrar-lo
+  s'emporti les parts; i que el filtre per categoria i l'anàlisi mirin les
+  parts.
 
 ## Què NO cobreixen
 

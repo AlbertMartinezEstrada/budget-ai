@@ -2,6 +2,7 @@ package com.budgetai.backend.service;
 
 import com.budgetai.backend.model.Category;
 import com.budgetai.backend.model.Transaction;
+import com.budgetai.backend.repository.TransactionPartRepository;
 import com.budgetai.backend.repository.TransactionRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -28,6 +29,8 @@ import static org.mockito.Mockito.when;
 class AnalyticsServiceTest {
 
     @Mock private TransactionRepository transactionRepository;
+    // Sense parts: cap moviment està dividit i tots compten sencers.
+    @Mock private TransactionPartRepository transactionPartRepository;
     @InjectMocks private AnalyticsService service;
 
     private Transaction transaction(String type, String amount, LocalDate date, String categoryName) {
