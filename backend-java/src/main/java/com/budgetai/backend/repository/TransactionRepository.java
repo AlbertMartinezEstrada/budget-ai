@@ -34,6 +34,4 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long>,
      */
     @Query("SELECT transaction FROM Transaction transaction WHERE transaction.debt.id = :debtId ORDER BY transaction.date ASC")
     List<Transaction> findByDebtOrderedByDate(@Param("debtId") Long debtId);
-
-    List<Transaction> findByDebtIsNotNull();
 }

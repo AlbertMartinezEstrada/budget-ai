@@ -31,8 +31,8 @@ docker compose up -d --build backend  # aplicar cambios de Java
 docker compose logs -f backend        # logs
 scripts\backup.bat                    # copia de la base de datos (backup.sh fuera de Windows)
 
-cd backend-java && ./gradlew test              # 125 unitarios, sin Docker
-cd backend-java && ./gradlew integrationTest   # 106, requieren Docker
+cd backend-java && ./gradlew test              # 140 unitarios, sin Docker
+cd backend-java && ./gradlew integrationTest   # 115, requieren Docker
 cd frontend && npm test                        # 22
 ```
 
@@ -63,6 +63,7 @@ distintos de los campos Java:
 | `FinancialGoal.targetAmount` | `quantitat_objectiu` |
 | `Transfer.amount` | `import` |
 | `Debt.amount` | `import` |
+| `TransactionPart.amount` | `import` |
 | `Transaction.debt` | `deute_id` (solo el id) |
 
 **Dos excepciones que hay que recordar:**
@@ -279,6 +280,25 @@ Las cuotas pactadas de lo que debo se reservan solas en el plan de la hoja que
 diga la deuda (`quotes_deutes`), como mucho lo que quedaba por devolver al
 empezar el mes. Lo que me deben no se reserva ni se prevé: un dinero que no ha
 llegado no ensancha el bote.
+
+### 12. De un movimiento dividido mandan las partes: suma líneas, no movimientos
+
+Un movimiento puede dividirse en partes (`transaction_parts`), cada una con su
+categoría, su «no cuenta» y su deuda. El movimiento no se toca: el saldo se
+mueve una vez, por el total, y el hash sigue identificando la línea del
+extracto. Las partes **suman exactamente el importe**; con un céntimo de
+diferencia, el presupuesto y la cuenta dejarían de cuadrar.
+
+Cuando hay partes, la categoría, el excluido y la deuda del movimiento **dejan
+de contar**. Por eso todo lo que sume dinero por categoría o por deuda pasa por
+`TransactionLines`, que da una línea por movimiento o una por parte. **Sumar
+`transactionRepository.findAll()` directamente funciona hasta el día que se
+divide algo**, y entonces ese movimiento cuenta entero en su categoría de antes,
+sin ningún error que avise. Lo usan el presupuesto, las deudas y el análisis; el
+tablero hace lo mismo en el navegador con `transaction.parts`.
+
+Un movimiento dividido no puede cambiar de importe sin cambiar sus partes, ni
+llevar la deuda en el movimiento: el vínculo es de la parte.
 
 ---
 

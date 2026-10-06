@@ -5,6 +5,7 @@ import com.budgetai.backend.model.Category;
 import com.budgetai.backend.model.Company;
 import com.budgetai.backend.model.Debt;
 import com.budgetai.backend.model.Transaction;
+import com.budgetai.backend.model.TransactionPart;
 import com.budgetai.backend.repository.AccountRepository;
 import com.budgetai.backend.repository.CategoryRepository;
 import com.budgetai.backend.repository.CompanyRepository;
@@ -16,9 +17,13 @@ import com.budgetai.backend.service.CategoryHierarchyService;
 import com.budgetai.backend.service.DebtService;
 import com.budgetai.backend.service.ImportRuleService;
 import com.budgetai.backend.service.TransactionHasher;
+import com.budgetai.backend.service.TransactionPartService;
+import com.budgetai.backend.service.TransactionPartService.TransactionNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
+import jakarta.persistence.criteria.Root;
+import jakarta.persistence.criteria.Subquery;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.HttpStatus;
@@ -73,6 +78,9 @@ public class TransactionController {
 
     @Autowired
     private DebtService debtService;
+
+    @Autowired
+    private TransactionPartService transactionPartService;
 
     @GetMapping("/")
     public Map<String, String> readRoot() {
@@ -328,6 +336,23 @@ public class TransactionController {
                     "message", "L'import ha de ser més gran que zero."));
         }
 
+        // Un moviment dividit no pot canviar d'import sense que les parts
+        // deixin de sumar-lo, ni portar el deute al moviment: el vincle és de
+        // la part. Es comprova abans de tocar el saldo, com la resta.
+        if (transactionPartService.isSplit(id)) {
+            if (changes.getAmount() != null && changes.getAmount().compareTo(existing.getAmount()) != 0) {
+                return ResponseEntity.badRequest().body(Map.of(
+                        "status", "error",
+                        "message", "Aquest moviment està dividit en parts. Canvia-les perquè sumin el nou "
+                                + "import, o treu la divisió abans de canviar-lo."));
+            }
+            if (changes.getDebt() != null && changes.getDebt().getId() != null && changes.getDebt().getId() > 0) {
+                return ResponseEntity.badRequest().body(Map.of(
+                        "status", "error",
+                        "message", "Aquest moviment està dividit en parts: vincula el deute a la part que toca."));
+            }
+        }
+
         // El deute es resol abans de desfer el saldo, pel mateix motiu que a
         // l'alta. Null vol dir que no l'han enviat; un negatiu, que el volen
         // desvincular, i resolveForLink el torna com a null.
@@ -531,9 +556,26 @@ public class TransactionController {
                 || (type != null && !type.isBlank()) || startDate != null || endDate != null) {
             Specification<Transaction> specification = Specification.unrestricted();
 
+            // D'un moviment dividit manen les parts: surt si alguna és de la
+            // categoria, i no per la categoria que encara porta el moviment.
             if (categoryId != null) {
-                specification = specification.and((root, query, criteriaBuilder) ->
-                        criteriaBuilder.equal(root.get("category").get("id"), categoryId));
+                specification = specification.and((root, query, criteriaBuilder) -> {
+                    Subquery<Long> anyPart = query.subquery(Long.class);
+                    Root<TransactionPart> part = anyPart.from(TransactionPart.class);
+                    anyPart.select(part.get("id")).where(criteriaBuilder.equal(part.get("transaction"), root));
+
+                    Subquery<Long> partInCategory = query.subquery(Long.class);
+                    Root<TransactionPart> categoryPart = partInCategory.from(TransactionPart.class);
+                    partInCategory.select(categoryPart.get("id")).where(
+                            criteriaBuilder.equal(categoryPart.get("transaction"), root),
+                            criteriaBuilder.equal(categoryPart.get("category").get("id"), categoryId));
+
+                    return criteriaBuilder.or(
+                            criteriaBuilder.and(
+                                    criteriaBuilder.equal(root.get("category").get("id"), categoryId),
+                                    criteriaBuilder.not(criteriaBuilder.exists(anyPart))),
+                            criteriaBuilder.exists(partInCategory));
+                });
             }
 
             if (companyId != null) {
@@ -565,9 +607,29 @@ public class TransactionController {
                         criteriaBuilder.lessThanOrEqualTo(root.get("date"), endDate));
             }
 
-            return transactionRepository.findAll(specification, Sort.by(Sort.Direction.DESC, "date"));
+            return transactionPartService.withParts(
+                    transactionRepository.findAll(specification, Sort.by(Sort.Direction.DESC, "date")));
         }
-        return transactionRepository.findAllByOrderByDateDesc();
+        return transactionPartService.withParts(transactionRepository.findAllByOrderByDateDesc());
+    }
+
+    /**
+     * Divideix un moviment en parts, o treu la divisió amb una llista buida.
+     *
+     * No toca cap saldo: el moviment ja el va moure pel total, i les parts
+     * només diuen com es reparteix. Per això no va pel camí de linkAndApplyToBalance.
+     */
+    @PutMapping("/gastos/{id}/parts")
+    public ResponseEntity<?> replaceParts(@PathVariable Long id, @RequestBody List<TransactionPart> parts) {
+        try {
+            return ResponseEntity.ok(transactionPartService.replace(id, parts));
+        } catch (TransactionNotFoundException exception) {
+            return ResponseEntity.notFound().build();
+        } catch (IllegalArgumentException exception) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "status", "error",
+                    "message", exception.getMessage()));
+        }
     }
 
     @GetMapping("/companies")

@@ -134,13 +134,12 @@ public class Debt {
     @EqualsAndHashCode.Exclude
     private List<Installment> schedule;
 
-    // Exclosos d'equals, hashCode i toString: cada moviment apunta a aquest
-    // mateix deute, i incloure'ls faria que un cridés l'altre sense fi.
+    /** Els moviments i les parts vinculats, per l'import que toca al deute. */
     @Transient
     @JsonProperty(value = "moviments", access = JsonProperty.Access.READ_ONLY)
     @ToString.Exclude
     @EqualsAndHashCode.Exclude
-    private List<Transaction> movements;
+    private List<Movement> movements;
 
     @PrePersist
     void applyDefaults() {
@@ -170,6 +169,27 @@ public class Debt {
     @JsonIgnore
     public boolean isOwedByMe() {
         return I_OWE.equals(direction);
+    }
+
+    /**
+     * Uns diners vinculats al deute: un moviment sencer o una part d'un de
+     * dividit.
+     *
+     * Els noms del JSON són els d'un moviment perquè la pestanya els pinti
+     * igual. D'una part, "cost" és l'import de la part i no el del moviment: és
+     * el que compta per al deute.
+     *
+     * @param transactionId el moviment d'on surt, per poder-lo trobar
+     * @param part si és només un tros del moviment
+     */
+    public record Movement(
+            @JsonProperty("id") Long transactionId,
+            @JsonProperty("data") @JsonFormat(pattern = "yyyy-MM-dd") LocalDate date,
+            @JsonProperty("type") String type,
+            @JsonProperty("cost") BigDecimal amount,
+            @JsonProperty("empresa") String company,
+            @JsonProperty("descripcio_curta") String description,
+            @JsonProperty("es_part") boolean part) {
     }
 
     /**
