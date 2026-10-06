@@ -71,18 +71,37 @@ public class TransactionPartService {
      * Substitueix les parts d'un moviment per les que arriben.
      *
      * Una llista buida treu la divisió: el moviment torna a comptar sencer amb
-     * la seva categoria. Una sola part no es pot: seria el moviment sencer amb
-     * una altra categoria, i per això ja hi ha l'edició.
-     *
-     * Quan el moviment queda dividit, el seu deute es buida: el vincle passa a
-     * la part que toca, i deixar-lo també al moviment el faria sortir a la
-     * fitxa del deute per partida doble.
+     * la seva categoria.
      */
     @Transactional
     public Transaction replace(Long transactionId, List<TransactionPart> requested) {
         Transaction transaction = transactionRepository.findById(transactionId)
-                .orElseThrow(() -> new TransactionNotFoundException(transactionId));
+                .orElseThrow(() -> new NotFoundException("el moviment", transactionId));
+        List<TransactionPart> parts = validate(transaction, requested);
+
+        partRepository.deleteAll(partRepository.findByTransactions(List.of(transactionId)));
+        if (!parts.isEmpty()) {
+            store(transaction, parts);
+        }
+        return withParts(new ArrayList<>(List.of(transaction))).get(0);
+    }
+
+    /**
+     * Comprova unes parts i les torna a punt per desar, sense desar res.
+     *
+     * Va separat de desar-les perquè una importació les ha de validar totes
+     * abans de moure cap saldo: si la fila 40 no quadra, les 39 d'abans no
+     * s'han d'haver aplicat.
+     *
+     * Una sola part no es pot: seria el moviment sencer amb una altra
+     * categoria, i per això ja hi ha l'edició.
+     *
+     * @param transaction n'agafa l'import; no cal que estigui desat
+     * @return buida si no se'n demana cap
+     */
+    public List<TransactionPart> validate(Transaction transaction, List<TransactionPart> requested) {
         List<TransactionPart> wanted = requested != null ? requested : List.of();
+        if (wanted.isEmpty()) return List.of();
         if (wanted.size() == 1) {
             throw new IllegalArgumentException(
                     "Per dividir-lo calen almenys dues parts. Per canviar-ne la categoria, edita el moviment.");
@@ -92,7 +111,6 @@ public class TransactionPartService {
         BigDecimal total = BigDecimal.ZERO;
         for (TransactionPart request : wanted) {
             TransactionPart part = new TransactionPart();
-            part.setTransaction(transaction);
             part.setAmount(validAmount(request.getAmount()));
             part.setCategory(leafOf(request.getCategory()));
             part.setExcludedFromBudget(Boolean.TRUE.equals(request.getExcludedFromBudget()));
@@ -103,17 +121,22 @@ public class TransactionPartService {
             parts.add(part);
             total = total.add(part.getAmount());
         }
-        if (!parts.isEmpty()) {
-            requireSameTotal(total, transaction.getAmount());
-        }
+        requireSameTotal(total, transaction.getAmount());
+        return parts;
+    }
 
-        partRepository.deleteAll(partRepository.findByTransactions(List.of(transactionId)));
-        if (!parts.isEmpty()) {
-            transaction.setDebt(null);
-            transactionRepository.save(transaction);
-            partRepository.saveAll(parts);
-        }
-        return withParts(new ArrayList<>(List.of(transaction))).get(0);
+    /**
+     * Desa unes parts ja validades d'un moviment ja desat.
+     *
+     * El deute del moviment es buida: el vincle passa a la part que toca, i
+     * deixar-lo també al moviment el faria sortir a la fitxa del deute per
+     * partida doble.
+     */
+    public void store(Transaction transaction, List<TransactionPart> parts) {
+        parts.forEach(part -> part.setTransaction(transaction));
+        transaction.setDebt(null);
+        transactionRepository.save(transaction);
+        partRepository.saveAll(parts);
     }
 
     private static BigDecimal validAmount(BigDecimal amount) {
@@ -148,12 +171,5 @@ public class TransactionPartService {
         throw new IllegalArgumentException("Les parts sumen " + partsTotal.toPlainString()
                 + " € i el moviment és de " + transactionAmount.toPlainString() + " €: "
                 + (comparison < 0 ? "en falten " : "en sobren ") + difference.toPlainString() + " €.");
-    }
-
-    /** El moviment no hi és. El controlador en fa un 404. */
-    public static class TransactionNotFoundException extends RuntimeException {
-        public TransactionNotFoundException(Long id) {
-            super("No existeix el moviment " + id);
-        }
     }
 }

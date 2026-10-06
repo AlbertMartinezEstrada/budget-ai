@@ -67,7 +67,7 @@ public class RecurringTransactionService {
                     recurring.setDescription(updatedRecurring.getDescription());
                     return recurringTransactionRepository.save(recurring);
                 })
-                .orElseThrow(() -> new RuntimeException("Recurring transaction not found with id: " + id));
+                .orElseThrow(() -> new NotFoundException("el moviment recurrent", id));
     }
 
     @Transactional

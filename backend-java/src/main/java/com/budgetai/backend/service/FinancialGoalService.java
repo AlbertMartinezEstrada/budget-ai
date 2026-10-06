@@ -52,7 +52,7 @@ public class FinancialGoalService {
                     if (updatedGoal.getAccount() != null) goal.setAccount(updatedGoal.getAccount());
                     return financialGoalRepository.save(goal);
                 })
-                .orElseThrow(() -> new RuntimeException("Financial goal not found with id: " + id));
+                .orElseThrow(() -> new NotFoundException("l'objectiu", id));
     }
 
     @Transactional
@@ -72,7 +72,7 @@ public class FinancialGoalService {
 
                     return financialGoalRepository.save(goal);
                 })
-                .orElseThrow(() -> new RuntimeException("Financial goal not found with id: " + id));
+                .orElseThrow(() -> new NotFoundException("l'objectiu", id));
     }
 
     @Transactional

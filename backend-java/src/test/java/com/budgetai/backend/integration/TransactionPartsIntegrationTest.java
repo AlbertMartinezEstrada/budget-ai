@@ -184,12 +184,14 @@ class TransactionPartsIntegrationTest extends AbstractIntegrationTest {
     @Test
     @DisplayName("Unes parts que no sumen el total es rebutgen i no canvien res")
     void partsThatDoNotAddUpAreRejected() {
-        ResponseEntity<?> response = transactionController.replaceParts(transferId, List.of(
+        // El 400 el posa el gestor d'errors global (ApiErrorsIntegrationTest);
+        // cridant el controlador directament es veu la validació que el provoca.
+        assertThatThrownBy(() -> transactionController.replaceParts(transferId, List.of(
                 part("300.00", savingsId, false, null),
-                part("150.00", insuranceId, false, null)));
+                part("150.00", insuranceId, false, null))))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("en falten 50.00 €");
 
-        assertThat(response.getStatusCode().value()).isEqualTo(400);
-        assertThat(response.getBody().toString()).contains("en falten 50.00 €");
         assertThat(partRepository.findAll()).isEmpty();
         assertThat(spentIn("Trade Republic")).isEqualByComparingTo("500.00");
     }
@@ -276,5 +278,94 @@ class TransactionPartsIntegrationTest extends AbstractIntegrationTest {
         assertThatThrownBy(() -> categoryService.delete(insuranceId))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("moviments associats");
+    }
+
+    // ============ EN IMPORTAR UN EXTRACTE ============
+
+    /** Un moviment tal com arriba de la pantalla de revisió, sense hash. */
+    private static Transaction imported(String concept, String amount, LocalDate date) {
+        Transaction transaction = new Transaction();
+        transaction.setOriginalConcept(concept);
+        transaction.setCompanyName(concept);
+        transaction.setCategoryName("Altres");
+        transaction.setAmount(new BigDecimal(amount));
+        transaction.setDate(date);
+        transaction.setType("EXPENSE");
+        return transaction;
+    }
+
+    @Test
+    @DisplayName("Un moviment dividit a la revisió s'importa amb les seves parts, i cadascuna compta on toca")
+    void importingASplitTransaction() {
+        transactionController.deleteTransaction(transferId);
+        Transaction transfer = imported("TRANSFERENCIA TRADE REPUBLIC", "500.00", TRANSFER_DATE);
+        transfer.setParts(List.of(
+                part("300.00", savingsId, false, null),
+                part("100.00", repaymentsId, false, selfLoanId),
+                part("60.00", insuranceId, false, null),
+                part("40.00", savingsId, true, null)));
+
+        transactionController.confirmUpload(List.of(transfer));
+
+        assertThat(partRepository.findAll()).hasSize(4);
+        assertThat(spentIn("Trade Republic")).isEqualByComparingTo("300.00");
+        assertThat(spentIn("Pagament de deutes")).isEqualByComparingTo("100.00");
+        assertThat(spentIn("Assegurances")).isEqualByComparingTo("60.00");
+        assertThat(((Debt) debtController.get(selfLoanId).getBody()).getRepaid()).isEqualByComparingTo("100.00");
+        // L'import es mou un sol cop, pel total, com qualsevol línia d'extracte.
+        assertThat(balance()).isEqualByComparingTo("500.00");
+    }
+
+    @Test
+    @DisplayName("Si una fila dividida no quadra no s'importa res, i el missatge diu quina és")
+    void importWithWrongPartsImportsNothing() {
+        transactionController.deleteTransaction(transferId);
+        Transaction groceries = imported("CONDIS", "45.30", TRANSFER_DATE);
+        Transaction transfer = imported("TRANSFERENCIA TRADE REPUBLIC", "500.00", TRANSFER_DATE.plusDays(1));
+        transfer.setParts(List.of(
+                part("300.00", savingsId, false, null),
+                part("150.00", insuranceId, false, null)));
+
+        assertThatThrownBy(() -> transactionController.confirmUpload(List.of(groceries, transfer)))
+                .hasMessageContaining("No s'ha importat res")
+                .hasMessageContaining("TRANSFERENCIA TRADE REPUBLIC")
+                .hasMessageContaining("en falten 50.00 €");
+
+        // Ni la fila bona: la importació és tota o res.
+        assertThat(transactionRepository.findAll()).isEmpty();
+        assertThat(partRepository.findAll()).isEmpty();
+        assertThat(balance()).isEqualByComparingTo("1000.00");
+    }
+
+    @Test
+    @DisplayName("L'alta manual també accepta un moviment ja dividit")
+    void manualEntryCanBeSplit() {
+        Transaction cash = new Transaction();
+        cash.setType("EXPENSE");
+        cash.setAmount(new BigDecimal("80.00"));
+        cash.setDate(TRANSFER_DATE);
+        cash.setCategoryName("Altres");
+        cash.setParts(List.of(
+                part("50.00", insuranceId, false, null),
+                part("30.00", repaymentsId, false, selfLoanId)));
+
+        ResponseEntity<?> response = transactionController.createTransaction(cash);
+
+        assertThat(response.getStatusCode().is2xxSuccessful()).isTrue();
+        assertThat(spentIn("Assegurances")).isEqualByComparingTo("50.00");
+        assertThat(((Debt) debtController.get(selfLoanId).getBody()).getRepaid()).isEqualByComparingTo("30.00");
+    }
+
+    @Test
+    @DisplayName("Editar un moviment no pot canviar-ne les parts: s'avisa en comptes d'ignorar-les")
+    void editingCannotChangeParts() {
+        Transaction changes = new Transaction();
+        changes.setParts(List.of(part("250.00", savingsId, false, null), part("250.00", insuranceId, false, null)));
+
+        ResponseEntity<?> response = transactionController.updateTransaction(transferId, changes);
+
+        assertThat(response.getStatusCode().value()).isEqualTo(400);
+        assertThat(response.getBody().toString()).contains("botó de dividir");
+        assertThat(partRepository.findAll()).isEmpty();
     }
 }

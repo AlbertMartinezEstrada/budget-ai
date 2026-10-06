@@ -95,7 +95,7 @@ public class BudgetService {
                     if (updatedBudget.getActive() != null) budget.setActive(updatedBudget.getActive());
                     return budgetRepository.save(budget);
                 })
-                .orElseThrow(() -> new RuntimeException("Budget not found with id: " + id));
+                .orElseThrow(() -> new NotFoundException("el pressupost", id));
     }
 
     @Transactional

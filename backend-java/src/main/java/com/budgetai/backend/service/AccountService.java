@@ -56,7 +56,7 @@ public class AccountService {
                     if (updatedAccount.getColor() != null) account.setColor(updatedAccount.getColor());
                     return accountRepository.save(account);
                 })
-                .orElseThrow(() -> new RuntimeException("Account not found with id: " + id));
+                .orElseThrow(() -> new NotFoundException("el compte", id));
     }
 
     // Esborrar un compte amb moviments associats trencava la clau forana i
@@ -80,11 +80,11 @@ public class AccountService {
     @Transactional
     public void updateAccountBalance(Long accountId, BigDecimal amount, String operation) {
         if (amount == null) {
-            throw new IllegalArgumentException("Amount is required to update a balance");
+            throw new IllegalArgumentException("Falta l'import per ajustar el saldo.");
         }
 
         Account account = accountRepository.findById(accountId)
-                .orElseThrow(() -> new RuntimeException("Account not found"));
+                .orElseThrow(() -> new NotFoundException("el compte", accountId));
 
         // Un compte creat abans que la columna tingués valor per defecte pot
         // tenir el saldo a null; tractar-lo com a zero evita un NPE.
@@ -97,7 +97,7 @@ public class AccountService {
         } else if ("SUBTRACT".equals(operation)) {
             account.setCurrentBalance(balance.subtract(amount));
         } else {
-            throw new IllegalArgumentException("Unknown balance operation: " + operation);
+            throw new IllegalArgumentException("L'operació sobre el saldo ha de ser ADD o SUBTRACT, no " + operation + ".");
         }
 
         accountRepository.save(account);

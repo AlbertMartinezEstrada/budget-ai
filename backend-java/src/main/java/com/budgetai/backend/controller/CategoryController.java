@@ -2,6 +2,7 @@ package com.budgetai.backend.controller;
 
 import com.budgetai.backend.model.Category;
 import com.budgetai.backend.service.CategoryService;
+import com.budgetai.backend.service.NotFoundException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -33,7 +34,7 @@ public class CategoryController {
     public ResponseEntity<Category> getById(@PathVariable Long id) {
         return categoryService.getById(id)
                 .map(ResponseEntity::ok)
-                .orElse(ResponseEntity.notFound().build());
+                .orElseThrow(() -> new NotFoundException("la categoria", id));
     }
 
     @PostMapping
