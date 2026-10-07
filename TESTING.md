@@ -237,6 +237,10 @@ nova.
   li tregui el compte; i que un recurrent en un bloc, sense categoria o de
   l'altre sentit es rebutgi dient per què. Abans cap d'aquests casos donava
   error: el recurrent simplement no sortia al pressupost.
+- `MonthlySummaryIntegrationTest`: el resum del mes que pinta Pressupostos.
+  Entre d'altres, que l'estalvi es reparteixi després dels fixos i que els
+  variables només es quedin el que en sobra, i que les seccions surtin en
+  l'ordre en què es reparteixen: ingressos, fixos, estalvi i variables.
 - `FixedCostIntegrationTest`: el menú de recurrents de Pressupostos. Que un
   canvi valgui des d'un mes sense tocar els anteriors, que un import posat en un
   sol mes no es copiï als següents, i que s'hi pugui posar la llum, una fulla

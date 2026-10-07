@@ -48,8 +48,10 @@ public class Category {
      *
      *   A UNA FULLA  com es mesura: un fix compta pel prorrateig del seu
      *                recurrent, un variable pel gasto real del mes.
-     *   A UN GRUP    a quina secció del repartiment va el bloc sencer. A null,
-     *                es dedueix: fix si totes les seves fulles ho són.
+     *   A UN GRUP    a quina secció del repartiment va el bloc sencer: FIXED,
+     *                SAVINGS, VARIABLE o INCOME. A null, es dedueix: fix si
+     *                totes les seves fulles ho són. L'estalvi i els ingressos
+     *                no es dedueixen mai: s'han de declarar.
      *
      * Un grup pot ser fix i tenir fulles variables a dins —"Llar" és una
      * despesa fixa, però la llum es mesura pel consum—, i per això la secció

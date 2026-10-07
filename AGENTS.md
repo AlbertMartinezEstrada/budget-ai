@@ -33,8 +33,8 @@ scripts\backup.bat                    # copia de la base de datos (backup.sh fue
 scripts/migrate.sh                    # aplica las migraciones pendientes (copia antes; --estat para ver cuáles)
 
 cd backend-java && ./gradlew test              # 148 unitarios, sin Docker
-cd backend-java && ./gradlew integrationTest   # 133, requieren Docker
-cd frontend && npm test                        # 40
+cd backend-java && ./gradlew integrationTest   # 135, requieren Docker
+cd frontend && npm test                        # 41
 ```
 
 **Ejecuta los tests antes de dar nada por terminado.** El backend hay que
@@ -207,8 +207,9 @@ esté**, y confundirlas es fácil:
 
 - En una **hoja**, cómo se mide: un fijo entra por su prorrateo y un variable
   por su gasto real. `null` cuenta como variable.
-- En un **bloque** de primer nivel, a qué sección va: `FIXED`, `VARIABLE` o
-  `INCOME`. A `null`, se deduce: es fijo si todas sus hojas lo son.
+- En un **bloque** de primer nivel, a qué sección va: `FIXED`, `SAVINGS`,
+  `VARIABLE` o `INCOME`. A `null`, se deduce: es fijo si todas sus hojas lo
+  son. `SAVINGS` e `INCOME` nunca se deducen: se declaran.
 
 Por eso un bloque fijo puede tener hojas variables dentro (el alquiler no se
 mueve, la luz sí). Para vaciar el campo hace falta el centinela `AUTO`: una
@@ -217,6 +218,11 @@ actualización parcial no distingue «vacío» de «no enviado».
 **`INCOME` cambia qué se mide**: las hojas de un bloque de ingresos suman los
 movimientos de entrada, no los de gasto. Con el filtro de gasto sumaban siempre
 cero.
+
+**`SAVINGS` es el ahorro y va entre fijos y variables**: su bote es lo que
+dejan los fijos, y el de los variables lo que queda después de apartarlo. Antes
+era un bloque variable («Trade Republic») y el ahorro salía como un gasto que
+competía con el supermercado por el mismo bote.
 
 **Lo que se reparte es la suma de los ingresos**, no el sueldo: el sueldo es un
 bloque de ingreso más. Cada hoja aporta el **mayor** entre su previsión y lo
