@@ -718,11 +718,31 @@ cualquier divergencia hace fallar toda la suite — que es como se detectó que 
 `SERIAL` cuando las entidades usan `Long`.
 
 Para cambiar el esquema en una instalación existente hay que añadir un fichero
-en `backend-java/migrations/` y aplicarlo a mano:
+en `backend-java/migrations/` y aplicarlo con el script:
 
 ```bash
-docker exec -i budget_db psql -U "$DB_USER" -d "$DB_NAME" < backend-java/migrations/001_....sql
+scripts/migrate.sh --estat   # qué hay aplicado y qué falta, sin cambiar nada
+scripts/migrate.sh           # copia de seguridad y aplica las pendientes, en orden
+docker compose up -d --build backend
 ```
+
+Lo aplicado se apunta en `schema_migrations`. Aplicarlas a mano, una a una, hacía
+fácil saltarse alguna: el backend no arrancaba («missing column vigent_des_de») y
+nada decía cuáles faltaban.
+
+Una base de datos sin esa tabla las recibió a mano y no se sabe cuáles. No se
+pueden repetir todas a ciegas —la 008 falla si ya está, y la 004 devolvería las
+categorías a sus bloques de origen—, así que el script mira el esquema y apunta
+como aplicadas las que ya se ven. Las que solo añaden categorías (004, 005, 007)
+se dan por aplicadas también si lo está alguna posterior que cambia el esquema:
+repetirlas desharía la organización del usuario, y que falten solo quiere decir
+que falta alguna categoría por defecto. Una migración nueva no necesita
+comprobación, pero sí poder aplicarse dos veces sin efecto.
+
+El usuario y la base de datos se leen dentro del contenedor, con comillas
+simples. Con dobles, el shell de fuera sustituye `$POSTGRES_USER` por su propia
+variable, vacía, y `psql` recibe «-U -d»: en el Mac fallaba con
+`role "-d" does not exist`. No hay versión `.bat` todavía.
 
 ## Integración continua
 

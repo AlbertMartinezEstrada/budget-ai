@@ -30,6 +30,7 @@ docker compose up -d --build          # levantar todo
 docker compose up -d --build backend  # aplicar cambios de Java
 docker compose logs -f backend        # logs
 scripts\backup.bat                    # copia de la base de datos (backup.sh fuera de Windows)
+scripts/migrate.sh                    # aplica las migraciones pendientes (copia antes; --estat para ver cuáles)
 
 cd backend-java && ./gradlew test              # 144 unitarios, sin Docker
 cd backend-java && ./gradlew integrationTest   # 126, requieren Docker
@@ -175,8 +176,17 @@ Nada se carga desde un CDN.
 entidades y **falla al arrancar** si no.
 
 - Instalación nueva → `backend-java/init.sql`, que es la fuente de verdad.
-- Instalación existente → un fichero nuevo en `backend-java/migrations/`,
-  aplicado a mano.
+- Instalación existente → un fichero nuevo en `backend-java/migrations/`, que
+  aplica `scripts/migrate.sh` junto con cualquier otro pendiente.
+
+`migrate.sh` apunta lo aplicado en `schema_migrations`. Una base de datos que no
+tiene esa tabla recibió las migraciones a mano: el script mira el esquema y da
+por aplicadas las que ya se ven (la 001–012 tienen su comprobación). Por eso
+**una migración nueva tiene que poder aplicarse dos veces sin efecto**
+(`IF NOT EXISTS`, `ON CONFLICT DO NOTHING`): si alguien la aplicó a mano, el
+script la volverá a pasar. Aplicarlas a mano una a una fue como una instalación
+se quedó sin la 010 sin que nada lo dijera, y con comillas dobles el comando ni
+siquiera funcionaba en el Mac.
 
 **Si tocas una entidad, toca `init.sql` en el mismo cambio.** Los tests de
 integración levantan la base de datos desde ese fichero, así que una
