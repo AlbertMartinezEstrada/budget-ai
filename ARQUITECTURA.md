@@ -141,6 +141,10 @@ Tres sitios tocan saldos, y los tres son `@Transactional`:
 | `POST /transfers` | Resta del origen, suma al destino, guarda la transferencia |
 | `DELETE /transfers/{id}` | **Revierte** el movimiento y borra la fila |
 | `POST /confirm-upload` | Guarda los movimientos y ajusta el saldo de la cuenta |
+| `POST/PUT/DELETE /gastos` | Lo mismo con un movimiento suelto: editar y borrar revierten antes |
+
+Un traspaso entre cuentas propias (`compte_contrapart_id`) mueve en cualquiera
+de ellas **los dos saldos**: el de su cuenta y el de la otra.
 
 Detalle importante: dentro de estos métodos las excepciones se **relanzan**, no
 se capturan para devolver un `ResponseEntity`. Capturarlas impediría el
@@ -423,18 +427,56 @@ Revolut    −100  «compra accions»      contaba como GASTO
 del presupuesto sale de la suma de ingresos, **ensanchaba el bote a repartir con
 euros que ya estaban dentro**.
 
-La regla: **una vez el dinero sale de la cuenta principal, ya está contado.** Lo
-que haga después —llegar a Revolut, comprarse algo allí— mueve saldos pero no
-vuelve a contar. Es lo que marca `exclos_pressupost`, y `spentIn` e `incomeIn`
-lo descuentan.
+**Un traspaso entre tus cuentas no es ni gasto ni ingreso**: el dinero sigue
+siendo tuyo. Es un movimiento con `compte_contrapart_id`, la otra cuenta, y lo
+que cuenta es lo que se hace con el dinero:
 
-Se llama «excluido del presupuesto» y no «es traspaso» porque la compra dentro
-de la cuenta destino no es ningún traspaso, pero tampoco debe contar.
+| Traspaso | Cómo cuenta | Ejemplo |
+|---|---|---|
+| Entre cuentas del día a día | No cuenta: se guarda con `exclos_pressupost` | Principal → Revolut. Cuenta lo que se paga desde Revolut, cada pago en su categoría (Claude en Subscripcions) |
+| Hacia una cuenta de ahorro (`AHORRO`, `INVERSIONES`) | Como ahorro, en su categoría | Principal → Trade Republic, en Estalvis |
+| Desde una cuenta de ahorro | Resta ahorro; no es ingreso | Sacar 200 € de Trade Republic |
 
-**El saldo sí se mueve igual**: cada extracto es la verdad de su propia cuenta y
-el movimiento ocurrió de verdad. Por eso **no hace falta emparejar las dos
-patas**: la salida vive en Principal, la entrada en Revolut, y cada una toca
-solo su saldo. Sin conciliación ni riesgo de mover el saldo dos veces.
+```
+Principal  −100  «traspàs a Revolut»   ⇄ Revolut, no cuenta
+Revolut    −20   «Claude»              Subscripcions · Claude
+Principal  −300  «Trade Republic»      ⇄ Trade Republic, Estalvis: 300 de ahorro
+```
+
+**Una sola fila por traspaso, y mueve los dos saldos.** La fila vive en la
+cuenta de cuyo extracto sale, y `InternalTransferService` suma o resta lo mismo
+en la otra cuenta. Así Trade Republic sube sin importar su extracto. Borrar el
+traspaso revierte los dos saldos, y editarlo es revertir y volver a aplicar,
+como cualquier movimiento.
+
+**La otra pata se reconoce al importar.** Al subir el extracto de Revolut, la
+entrada de 100 € es el mismo dinero que ya movió el traspaso. En la revisión,
+una línea con el mismo importe, el sentido contrario y una fecha a ±3 días de
+un traspaso guardado hacia esa cuenta sale **desmarcada**, con el aviso «ya
+guardado como traspaso». Cada traspaso reconoce como mucho una línea: dos
+traspasos iguales el mismo día son dos. Da igual qué extracto se importe
+primero: el que llega antes crea el traspaso, y el otro lo reconoce.
+
+**Las reglas de importación lo hacen solas**: una regla puede decir «es un
+traspaso a la cuenta X» (`compte_traspas_id`). Si apunta a la cuenta del mismo
+extracto, se ignora: «REVOLUT» → Revolut no significa nada leyendo el extracto
+de Revolut. En una regla de traspaso, `marca_exclos` no se aplica: si cuenta o
+no lo deciden las dos cuentas.
+
+**Se guarda marcado, no se calcula al leer.** Un traspaso entre cuentas del día
+a día se guarda con `exclos_pressupost`, y así el presupuesto, las deudas, el
+análisis y el panel lo respetan sin saber nada de traspasos. El panel y el
+análisis tampoco suman traspasos en sus totales de ingresos y gastos. Si
+después cambias el tipo de una cuenta, los traspasos ya guardados no se
+recalculan.
+
+**Antes la regla era la contraria**: «una vez el dinero sale de la cuenta
+principal, ya está contado», y lo que se pagaba desde Revolut se marcaba a mano
+como no contado. Funcionaba para el ahorro, pero cada pago desde Revolut perdía
+su categoría: todo acababa en un solo movimiento «traspàs a Revolut». Los
+movimientos de antes no se tocan, porque no se sabe cuáles eran traspasos.
+`exclos_pressupost` sigue sirviendo para lo que no es ni gasto ni ingreso y no
+es un traspaso.
 
 La identidad de un movimiento importado pasa a ser **hash + cuenta**. Un
 traspaso deja el mismo importe el mismo día en dos extractos, y con la unicidad

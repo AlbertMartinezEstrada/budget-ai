@@ -16,12 +16,14 @@ import com.budgetai.backend.service.BankReaderService;
 import com.budgetai.backend.service.CategoryHierarchyService;
 import com.budgetai.backend.service.DebtService;
 import com.budgetai.backend.service.ImportRuleService;
+import com.budgetai.backend.service.InternalTransferService;
 import com.budgetai.backend.service.TransactionHasher;
 import com.budgetai.backend.service.TransactionPartService;
 import com.budgetai.backend.service.NotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
+import jakarta.persistence.criteria.JoinType;
 import jakarta.persistence.criteria.Root;
 import jakarta.persistence.criteria.Subquery;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -83,6 +85,25 @@ public class TransactionController {
     @Autowired
     private TransactionPartService transactionPartService;
 
+    @Autowired
+    private InternalTransferService internalTransfers;
+
+    /** El compte on va un moviment que no en diu cap. */
+    private Account defaultAccount() {
+        return accountRepository.findByName("Compte Principal")
+                .orElseGet(() -> accountRepository.findAll().stream().findFirst().orElse(null));
+    }
+
+    /**
+     * El compte d'un moviment, sencer. De la petició només n'arriba l'id, i per
+     * saber si un traspàs compta cal el tipus: un compte a mig carregar
+     * semblaria sempre del dia a dia.
+     */
+    private Account ownAccountOf(Transaction transaction, Account fallback) {
+        if (transaction.getAccount() == null || transaction.getAccount().getId() == null) return fallback;
+        return accountRepository.findById(transaction.getAccount().getId()).orElse(fallback);
+    }
+
     @GetMapping("/")
     public Map<String, String> readRoot() {
         return Map.of("status", "API Budget AI (Java) con BBDD profesional funcionant correctament", "version", "2.0");
@@ -130,6 +151,13 @@ public class TransactionController {
             //    posta: una regla és una decisió explícita seva i ha de manar
             //    sobre el que endevini el model.
             importRuleService.apply(classifiedTransactions);
+
+            // 5. Els traspassos: els que ha marcat una regla, i les línies que
+            //    són l'altra pota d'un traspàs ja desat des de l'altre compte.
+            Account importAccount = accountId != null
+                    ? accountRepository.findById(accountId).orElse(null)
+                    : defaultAccount();
+            internalTransfers.prepareForReview(classifiedTransactions, importAccount);
 
             return ResponseEntity.ok(Map.of(
                     "status", "review",
@@ -221,6 +249,11 @@ public class TransactionController {
                 accountService.updateAccountBalance(transaction.getAccount().getId(), transaction.getAmount(), "ADD");
             }
         }
+
+        // Un traspàs mou també el saldo de l'altre compte: el que surt d'aquí
+        // hi entra. És el que fa que Trade Republic pugi sense importar-ne
+        // l'extracte.
+        internalTransfers.applyToCounterpart(transaction);
     }
 
     /**
@@ -231,6 +264,7 @@ public class TransactionController {
      * i el compte que es toca és el que tenia abans, no el nou.
      */
     private void revertFromBalance(Transaction transaction) {
+        internalTransfers.revertFromCounterpart(transaction);
         if (transaction.getAccount() == null || transaction.getAmount() == null) return;
 
         if ("EXPENSE".equals(transaction.getType())) {
@@ -281,20 +315,24 @@ public class TransactionController {
         // dues fonts diguessin coses diferents amb el mateix nom.
         transaction.setBalance(null);
 
-        // Abans de tocar cap saldo: si el deute no existeix o les parts no
-        // quadren, no s'ha mogut res i es pot respondre sense haver de desfer.
+        Account defaultAccount = defaultAccount();
+        Account own = ownAccountOf(transaction, defaultAccount);
+        transaction.setAccount(own);
+
+        // Abans de tocar cap saldo: si el deute no existeix, les parts no
+        // quadren o el traspàs va al mateix compte, no s'ha mogut res i es pot
+        // respondre sense haver de desfer.
         List<TransactionPart> parts;
         try {
             transaction.setDebt(debtService.resolveForLink(transaction.getDebt()));
+            internalTransfers.link(transaction, own,
+                    internalTransfers.resolve(transaction.getCounterpartAccount(), own));
             parts = splitBeforeSaving(transaction);
         } catch (IllegalArgumentException exception) {
             return ResponseEntity.badRequest().body(Map.of(
                     "status", "error",
                     "message", exception.getMessage()));
         }
-
-        Account defaultAccount = accountRepository.findByName("Compte Principal")
-                .orElseGet(() -> accountRepository.findAll().stream().findFirst().orElse(null));
 
         linkAndApplyToBalance(transaction, defaultAccount);
         Transaction saved = transactionRepository.save(transaction);
@@ -378,6 +416,23 @@ public class TransactionController {
             }
         }
 
+        // El traspàs també: amb el compte que tindrà després, que pot ser
+        // precisament el de l'altre costat.
+        Account ownAfter = changes.getAccount() != null && changes.getAccount().getId() != null
+                ? accountRepository.findById(changes.getAccount().getId()).orElse(existing.getAccount())
+                : existing.getAccount();
+        boolean counterpartSent = changes.getCounterpartAccount() != null;
+        Account counterpartAfter;
+        try {
+            counterpartAfter = internalTransfers.resolve(
+                    counterpartSent ? changes.getCounterpartAccount() : existing.getCounterpartAccount(), ownAfter);
+        } catch (IllegalArgumentException exception) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "status", "error",
+                    "message", exception.getMessage()));
+        }
+        boolean wasTransfer = existing.isTransfer();
+
         revertFromBalance(existing);
 
         existing.setDebt(debt);
@@ -395,8 +450,17 @@ public class TransactionController {
             accountRepository.findById(changes.getAccount().getId()).ifPresent(existing::setAccount);
         }
 
+        // Si canvia l'altre compte, la marca d'exclòs l'havia posada el traspàs
+        // d'abans: es torna a decidir amb el nou, tret que en la mateixa edició
+        // diguin què volen. Sense això, passar de Revolut a Trade Republic
+        // deixava l'estalvi marcat com a no comptat.
+        if (wasTransfer && counterpartSent && changes.getExcludedFromBudget() == null) {
+            existing.setExcludedFromBudget(false);
+        }
+        internalTransfers.link(existing, existing.getAccount(), counterpartAfter);
+
         // Torna a lligar categoria i empresa —poden haver canviat de nom— i
-        // aplica el saldo nou al compte que toqui ara.
+        // aplica el saldo nou al compte que toqui ara, i al de l'altre costat.
         linkAndApplyToBalance(existing, existing.getAccount());
         transactionRepository.save(existing);
 
@@ -437,8 +501,7 @@ public class TransactionController {
     public ResponseEntity<?> confirmUpload(@RequestBody List<Transaction> confirmedTransactions) {
         try {
             // Obtener la cuenta principal por defecto
-            Account defaultAccount = accountRepository.findByName("Compte Principal")
-                    .orElseGet(() -> accountRepository.findAll().stream().findFirst().orElse(null));
+            Account defaultAccount = defaultAccount();
 
             // El hash es torna a calcular aquí, no arriba del client.
             //
@@ -452,9 +515,7 @@ public class TransactionController {
             // El compte s'assigna abans de comparar, perquè forma part de la
             // identitat del moviment.
             for (Transaction transaction : confirmedTransactions) {
-                if (transaction.getAccount() == null && defaultAccount != null) {
-                    transaction.setAccount(defaultAccount);
-                }
+                transaction.setAccount(ownAccountOf(transaction, defaultAccount));
                 transaction.setVerificationHash(transactionHasher.hash(transaction));
                 // La pantalla de revisió no vincula deutes, però deute_id s'ha
                 // de llegir igual per les tres portes d'entrada: sense resoldre'l,
@@ -500,6 +561,8 @@ public class TransactionController {
             for (Transaction transaction : toPersist) {
                 List<TransactionPart> parts;
                 try {
+                    internalTransfers.link(transaction, transaction.getAccount(),
+                            internalTransfers.resolve(transaction.getCounterpartAccount(), transaction.getAccount()));
                     parts = splitBeforeSaving(transaction);
                 } catch (IllegalArgumentException exception) {
                     throw new IllegalArgumentException(describe(transaction) + ": " + exception.getMessage(), exception);
@@ -644,9 +707,14 @@ public class TransactionController {
 
             // Amb diversos comptes, mirar-los per separat és el que permet
             // quadrar el saldo de cadascun amb el seu extracte.
+            // Un traspàs és del compte d'on surt i també del de l'altre costat:
+            // Trade Republic té els seus moviments encara que no se n'importi
+            // l'extracte.
             if (accountId != null) {
-                specification = specification.and((root, query, criteriaBuilder) ->
-                        criteriaBuilder.equal(root.get("account").get("id"), accountId));
+                specification = specification.and((root, query, criteriaBuilder) -> criteriaBuilder.or(
+                        criteriaBuilder.equal(root.get("account").get("id"), accountId),
+                        // LEFT: la majoria de moviments no en tenen, i un join normal els deixaria fora.
+                        criteriaBuilder.equal(root.join("counterpartAccount", JoinType.LEFT).get("id"), accountId)));
             }
 
             if (startDate != null) {

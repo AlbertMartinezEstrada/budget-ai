@@ -34,4 +34,8 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long>,
      */
     @Query("SELECT transaction FROM Transaction transaction WHERE transaction.debt.id = :debtId ORDER BY transaction.date ASC")
     List<Transaction> findByDebtOrderedByDate(@Param("debtId") Long debtId);
+
+    /** Els traspassos que tenen aquest compte a l'altre costat. Escrita per la mateixa raó. */
+    @Query("SELECT transaction FROM Transaction transaction WHERE transaction.counterpartAccount.id = :accountId")
+    List<Transaction> findTransfersWithCounterpart(@Param("accountId") Long accountId);
 }

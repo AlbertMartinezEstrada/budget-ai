@@ -588,8 +588,22 @@ public class BudgetService {
                 // Una entrada per traspàs no són diners nous: eixamplaria el
                 // bot a repartir amb els mateixos euros que ja hi eren.
                 .filter(line -> !line.excludedFromBudget())
+                // Tampoc la que torna d'un compte d'estalvi, que compta: resta
+                // estalvi, però no és cap ingrés.
+                .filter(line -> !line.transaction().isTransfer())
                 .filter(line -> categoryId == null
                         || (line.category() != null && categoryId.equals(line.category().getId())))
+                .filter(line -> line.isBetween(from, to))
+                .map(Line::amount)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
+    /** El que ha tornat d'una categoria d'estalvi: les entrades que hi compten. */
+    private BigDecimal withdrawnFrom(List<Line> lines, Long categoryId, LocalDate from, LocalDate to) {
+        return lines.stream()
+                .filter(line -> "INCOME".equals(line.type()))
+                .filter(line -> !line.excludedFromBudget())
+                .filter(line -> line.category() != null && categoryId.equals(line.category().getId()))
                 .filter(line -> line.isBetween(from, to))
                 .map(Line::amount)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
@@ -721,6 +735,11 @@ public class BudgetService {
             }
 
             BigDecimal real = spentIn(lines, Set.of(category.getId()), from, to);
+            // A l'estalvi, el que en torna resta: treure'n 200 € el mateix mes
+            // que se n'aparten 300 vol dir que se n'han estalviat 100.
+            if (SECTION_SAVINGS.equals(section)) {
+                real = real.subtract(withdrawnFrom(lines, category.getId(), from, to));
+            }
             BigDecimal prorated = proratedFor(category, recurring, EXPENSE);
             // Les quotes pactades dels deutes que dec: diners que aquest mes ja
             // estan compromesos. Van a part del prorrateig perquè no són cap

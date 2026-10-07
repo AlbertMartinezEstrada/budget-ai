@@ -28,8 +28,10 @@ import static org.assertj.core.api.Assertions.assertThat;
  * allà es compren accions. Són 100 € de despesa, no 200, i l'entrada a Revolut
  * no són diners nous.
  *
- * La regla: un cop surten del principal ja estan comptats. El que facin
- * després mou saldos però no torna a comptar al pressupost.
+ * Aquí es marquen a mà com a "no compta", que és com es feia abans dels
+ * traspassos (compte_contrapart_id) i com es pot continuar fent: el que és
+ * exclòs mou saldos però no torna a comptar al pressupost. Els traspassos
+ * pròpiament dits són a InternalTransfersIntegrationTest.
  */
 class TraspassosIntegrationTest extends AbstractIntegrationTest {
 

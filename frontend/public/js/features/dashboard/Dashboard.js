@@ -74,11 +74,15 @@ export async function initDashboard(container) {
     }
 }
 
+// Un traspàs entre comptes teus no és ni ingrés ni despesa: sumat, 100 € passats
+// a Revolut sortien com a despesa, i el que s'hi pagués comptava dues vegades.
+const isTransfer = (transaction) => Boolean(transaction.compte_contrapart_id);
+
 function updateStats(transactions) {
     let income = 0;
     let expense = 0;
 
-    transactions.forEach(transaction => {
+    transactions.filter(transaction => !isTransfer(transaction)).forEach(transaction => {
         const amount = parseFloat(transaction.cost || 0);
         // Check type. If not present, assume expense if amount is positive? 
         // Usually banks give negative for expense. 
@@ -111,7 +115,7 @@ function updateStats(transactions) {
 
 function renderTopCategories(transactions) {
     // Filter only expenses for categories
-    const expenses = transactions.filter(transaction => transaction.type !== 'INCOME');
+    const expenses = transactions.filter(transaction => transaction.type !== 'INCOME' && !isTransfer(transaction));
     const categories = {};
 
     // D'un moviment dividit, cada part va a la seva categoria: si no, la
