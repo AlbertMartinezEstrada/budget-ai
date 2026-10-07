@@ -730,6 +730,13 @@ todos los movimientos de golpe y una colección por movimiento haría una consul
 por cada uno. El filtro por categoría encuentra un movimiento dividido por sus
 partes, no por la categoría que aún lleva.
 
+En la lista de Transacciones **las partes salen plegadas**. La pastilla
+«dividit en N» las despliega, y su título ya dice dónde va cada parte; el botón
+«Desplegar les parts» las abre o cierra todas. Lo desplegado se mantiene al
+filtrar o volver a cargar la lista. Con todas abiertas, cuatro partes por
+movimiento hacían la lista el doble de larga y lo que se buscaba quedaba
+enterrado.
+
 Borrar el movimiento borra sus partes (`ON DELETE CASCADE`), y una categoría que
 solo usan partes tampoco se puede borrar.
 
