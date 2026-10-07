@@ -188,13 +188,18 @@ class FixedCostIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("Un cost fix no pot anar a una fulla variable ni a un grup")
-    void onlyFixedLeavesTakeFixedCosts() {
-        assertThatThrownBy(() -> fixedCostService.create(MARCH, request(electricity, "Llum", "50.00")))
-                .isInstanceOf(IllegalArgumentException.class);
+    @DisplayName("Un cost fix pot anar a una fulla variable, com la llum, però no a un grup")
+    void variableLeavesTakeFixedCostsButGroupsDoNot() {
+        // Abans es rebutjava, i el recurrent de la llum que es posava des de
+        // Recurrents no sortia enlloc.
+        fixedCostService.create(MARCH, request(electricity, "Llum", "50.00"));
+        assertThat(planOf(electricity, MARCH)).isEqualByComparingTo("50.00");
+        assertThat(fixedCostService.listFor(MARCH)).extracting(RecurringTransaction::getName).containsExactly("Llum");
+
         Category home = categoryRepository.findById(rent.getParentId()).orElseThrow();
         assertThatThrownBy(() -> fixedCostService.create(MARCH, request(home, "Llar", "50.00")))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("és un bloc");
     }
 
     @Test

@@ -1,5 +1,7 @@
 import { getRecurringTransactions, getRecurringTransaction, createRecurringTransaction, updateRecurringTransaction, deleteRecurringTransaction, processRecurring, getCategories, formatCurrency, escapeHtml } from '../../api.js';
-import { categoryOptions, EXPENSE_SECTIONS, INCOME_SECTIONS } from '../../categoryOptions.js';
+import {
+    categoryOptions, leafCategories, sectionOfCategory, EXPENSE_SECTIONS, INCOME_SECTIONS
+} from '../../categoryOptions.js';
 
 export async function initRecurring(container) {
     container.innerHTML = `
@@ -55,7 +57,7 @@ export async function initRecurring(container) {
                     </div>
                     <div>
                         <label class="block text-sm font-medium mb-1">Categoría</label>
-                        <select id="recurring-category" class="w-full px-3 py-2 border rounded-lg"></select>
+                        <select id="recurring-category" required class="w-full px-3 py-2 border rounded-lg"></select>
                     </div>
                     <div>
                         <label class="block text-sm font-medium mb-1">Descripción</label>
@@ -99,9 +101,13 @@ async function loadCategoriesSelect() {
  *
  * Una despesa en una categoria d'ingressos no comptaria enlloc: allà el
  * pressupost mira el que entra. I al revés, igual.
+ *
+ * La categoria és obligatòria: sense, el recurrent no compta al pressupost. La
+ * primera opció és buida perquè, si el recurrent en tenia una que ja no
+ * s'ofereix (un bloc), el desplegable no en triï una altra sense dir res.
  */
 function fillCategorySelect(type, selected = null) {
-    document.getElementById('recurring-category').innerHTML = '<option value="">Sin categoría</option>'
+    document.getElementById('recurring-category').innerHTML = '<option value="">— Elige una categoría —</option>'
         + categoryOptions(categories, {
             sections: type === 'INCOME' ? INCOME_SECTIONS : EXPENSE_SECTIONS,
             selected
@@ -160,8 +166,47 @@ function renderRecurrings(recurrings) {
                 </span>
                 <span class="text-xs ${item.activa ? 'text-green-600' : 'text-gray-400'}">${item.activa ? 'Activa' : 'Inactiva'}</span>
             </div>
+            ${budgetLine(item)}
         </div>
     `).join('');
+}
+
+/**
+ * Com compta el recurrent al pressupost.
+ *
+ * Els recurrents i el pressupost semblaven dues coses sense relació: es posava
+ * un import aquí i no se sabia si allà sortia. I n'hi havia que no hi sortien
+ * mai —sense categoria, en un bloc, de l'altre sentit o desactivats en
+ * editar-los— sense que res ho digués. El backend ja no n'accepta de nous,
+ * però els d'abans hi són: la targeta diu què els passa.
+ */
+function budgetLine(item) {
+    const problem = whyItDoesNotCount(item);
+    if (problem) {
+        return `<p class="text-xs mt-2 text-amber-800 dark:text-amber-300">${escapeHtml(problem)}</p>`;
+    }
+    return `<p class="text-xs mt-2 text-gray-500 dark:text-slate-400">
+                ${escapeHtml(item.category.nom)} · cuenta ${formatCurrency(item.prorrateig_mensual)} al mes en el presupuesto
+            </p>`;
+}
+
+function whyItDoesNotCount(item) {
+    if (!item.activa) return 'Inactiva: no cuenta en el presupuesto.';
+    if (!item.category) return 'Sin categoría: no cuenta en el presupuesto. Edítala y elige una.';
+    // Sense les categories carregades no es pot saber: val més no alarmar.
+    if (categories.length === 0) return null;
+
+    const name = item.category.nom;
+    if (!leafCategories(categories).some(category => category.id === item.category.id)) {
+        return `«${name}» es un bloque: no cuenta en el presupuesto. Edítala y elige una de sus subcategorías.`;
+    }
+    const isIncomeCategory = sectionOfCategory(categories, item.category.id) === 'INCOME';
+    if (isIncomeCategory !== (item.tipus === 'INCOME')) {
+        return isIncomeCategory
+            ? `«${name}» es de ingresos: un gasto ahí no cuenta en el presupuesto. Edítala y cambia la categoría.`
+            : `«${name}» es de gastos: un ingreso ahí no cuenta en el presupuesto. Edítala y cambia la categoría.`;
+    }
+    return null;
 }
 
 function openModal(recurring = null) {
@@ -170,7 +215,6 @@ function openModal(recurring = null) {
     const form = document.getElementById('recurring-form');
 
     const today = new Date().toISOString().split('T')[0];
-    document.getElementById('recurring-next-date').value = today;
 
     if (recurring) {
         title.textContent = 'Editar Transacción Recurrente';
@@ -186,6 +230,9 @@ function openModal(recurring = null) {
         title.textContent = 'Nueva Transacción Recurrente';
         form.reset();
         document.getElementById('recurring-id').value = '';
+        // Després del reset: abans la data es posava primer i el reset la
+        // tornava a deixar buida.
+        document.getElementById('recurring-next-date').value = today;
         fillCategorySelect(document.getElementById('recurring-type').value);
     }
 
@@ -251,7 +298,9 @@ async function handleSubmit(event) {
         closeModal();
         await loadRecurrings();
     } catch (error) {
-        alert('Error al guardar');
+        // El backend diu què no quadra (un bloc, una categoria de l'altre
+        // sentit…): «Error al guardar» no ajudava a arreglar-ho.
+        alert(error.message || 'Error al guardar');
     }
 }
 

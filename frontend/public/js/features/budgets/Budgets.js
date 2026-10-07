@@ -84,9 +84,9 @@ export async function initBudgets(container) {
                     ${MONTH_NAMES.map((monthName, monthIndex) => `<option value="${monthIndex + 1}">${monthName}</option>`).join('')}
                 </select>
                 <button id="fixed-costs-btn" class="px-3 py-2 border rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700 dark:border-slate-600 flex items-center gap-2"
-                        title="Los gastos fijos que se copian a cada mes">
+                        title="Los gastos que se repiten y se copian a cada mes">
                     <span class="material-symbols-outlined">event_repeat</span>
-                    Costes fijos
+                    Recurrentes
                 </button>
                 <button id="copy-month-btn" class="px-3 py-2 border rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700 dark:border-slate-600 flex items-center gap-2"
                         title="Duplicar aquí las asignaciones del mes anterior">
@@ -108,7 +108,7 @@ export async function initBudgets(container) {
         <div id="fixed-costs-modal" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-50 p-4">
             <div class="bg-white dark:bg-slate-800 rounded-xl p-6 w-full max-w-2xl max-h-full overflow-y-auto">
                 <div class="flex justify-between items-start gap-4 mb-1">
-                    <h3 class="text-xl font-bold">Costes fijos</h3>
+                    <h3 class="text-xl font-bold">Gastos recurrentes</h3>
                     <button type="button" id="fixed-costs-close" class="p-1 hover:bg-gray-100 dark:hover:bg-slate-700 rounded" title="Cerrar">
                         <span class="material-symbols-outlined">close</span>
                     </button>
@@ -119,7 +119,7 @@ export async function initBudgets(container) {
 
                 <form id="fixed-cost-form" class="rounded-lg bg-slate-50 dark:bg-slate-700/50 p-4 space-y-3">
                     <input type="hidden" id="fixed-cost-id">
-                    <div class="font-semibold text-sm" id="fixed-cost-form-title">Añadir un coste fijo</div>
+                    <div class="font-semibold text-sm" id="fixed-cost-form-title">Añadir un gasto recurrente</div>
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div>
                             <label class="block text-sm font-medium mb-1" for="fixed-cost-name">Nombre</label>
@@ -327,9 +327,9 @@ function walkPots(node, potLabel, potAmount) {
     potByCategory.set(node.categoria.id, {
         label: potLabel,
         base: toNumber(node.base_assignacio) ?? potAmount,
-        // El que val el mes segons els costos fixos. És el punt de partida
-        // quan es canvia l'import només d'aquest mes.
-        fixedCost: node.categoria.es_fix ? toNumber(node.prorrateig_mensual) : null
+        // El que val el mes segons els seus recurrents, sigui fixa o variable.
+        // És el punt de partida quan es canvia l'import només d'aquest mes.
+        fixedCost: toNumber(node.prorrateig_mensual)
     });
 
     // Els fills es reparteixen el que li ha tocat al pare, sempre que el pare
@@ -723,16 +723,17 @@ function shareBadge(node, style) {
 
 function actionButtons(node, budgetByCategory) {
     const budget = budgetByCategory.get(node.categoria.id);
-    // Una fulla amb cost fix ja té import sense assignar-li res: el que es fa
-    // des d'aquí és canviar-lo només aquest mes, i treure-ho hi torna.
-    const hasFixedCost = toNumber(node.prorrateig_mensual) > 0 && node.categoria.es_fix;
+    // Una fulla amb recurrent ja té import sense assignar-li res: el que es fa
+    // des d'aquí és canviar-lo només aquest mes, i treure-ho hi torna. Abans
+    // només ho feien les fixes; la llum, amb el seu recurrent, semblava buida.
+    const hasFixedCost = toNumber(node.prorrateig_mensual) > 0;
     if (budget) {
         return `
             <button data-action="edit" data-id="${budget.id}" class="p-1 hover:bg-gray-100 dark:hover:bg-slate-700 rounded" title="Cambiar la asignación">
                 <span class="material-symbols-outlined text-sm">edit</span>
             </button>
             <button data-action="delete" data-id="${budget.id}" data-fixed="${hasFixedCost}" class="p-1 hover:bg-red-50 dark:hover:bg-red-500/10 text-red-500 rounded"
-                    title="${hasFixedCost ? 'Volver al coste fijo' : 'Quitar la asignación'}">
+                    title="${hasFixedCost ? 'Volver al recurrente' : 'Quitar la asignación'}">
                 <span class="material-symbols-outlined text-sm">${hasFixedCost ? 'undo' : 'delete'}</span>
             </button>`;
     }
@@ -896,7 +897,7 @@ function openModal(budget = null, presetCategoryId = null) {
             document.getElementById('budget-limit').value = fixedCost.toFixed(2);
         }
         document.getElementById('modal-subtitle').textContent =
-            `Solo para ${MONTH_NAMES[month - 1]} ${year}. El coste fijo es ${formatCurrency(fixedCost)} y no cambia: se edita en «Costes fijos».`;
+            `Solo para ${MONTH_NAMES[month - 1]} ${year}. El recurrente es ${formatCurrency(fixedCost)} y no cambia: se edita en «Recurrentes».`;
     } else {
         document.getElementById('modal-subtitle').textContent =
             'Un porcentaje se mide siempre sobre el nivel que tiene encima, no sobre el total de ingresos.';
@@ -922,27 +923,29 @@ function closeModal() {
     modal.classList.remove('flex');
 }
 
-// ============ COSTOS FIXOS ============
+// ============ RECURRENTS ============
 //
 // La plantilla de cada mes: el que s'hi defineix arriba sol a tots els mesos
 // des del que s'està mirant. Canviar l'import d'un sol mes es fa des de la
-// fila de la categoria, no d'aquí.
+// fila de la categoria, no d'aquí. Al codi i a l'API es diuen "costos fixos"
+// perquè va començar només amb les fulles fixes.
 
 let loadedFixedCosts = [];
-
-/** Les fulles fixes: les úniques que poden tenir cost fix. */
-const isFixedLeaf = (category) => category.es_fix;
 
 async function openFixedCosts() {
     const modal = document.getElementById('fixed-costs-modal');
     const { year, month } = selectedPeriod();
 
     document.getElementById('fixed-costs-subtitle').textContent =
-        `Se copian a cada mes. Los cambios valen desde ${MONTH_NAMES[month - 1]} ${year}; los meses anteriores no cambian.`;
+        'Se copian a cada mes y son lo previsto en su categoría: en una fija, lo que cuesta; '
+        + 'en una variable, como la luz, el tope con el que se compara lo gastado. '
+        + `Los cambios valen desde ${MONTH_NAMES[month - 1]} ${year}; los meses anteriores no cambian.`;
 
-    const options = categoryOptions(categories, { sections: EXPENSE_SECTIONS, only: isFixedLeaf });
+    // Cualquier subcategoría de gasto: antes solo las fijas, y la luz no podía
+    // tener el suyo.
+    const options = categoryOptions(categories, { sections: EXPENSE_SECTIONS });
     document.getElementById('fixed-cost-category').innerHTML = options
-        || '<option value="">No hay subcategorías fijas</option>';
+        || '<option value="">No hay subcategorías de gasto</option>';
 
     resetFixedCostForm();
     modal.classList.remove('hidden');
@@ -964,7 +967,7 @@ async function loadFixedCosts() {
         loadedFixedCosts = response.costos || [];
         renderFixedCosts(loadedFixedCosts, toNumber(response.total_mensual) || 0);
     } catch (error) {
-        list.innerHTML = `<p class="text-red-500 text-sm">${escapeHtml(error.message || 'Error al cargar los costes fijos')}</p>`;
+        list.innerHTML = `<p class="text-red-500 text-sm">${escapeHtml(error.message || 'Error al cargar los recurrentes')}</p>`;
     }
 }
 
@@ -973,7 +976,7 @@ function renderFixedCosts(fixedCosts, monthlyTotal) {
     if (fixedCosts.length === 0) {
         list.innerHTML = `
             <p class="text-sm text-gray-500 dark:text-slate-400 text-center py-4">
-                Todavía no hay costes fijos este mes.
+                Todavía no hay gastos recurrentes este mes.
             </p>`;
         return;
     }
@@ -1014,7 +1017,7 @@ function renderFixedCosts(fixedCosts, monthlyTotal) {
 function resetFixedCostForm() {
     document.getElementById('fixed-cost-form').reset();
     document.getElementById('fixed-cost-id').value = '';
-    document.getElementById('fixed-cost-form-title').textContent = 'Añadir un coste fijo';
+    document.getElementById('fixed-cost-form-title').textContent = 'Añadir un gasto recurrente';
     document.getElementById('fixed-cost-submit').textContent = 'Añadir';
     document.getElementById('fixed-cost-cancel').classList.add('hidden');
     document.getElementById('fixed-cost-frequency').value = 'MENSUAL';
@@ -1052,7 +1055,7 @@ async function handleFixedCostListClick(event) {
             resetFixedCostForm();
             await Promise.all([loadFixedCosts(), loadSummary()]);
         } catch (error) {
-            alert(error.message || 'Error al quitar el coste fijo');
+            alert(error.message || 'Error al quitar el recurrente');
         }
     }
 }
@@ -1065,7 +1068,7 @@ async function handleFixedCostSubmit(event) {
     const amount = toNumber(document.getElementById('fixed-cost-amount').value);
 
     if (!Number.isInteger(categoryId)) {
-        alert('Primero marca alguna subcategoría como «fijo» en Categorías.');
+        alert('Primero crea alguna subcategoría de gasto en Categorías.');
         return;
     }
     if (amount == null || amount < 0) {
@@ -1089,7 +1092,7 @@ async function handleFixedCostSubmit(event) {
         resetFixedCostForm();
         await Promise.all([loadFixedCosts(), loadSummary()]);
     } catch (error) {
-        alert(error.message || 'Error al guardar el coste fijo');
+        alert(error.message || 'Error al guardar el recurrente');
     }
 }
 
@@ -1132,7 +1135,7 @@ async function handleListClick(event) {
 
     if (action === 'delete') {
         const question = button.dataset.fixed === 'true'
-            ? '¿Volver al coste fijo en este mes?'
+            ? '¿Volver al recurrente en este mes?'
             : '¿Quitar esta asignación?';
         if (!confirm(question)) return;
         try {
