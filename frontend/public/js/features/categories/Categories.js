@@ -61,6 +61,7 @@ export async function initCategories(container) {
                         <select id="category-section" class="w-full px-3 py-2 border rounded-lg">
                             <option value="AUTO">Deducir de las subcategorías</option>
                             <option value="FIXED">Gastos fijos</option>
+                            <option value="SAVINGS">Ahorro — se aparta después de los fijos y antes de los variables</option>
                             <option value="VARIABLE">Gastos variables</option>
                             <option value="INCOME">Ingresos — dinero que entra, no se reparte</option>
                         </select>
@@ -98,6 +99,9 @@ async function loadCategories() {
 }
 
 const childrenOf = (id) => categories.filter(category => category.parent_id === id);
+
+/** Seccions que no diuen com es mesura una fulla, només on va el bloc. */
+const SECTION_ONLY = new Set(['SAVINGS', 'INCOME']);
 const isGroup = (category) => childrenOf(category.id).length > 0;
 
 function renderTree() {
@@ -138,17 +142,21 @@ function renderTree() {
 function renderRow(category, asGroupHeader) {
     const group = isGroup(category);
     // Els grups no tenen naturalesa pròpia: poden barrejar fixos i variables.
+    // Un bloc d'estalvi o d'ingressos sense subcategories tampoc: el que diu el
+    // seu camp és la secció, i "variable" hauria estat mentida.
     const badge = group
         ? { text: 'grupo', cls: BADGE_CLASSES.group }
-        : category.tipus_cost === 'FIXED'
-            ? { text: 'fijo', cls: BADGE_CLASSES.fixed }
-            : { text: 'variable', cls: BADGE_CLASSES.variable };
+        : SECTION_ONLY.has(category.tipus_cost)
+            ? null
+            : category.tipus_cost === 'FIXED'
+                ? { text: 'fijo', cls: BADGE_CLASSES.fixed }
+                : { text: 'variable', cls: BADGE_CLASSES.variable };
 
     return `
         <div class="flex items-center justify-between ${asGroupHeader ? '' : 'text-sm'}">
             <span class="flex items-center gap-2 flex-wrap">
                 <span class="${asGroupHeader ? 'font-semibold text-lg' : ''}">${escapeHtml(category.nom)}</span>
-                <span class="text-xs px-2 py-0.5 rounded-full ${badge.cls}">${badge.text}</span>
+                ${badge ? `<span class="text-xs px-2 py-0.5 rounded-full ${badge.cls}">${badge.text}</span>` : ''}
                 ${sectionBadge(category, group)}
                 ${group ? `<span class="text-xs text-gray-500 dark:text-slate-400">${childrenOf(category.id).length} subcategorías</span>` : ''}
             </span>
@@ -172,13 +180,19 @@ function renderRow(category, asGroupHeader) {
  * res, perquè la secció surt de les fulles i ja es veu en cadascuna.
  */
 function sectionBadge(category, group) {
-    if (!group || category.parent_id || !category.tipus_cost) return '';
+    if (category.parent_id || !category.tipus_cost) return '';
+    // Una fulla de primer nivell només en porta si és d'estalvi o d'ingressos:
+    // si és fixa o variable, ja ho diu la seva pastilla.
+    if (!group && !SECTION_ONLY.has(category.tipus_cost)) return '';
 
     if (category.tipus_cost === 'FIXED') {
         return '<span class="text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">en gastos fijos</span>';
     }
     if (category.tipus_cost === 'INCOME') {
         return '<span class="text-xs px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">en ingresos</span>';
+    }
+    if (category.tipus_cost === 'SAVINGS') {
+        return '<span class="text-xs px-2 py-0.5 rounded-full bg-teal-100 text-teal-700">en ahorro</span>';
     }
     return '<span class="text-xs px-2 py-0.5 rounded-full bg-violet-100 text-violet-700">en gastos variables</span>';
 }
@@ -227,16 +241,21 @@ function openModal(category = null) {
         document.getElementById('category-nature').value = category.tipus_cost || 'VARIABLE';
         document.getElementById('category-section').value = category.tipus_cost || 'AUTO';
 
-        // A un grup, el camp no diu com es mesura —això ho diu cada
-        // subcategoria— sinó a quina secció del repartiment va el bloc sencer.
+        // A un bloc de primer nivell, el camp no diu com es mesura —això ho diu
+        // cada subcategoria— sinó a quina secció del repartiment va. També si
+        // no té subcategories, com Estalvis: amb el desplegable de naturalesa,
+        // que només té fix i variable, editar-lo li treia la secció d'estalvi.
         const group = isGroup(category);
-        natureWrapper.style.display = group ? 'none' : '';
-        sectionWrapper.style.display = group && !category.parent_id ? '' : 'none';
+        const root = !category.parent_id;
+        natureWrapper.style.display = root || group ? 'none' : '';
+        sectionWrapper.style.display = root ? '' : 'none';
         hint.textContent = group
             ? (category.parent_id
                 ? 'Es un grupo: su coste sale de sumar sus subcategorías.'
                 : 'Un bloque puede ser fijo y tener dentro subcategorías variables: el alquiler no se mueve, la luz sí.')
-            : '';
+            : root
+                ? 'Está en el primer nivel: aquí eliges en qué sección del presupuesto cuenta.'
+                : '';
     } else {
         document.getElementById('category-id').value = '';
         natureWrapper.style.display = '';
@@ -303,10 +322,11 @@ async function handleSubmit(event) {
     // El mateix camp, dues preguntes: a una fulla, com es mesura; a un bloc de
     // primer nivell, a quina secció del repartiment va. "AUTO" el buida, per
     // tornar a deduir-la de les subcategories.
-    if (!group) {
+    if (existing && !existing.parent_id) {
+        // Si la penja d'un grup, la secció ja no vol dir res: es queda com estava.
+        if (!parentValue) data.tipus_cost = document.getElementById('category-section').value;
+    } else if (!group) {
         data.tipus_cost = document.getElementById('category-nature').value;
-    } else if (existing && !existing.parent_id) {
-        data.tipus_cost = document.getElementById('category-section').value;
     }
 
     try {
