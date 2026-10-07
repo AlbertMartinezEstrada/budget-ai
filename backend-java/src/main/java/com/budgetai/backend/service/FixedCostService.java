@@ -17,10 +17,16 @@ import java.util.Set;
 /**
  * Els costos fixos: la plantilla de la qual surt cada mes.
  *
- * No és una taula a part: són els recurrents de despesa de les fulles fixes.
- * El pressupost d'un mes ja pren el prorrateig d'aquests recurrents quan la
- * fulla no té import propi, així que definir-los aquí és definir-los per a
- * tots els mesos. Un import posat a mà en un mes només val per a aquell mes.
+ * No és una taula a part: són els recurrents de despesa de les fulles de
+ * despesa. El pressupost d'un mes ja pren el prorrateig d'aquests recurrents
+ * quan la fulla no té import propi, així que definir-los aquí és definir-los
+ * per a tots els mesos. Un import posat a mà en un mes només val per a aquell
+ * mes.
+ *
+ * Es diuen "fixos" perquè l'import ho és, no la fulla. Abans només s'admetien
+ * a les fulles fixes, i la llum —una fulla variable dins de Llar— no podia
+ * tenir-ne: el recurrent que s'hi posava des de Recurrents no sortia enlloc.
+ * En una fulla variable fan de sostre amb què es compara el que s'hi gasta.
  *
  * Tots els canvis valen des d'un mes concret cap endavant. Si es modifiqués
  * la fila, els mesos passats canviarien de xifra: per això un canvi tanca la
@@ -46,8 +52,9 @@ public class FixedCostService {
 
     /** Els costos fixos que compten en aquest mes. */
     public List<RecurringTransaction> listFor(YearMonth month) {
+        CategoryHierarchyService.Tree tree = hierarchyService.loadTree();
         return recurringRepository.findByActiveTrue().stream()
-                .filter(this::isFixedCost)
+                .filter(recurring -> isFixedCost(recurring, tree))
                 .filter(recurring -> recurring.isValidDuring(month.atDay(1), month.atEndOfMonth()))
                 .sorted(Comparator.comparing((RecurringTransaction recurring) -> recurring.getCategory().getName())
                         .thenComparing(RecurringTransaction::getName))
@@ -128,18 +135,19 @@ public class FixedCostService {
         recurringRepository.save(current);
     }
 
-    private boolean isFixedCost(RecurringTransaction recurring) {
+    /** Una despesa recurrent en una fulla de despesa: la que el pressupost compta. */
+    private static boolean isFixedCost(RecurringTransaction recurring, CategoryHierarchyService.Tree tree) {
         Category category = recurring.getCategory();
         return "EXPENSE".equals(recurring.getType())
                 && category != null
-                && category.isFixed()
-                && !hierarchyService.isGroup(category.getId());
+                && !tree.isGroup(category.getId())
+                && !tree.isIncome(category.getId());
     }
 
     private RecurringTransaction findFixedCost(Long id) {
         RecurringTransaction recurring = recurringRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("No existeix el cost fix " + id));
-        if (!isFixedCost(recurring)) {
+        if (!isFixedCost(recurring, hierarchyService.loadTree())) {
             throw new IllegalArgumentException("El recurrent " + id + " no és un cost fix");
         }
         return recurring;
@@ -157,11 +165,7 @@ public class FixedCostService {
         if (request.getCategory() != null && request.getCategory().getId() != null) {
             Category category = categoryRepository.findById(request.getCategory().getId())
                     .orElseThrow(() -> new IllegalArgumentException("No existeix la categoria"));
-            // Un grup no rep moviments i una fulla variable es mesura pel que
-            // s'hi gasta: cap dels dos pot tenir un cost fix.
-            if (!category.isFixed() || hierarchyService.isGroup(category.getId())) {
-                throw new IllegalArgumentException("Un cost fix ha d'anar a una subcategoria fixa");
-            }
+            hierarchyService.requireRecurringCategory(category, "EXPENSE");
             target.setCategory(category);
         }
     }

@@ -75,6 +75,23 @@ function sectionOf(root, childrenOf) {
 }
 
 /**
+ * La secció del pressupost on cau una categoria: la del bloc d'on penja.
+ *
+ * @returns FIXED, VARIABLE o INCOME; null si la categoria no hi és.
+ */
+export function sectionOfCategory(categories, categoryId) {
+    const byId = new Map((categories || []).map(category => [category.id, category]));
+    let current = byId.get(categoryId);
+    if (!current) return null;
+    const visited = new Set();
+    while (current.parent_id != null && byId.has(current.parent_id) && !visited.has(current.id)) {
+        visited.add(current.id);
+        current = byId.get(current.parent_id);
+    }
+    return sectionOf(current, buildTree(categories).childrenOf);
+}
+
+/**
  * Les categories on poden anar diners: les que no tenen fills.
  *
  * Un grup existeix per agregar els seus fills, i un moviment penjat d'un grup

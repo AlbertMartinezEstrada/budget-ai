@@ -113,9 +113,11 @@ public class BudgetService {
      * Es copia el percentatge tal com estava; l'import es recalcula sol sobre
      * el bot del mes nou, que és tot el sentit de repartir per percentatges.
      *
-     * Les fulles que tenen un cost fix vigent al mes destí no es copien: el
-     * seu import ja surt del cost fix, i un canvi fet a mà en un mes només ha
-     * de valer per a aquell mes. Copiar-lo l'arrossegaria als següents.
+     * Les fulles que tenen un recurrent vigent al mes destí no es copien: el
+     * seu import ja surt del recurrent, i un canvi fet a mà en un mes només ha
+     * de valer per a aquell mes. Copiar-lo l'arrossegaria als següents. Val
+     * per a qualsevol fulla, no només les fixes: el recurrent de la llum també
+     * fa de plantilla.
      */
     @Transactional
     public Map<String, Object> copyFromPreviousMonth(int year, int month) {
@@ -127,11 +129,11 @@ public class BudgetService {
             alreadySet.add(budget.getCategory().getId());
         }
 
-        Set<Long> withFixedCost = activeRecurringByCategory(target.atDay(1), target.atEndOfMonth()).keySet();
+        Set<Long> withRecurring = activeRecurringByCategory(target.atDay(1), target.atEndOfMonth()).keySet();
 
         int copied = 0;
         for (Budget origin : activeBudgetsOverlapping(source.atDay(1), source.atEndOfMonth())) {
-            if (origin.getCategory().isFixed() && withFixedCost.contains(origin.getCategory().getId())) continue;
+            if (withRecurring.contains(origin.getCategory().getId())) continue;
             if (!alreadySet.add(origin.getCategory().getId())) continue;
 
             Budget copy = new Budget();
@@ -338,6 +340,10 @@ public class BudgetService {
      */
     private static final String SECTION_INCOME = "INCOME";
 
+    /** El sentit d'un recurrent, al seu camp tipus. */
+    private static final String EXPENSE = "EXPENSE";
+    private static final String INCOME = "INCOME";
+
     /**
      * Resum del mes: capçalera amb el sou de referència i l'arbre de grups.
      *
@@ -367,7 +373,7 @@ public class BudgetService {
         BigDecimal realIncome = realIncomeIn(lines, from, to);
         // El que hi ha per repartir surt de la secció d'ingressos: la nòmina hi
         // és un bloc més, al costat dels regals i de qualsevol altra entrada.
-        Income income = incomeAvailable(tree, amountsByCategory, lines, from, to);
+        Income income = incomeAvailable(tree, amountsByCategory, recurringByCategory, lines, from, to);
         // Amb la secció d'ingressos buida no hi hauria res a repartir i la
         // pantalla es quedaria morta, així que s'hi aplica el sou de referència.
         boolean fromIncomeSection = income.total().signum() > 0;
@@ -520,9 +526,13 @@ public class BudgetService {
      * Prendre el màxim i no la suma és el que impedeix comptar dues vegades la
      * mateixa nòmina: la previsió i el moviment real són la mateixa cosa vista
      * dos cops, no dos ingressos.
+     *
+     * La previsió és la que s'ha posat al mes o, si no n'hi ha, la dels seus
+     * ingressos recurrents: és el mateix criteri que a buildNode.
      */
     private Income incomeAvailable(CategoryHierarchyService.Tree tree,
                                    Map<Long, BigDecimal> forecasts,
+                                   Map<Long, List<RecurringTransaction>> recurring,
                                    List<Line> lines,
                                    LocalDate from, LocalDate to) {
         BigDecimal total = BigDecimal.ZERO;
@@ -533,7 +543,8 @@ public class BudgetService {
 
             for (Category leaf : tree.leavesOf(root.getId())) {
                 BigDecimal received = receivedIn(lines, leaf.getId(), from, to);
-                BigDecimal forecast = forecasts.getOrDefault(leaf.getId(), BigDecimal.ZERO);
+                BigDecimal assigned = forecasts.get(leaf.getId());
+                BigDecimal forecast = assigned != null ? assigned : proratedFor(leaf, recurring, INCOME);
                 total = total.add(received.max(forecast));
                 forecastTotal = forecastTotal.add(forecast);
             }
@@ -674,8 +685,10 @@ public class BudgetService {
                 node.put("cost_vida_real", received);
                 node.put("carrec_puntual_aquest_mes", false);
 
-                // Aquí el "pla" és el que s'esperava cobrar, si s'ha dit.
-                BigDecimal expected = assigned != null ? assigned : BigDecimal.ZERO;
+                // Aquí el "pla" és el que s'esperava cobrar: el que s'hagi dit
+                // per a aquest mes o, si no, el que diuen els seus ingressos
+                // recurrents. Abans una nòmina recurrent no hi comptava.
+                BigDecimal expected = assigned != null ? assigned : proratedFor(category, recurring, INCOME);
                 node.put("cost_vida_pla", expected);
                 // El que aquesta categoria posa al total a repartir: el que ha
                 // entrat o el que s'esperava, el que sigui més gran.
@@ -684,7 +697,7 @@ public class BudgetService {
             }
 
             BigDecimal real = spentIn(lines, Set.of(category.getId()), from, to);
-            BigDecimal prorated = proratedFor(category, recurring);
+            BigDecimal prorated = proratedFor(category, recurring, EXPENSE);
             // Les quotes pactades dels deutes que dec: diners que aquest mes ja
             // estan compromesos. Van a part del prorrateig perquè no són cap
             // cost fix: no es prorrategen ni tenen versions, s'acaben quan el
@@ -701,14 +714,14 @@ public class BudgetService {
             // aquest mes dispara la caixa sense que el cost de vida canviï.
             node.put("carrec_puntual_aquest_mes", fixed && real.signum() > 0);
 
-            // El que l'usuari hagi assignat mana. Si no ha assignat res, un fix
-            // val el seu prorrateig —el rebut ja diu quant costa— i un variable
-            // es queda sense pla. Les quotes de deutes s'hi sumen en tots dos
-            // casos: un compromís no deixa de ser-ho perquè la fulla sigui
-            // variable.
-            BigDecimal plan = assigned != null
-                    ? assigned
-                    : (fixed ? prorated : BigDecimal.ZERO).add(installments);
+            // El que l'usuari hagi assignat mana. Si no ha assignat res, la
+            // fulla val el que diuen els seus recurrents: en una fixa és també
+            // el que costa, i en una variable, el sostre amb què es compara el
+            // que s'hi gasti. Abans una variable es quedava sense pla, i un
+            // recurrent de la llum no sortia enlloc. Les quotes de deutes s'hi
+            // sumen en tots dos casos: un compromís no deixa de ser-ho perquè
+            // la fulla sigui variable.
+            BigDecimal plan = assigned != null ? assigned : prorated.add(installments);
             node.put("cost_vida_pla", plan);
             return plan;
         }
@@ -744,10 +757,15 @@ public class BudgetService {
         }
     }
 
-    /** Prorrateig mensual de les despeses fixes lligades a una fulla. */
-    private BigDecimal proratedFor(Category leaf, Map<Long, List<RecurringTransaction>> recurring) {
+    /**
+     * Prorrateig mensual dels recurrents d'una fulla, d'un sol sentit.
+     *
+     * @param type EXPENSE a les fulles de despesa, INCOME a les d'ingressos:
+     *             un recurrent de l'altre sentit no hi compta.
+     */
+    private BigDecimal proratedFor(Category leaf, Map<Long, List<RecurringTransaction>> recurring, String type) {
         return recurring.getOrDefault(leaf.getId(), List.of()).stream()
-                .filter(recurringTransaction -> "EXPENSE".equals(recurringTransaction.getType()))
+                .filter(recurringTransaction -> type.equals(recurringTransaction.getType()))
                 .map(RecurringTransaction::getMonthlyAmount)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
     }

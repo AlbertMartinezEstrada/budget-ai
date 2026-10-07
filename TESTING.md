@@ -228,6 +228,19 @@ nova.
   seves parts, que si una no quadra no s'importi res i el missatge digui quina,
   que l'alta manual accepti parts i que l'edició les rebutgi en comptes
   d'ignorar-les.
+- `RecurringBudgetIntegrationTest`: que el que es posa a Recurrents surti al
+  pressupost. Que un recurrent a la llum (una fulla variable) en sigui el pla i
+  es compari amb el que s'hi gasta; que un import del mes continuï manant
+  només aquell mes i que copiar el mes anterior no l'arrossegui; que un ingrés
+  recurrent sigui la previsió de la nòmina i entri al que es reparteix; que
+  editar-lo per HTTP com ho fa la pantalla, sense «activa», no el desactivi ni
+  li tregui el compte; i que un recurrent en un bloc, sense categoria o de
+  l'altre sentit es rebutgi dient per què. Abans cap d'aquests casos donava
+  error: el recurrent simplement no sortia al pressupost.
+- `FixedCostIntegrationTest`: el menú de recurrents de Pressupostos. Que un
+  canvi valgui des d'un mes sense tocar els anteriors, que un import posat en un
+  sol mes no es copiï als següents, i que s'hi pugui posar la llum, una fulla
+  variable, però no un bloc.
 
 ## Què NO cobreixen
 

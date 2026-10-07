@@ -163,6 +163,14 @@ test('els noms s\'escapen: venen del que escriu l\'usuari', () => {
     assert.ok(html.includes('value="O&#39;Brien &lt;b&gt;"'));
 });
 
+test('la secció d\'una categoria és la del bloc d\'on penja', () => {
+    assert.equal(module.sectionOfCategory(CATEGORIES, byName('Llum').id), 'FIXED');
+    assert.equal(module.sectionOfCategory(CATEGORIES, byName('Nòmina').id), 'INCOME');
+    assert.equal(module.sectionOfCategory(CATEGORIES, byName('Cinema').id), 'VARIABLE');
+    assert.equal(module.sectionOfCategory(CATEGORIES, tradeRepublic.id), 'VARIABLE');
+    assert.equal(module.sectionOfCategory(CATEGORIES, 99999), null);
+});
+
 test('sense categories no peta', () => {
     assert.equal(module.categoryOptions([]), '');
     assert.equal(module.categoryOptions(undefined), '');
