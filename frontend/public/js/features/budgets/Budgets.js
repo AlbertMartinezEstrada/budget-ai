@@ -11,9 +11,9 @@ import { categoryOptions, EXPENSE_SECTIONS } from '../../categoryOptions.js';
 const BAR_CLASSES = { low: 'bg-green-500', medium: 'bg-orange-500', high: 'bg-red-500' };
 const TEXT_CLASSES = { low: 'text-green-600', medium: 'text-orange-600', high: 'text-red-600' };
 
-// Les tres seccions es pinten diferent a propòsit: la primera cosa que s'ha de
+// Les seccions es pinten diferent a propòsit: la primera cosa que s'ha de
 // veure en obrir la pantalla és d'on venen els diners, on acaba el que està
-// compromès i on comença el que es pot moure.
+// compromès, el que s'aparta i on comença el que es pot moure.
 const SECTIONS = {
     FIXED: {
         titol: 'Gastos fijos',
@@ -23,9 +23,22 @@ const SECTIONS = {
         barra: 'bg-blue-500',
         buit: 'Ningún bloque es fijo todavía. Un bloque cuenta como fijo cuando todas sus subcategorías están marcadas como «fijo» en Categorías.'
     },
+    // L'estalvi no és cap gasto: s'aparta abans que els variables, i el que
+    // queda és el que hi ha per viure el mes. Passar del previst no és dolent,
+    // així que la barra no es posa mai en vermell.
+    SAVINGS: {
+        titol: 'Ahorro',
+        descripcio: 'Lo que apartas cada mes. Va después de los fijos y antes de los variables.',
+        accent: 'border-l-4 border-teal-500',
+        pastilla: 'bg-teal-100 text-teal-700 dark:bg-teal-500/20 dark:text-teal-300',
+        barra: 'bg-teal-500',
+        buit: 'Ningún bloque es de ahorro. Se marca en Categorías, en «Sección del reparto».',
+        verb: 'Apartado',
+        esEstalvi: true
+    },
     VARIABLE: {
         titol: 'Gastos variables',
-        descripcio: 'Se reparten sobre lo que queda después de los fijos.',
+        descripcio: 'Se reparten sobre lo que queda después de los fijos y el ahorro.',
         accent: 'border-l-4 border-violet-500',
         pastilla: 'bg-violet-100 text-violet-700 dark:bg-violet-500/20 dark:text-violet-300',
         barra: 'bg-violet-500',
@@ -315,7 +328,9 @@ function indexPots(summary) {
             : section.tipus === 'INCOME'
                 // Los ingresos no cuelgan de ningún bote: no se reparten.
                 ? 'lo previsto'
-                : 'lo que queda para variables';
+                : section.tipus === 'SAVINGS'
+                    ? 'lo que dejan los fijos'
+                    : 'lo que queda para variables';
 
         for (const node of section.grups || []) {
             walkPots(node, label, section.base);
@@ -498,16 +513,21 @@ function renderSection(section, budgetByCategory, available) {
                         <div class="flex flex-wrap justify-between gap-2 text-xs mt-1.5">
                             <span class="text-gray-600 dark:text-slate-300">
                                 Hay <strong>${formatCurrency(pot)}</strong>
-                                ${section.tipus === 'FIXED' ? 'disponibles este mes' : 'después de los fijos'}
+                                ${section.tipus === 'FIXED'
+                                    ? 'disponibles este mes'
+                                    : section.tipus === 'SAVINGS' ? 'después de los fijos' : 'después de los fijos y el ahorro'}
                             </span>
                             <span class="${left < 0 ? 'text-red-600 font-medium' : 'text-gray-600 dark:text-slate-300'}">
                                 ${left < 0
                                     ? `${formatCurrency(-left)} por encima de lo que hay`
                                     : section.tipus === 'FIXED'
                                         // Lo que no se llevan los fijos no queda libre: es exactamente
-                                        // el bote con el que empiezan los variables.
-                                        ? `${formatCurrency(left)} pasan a variables`
-                                        : `quedan ${formatCurrency(left)} por repartir`}
+                                        // el bote con el que empieza el ahorro, y lo que este no
+                                        // aparta, el de los variables.
+                                        ? `${formatCurrency(left)} pasan al ahorro y a variables`
+                                        : section.tipus === 'SAVINGS'
+                                            ? `${formatCurrency(left)} pasan a variables`
+                                            : `quedan ${formatCurrency(left)} por repartir`}
                             </span>
                         </div>
                     </div>` : ''}
@@ -532,7 +552,7 @@ function renderSection(section, budgetByCategory, available) {
  */
 const spentOf = (node) => toNumber(node.caixa_real) || 0;
 
-/** Un bloc de primer nivell: Trade Republic, Gast mensual, Allotjament… */
+/** Un bloc de primer nivell: Estalvis, Gast mensual, Allotjament… */
 function renderBlock(node, budgetByCategory, style) {
     const category = node.categoria;
     const plan = toNumber(node.cost_vida_pla) || 0;
@@ -542,7 +562,8 @@ function renderBlock(node, budgetByCategory, style) {
     const left = toNumber(node.restant);
 
     const percent = plan > 0 ? Math.min((real / plan) * 100, 100) : 0;
-    const level = plan > 0 && real > plan ? 'high' : percent > 80 ? 'medium' : 'low';
+    // A l'estalvi, arribar al previst o passar-se'n és el que es vol.
+    const level = style.esEstalvi ? 'low' : plan > 0 && real > plan ? 'high' : percent > 80 ? 'medium' : 'low';
 
     return `
         <div class="rounded-lg border border-slate-200 dark:border-slate-700 p-4">
@@ -591,7 +612,7 @@ function renderBlock(node, budgetByCategory, style) {
                 </div>
                 <div class="flex flex-wrap justify-between gap-2 text-xs mt-1.5">
                     <span class="${TEXT_CLASSES[level]} font-medium">
-                        Gastado ${formatCurrency(real)} de ${formatCurrency(plan)}
+                        ${style.verb || 'Gastado'} ${formatCurrency(real)} de ${formatCurrency(plan)}
                     </span>
                     ${left != null
                         ? `<span class="${left < 0 ? 'text-red-600' : 'text-gray-500 dark:text-slate-400'}">
@@ -626,7 +647,8 @@ function renderLeaf(node, budgetByCategory, style) {
     const fixed = category.tipus_cost === 'FIXED';
 
     const percent = plan > 0 ? Math.min((real / plan) * 100, 100) : 0;
-    const level = plan > 0 && real > plan ? 'high' : percent > 80 ? 'medium' : 'low';
+    // A l'estalvi, arribar al previst o passar-se'n és el que es vol.
+    const level = style.esEstalvi ? 'low' : plan > 0 && real > plan ? 'high' : percent > 80 ? 'medium' : 'low';
 
     // Una subsecció buida s'apaga en comptes d'ocupar el mateix que una amb
     // diners: hi ha catorze i només compten les que tenen alguna cosa.
@@ -666,10 +688,10 @@ function renderLeaf(node, budgetByCategory, style) {
                            </div>`
                         : plan > 0
                             ? `<div class="font-medium">${formatCurrency(plan)}</div>
-                               <div class="text-xs ${TEXT_CLASSES[level]}">gastado ${formatCurrency(real)}</div>`
+                               <div class="text-xs ${TEXT_CLASSES[level]}">${(style.verb || 'Gastado').toLowerCase()} ${formatCurrency(real)}</div>`
                             : real > 0
                                 ? `<div class="font-medium text-orange-600">${formatCurrency(real)}</div>
-                                   <div class="text-xs text-gray-500 dark:text-slate-400">gastado sin asignar</div>`
+                                   <div class="text-xs text-gray-500 dark:text-slate-400">${(style.verb || 'Gastado').toLowerCase()} sin asignar</div>`
                                 : '<div class="text-xs text-gray-500 dark:text-slate-400">sin asignar</div>'}
                 </div>
                 ${actionButtons(node, budgetByCategory)}

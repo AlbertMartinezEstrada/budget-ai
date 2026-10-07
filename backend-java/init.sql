@@ -12,10 +12,12 @@ CREATE TABLE IF NOT EXISTS categories (
     --   a una FULLA, com es mesura: FIXED pel prorrateig, VARIABLE pel gasto
     --     real del mes. NULL compta com a VARIABLE.
     --   a un BLOC de primer nivell, a quina secció del repartiment va: FIXED,
-    --     VARIABLE o INCOME. NULL la dedueix de les seves fulles.
+    --     SAVINGS, VARIABLE o INCOME. NULL la dedueix de les seves fulles.
     -- INCOME només té sentit a un bloc: marca els diners que entren, que ni es
-    -- prorrategen ni es comparen amb un sostre.
-    tipus_cost VARCHAR(20) CHECK (tipus_cost IN ('FIXED', 'VARIABLE', 'INCOME'))
+    -- prorrategen ni es comparen amb un sostre. SAVINGS, tampoc: marca els
+    -- diners que s'aparten, que es reparteixen després dels fixos i abans dels
+    -- variables.
+    tipus_cost VARCHAR(20) CHECK (tipus_cost IN ('FIXED', 'VARIABLE', 'INCOME', 'SAVINGS'))
 );
 
 -- Taula d'Empreses
@@ -224,10 +226,12 @@ CREATE TABLE IF NOT EXISTS import_rules (
 -- migrations/004_blocs_de_repartiment.sql és el preu de tenir una instal·lació
 -- nova i una d'existent acabant igual.
 -- Blocs de primer nivell. A un bloc, tipus_cost diu a quina secció del
--- repartiment va (FIXED, VARIABLE o INCOME); a null, es dedueix de les fulles.
+-- repartiment va (FIXED, SAVINGS, VARIABLE o INCOME); a null, es dedueix de les fulles.
 INSERT INTO categories (nom, tipus_cost) VALUES
 ('Llar', 'FIXED'), ('Subscripcions', 'FIXED'), ('Assegurances i salut', 'FIXED'),
-('Trade Republic', 'VARIABLE'), ('Gastos compartits', 'VARIABLE'),
+-- Estalvis és el que s'aparta cada mes. Es deia "Trade Republic", que és on
+-- són els diners i no per a què són.
+('Estalvis', 'SAVINGS'), ('Gastos compartits', 'VARIABLE'),
 ('Fons d''inversió', 'VARIABLE'), ('Gast mensual', 'VARIABLE'),
 ('Inversió de risc', 'VARIABLE'), ('Regals i altres', 'VARIABLE'),
 ('Deutes i préstecs', 'FIXED'),
