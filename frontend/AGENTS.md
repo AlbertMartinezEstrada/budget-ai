@@ -33,7 +33,7 @@ test/                 tests con el ejecutor integrado de Node
 
 ```bash
 npm ci                 # instalar exactamente las versiones del lockfile
-npm test               # 22 tests (hace falta npm ci antes: compilan Tailwind)
+npm test               # 39 tests (hace falta npm ci antes: compilan Tailwind)
 npm run build:assets   # regenerar tailwind.css y las fuentes de public/vendor
 ```
 
@@ -83,6 +83,14 @@ sin paso de construcción. La configuración está en `tailwind.config.js`.
   `index.html` y `js/`. `bg-${color}-500` no sale en el CSS: enumera las clases.
 - Las fuentes de `public/vendor/` se copian de `node_modules` con el mismo
   comando; el mismo test comprueba que coinciden con las versiones instaladas.
+
+**Los desplegables de categoría se montan con `categoryOptions()`**
+(`js/categoryOptions.js`), nunca a mano. Agrupa por sección y bloque igual que
+el presupuesto y solo ofrece hojas; con `groups: true` también los bloques, que
+solo valen para un presupuesto o el grupo de una categoría. `sections` y `only`
+filtran (las de gasto, las fijas…), y `value` decide si el valor es el id o el
+nombre. Los títulos de grupo van en negrita con `select optgroup` en
+`components.css`: el preflight de Tailwind se lo quitaba.
 
 **Los iconos son de Material Symbols**: `<span class="material-symbols-outlined">nombre</span>`.
 No uses otra librería de iconos.

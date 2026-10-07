@@ -326,3 +326,19 @@
     flex-direction: column;
     align-items: center;
 }
+
+/* Desplegables de categoria agrupats per secció i bloc (categoryOptions.js).
+   El preflight de Tailwind posa font-weight: inherit als optgroup, i on el
+   navegador pinta ell la llista (Windows, Linux) el nom del bloc quedava igual
+   que les categories: no es veia on començava cada grup. "select optgroup" i
+   no "optgroup" a soles perquè tailwind.css es carrega després i, amb la
+   mateixa especificitat, guanyaria. */
+select optgroup {
+    font-weight: 600;
+    color: var(--text-secondary);
+}
+
+select optgroup option {
+    font-weight: 400;
+    color: var(--text-main);
+}

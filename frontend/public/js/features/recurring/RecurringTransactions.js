@@ -1,4 +1,5 @@
 import { getRecurringTransactions, getRecurringTransaction, createRecurringTransaction, updateRecurringTransaction, deleteRecurringTransaction, processRecurring, getCategories, formatCurrency, escapeHtml } from '../../api.js';
+import { categoryOptions, EXPENSE_SECTIONS, INCOME_SECTIONS } from '../../categoryOptions.js';
 
 export async function initRecurring(container) {
     container.innerHTML = `
@@ -75,6 +76,9 @@ export async function initRecurring(container) {
     document.getElementById('add-recurring-btn').addEventListener('click', () => openModal());
     document.getElementById('cancel-btn').addEventListener('click', () => closeModal());
     document.getElementById('recurring-form').addEventListener('submit', handleSubmit);
+    document.getElementById('recurring-type').addEventListener('change', (event) => {
+        fillCategorySelect(event.target.value, document.getElementById('recurring-category').value);
+    });
     document.getElementById('process-btn').addEventListener('click', handleProcess);
     document.getElementById('recurring-list').addEventListener('click', handleListClick);
 }
@@ -84,11 +88,24 @@ let categories = [];
 async function loadCategoriesSelect() {
     try {
         categories = await getCategories();
-        const select = document.getElementById('recurring-category');
-        select.innerHTML = '<option value="">Sin categoría</option>' + categories.map(category => `<option value="${category.id}">${escapeHtml(category.nom)}</option>`).join('');
+        fillCategorySelect(document.getElementById('recurring-type').value);
     } catch (error) {
         console.error('Error loading categories:', error);
     }
+}
+
+/**
+ * Les categories que té sentit donar a un recurrent d'aquest tipus.
+ *
+ * Una despesa en una categoria d'ingressos no comptaria enlloc: allà el
+ * pressupost mira el que entra. I al revés, igual.
+ */
+function fillCategorySelect(type, selected = null) {
+    document.getElementById('recurring-category').innerHTML = '<option value="">Sin categoría</option>'
+        + categoryOptions(categories, {
+            sections: type === 'INCOME' ? INCOME_SECTIONS : EXPENSE_SECTIONS,
+            selected
+        });
 }
 
 async function loadRecurrings() {
@@ -163,12 +180,13 @@ function openModal(recurring = null) {
         document.getElementById('recurring-amount').value = recurring.import;
         document.getElementById('recurring-frequency').value = recurring.frequencia;
         document.getElementById('recurring-next-date').value = recurring.proxima_data;
-        document.getElementById('recurring-category').value = recurring.category?.id || '';
+        fillCategorySelect(recurring.tipus, recurring.category?.id);
         document.getElementById('recurring-description').value = recurring.descripcio || '';
     } else {
         title.textContent = 'Nueva Transacción Recurrente';
         form.reset();
         document.getElementById('recurring-id').value = '';
+        fillCategorySelect(document.getElementById('recurring-type').value);
     }
 
     modal.classList.remove('hidden');

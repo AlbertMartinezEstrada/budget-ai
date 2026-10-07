@@ -4,6 +4,7 @@ import {
     copyPreviousMonthBudgets, getCategories, formatCurrency, escapeHtml,
     getFixedCosts, createFixedCost, updateFixedCost, deleteFixedCost
 } from '../../api.js';
+import { categoryOptions, EXPENSE_SECTIONS } from '../../categoryOptions.js';
 
 // Tailwind no pot generar classes construïdes en temps d'execució
 // (`bg-${color}-500`), així que s'enumeren senceres.
@@ -271,24 +272,9 @@ async function loadCategories() {
     try {
         categories = await getCategories();
 
-        // Al desplegable, les subcategories surten indentades sota el seu bloc
-        // perquè es vegi l'estructura sense haver-la de recordar.
-        const groups = categories.filter(category => categories.some(child => child.parent_id === category.id));
-        const groupIds = new Set(groups.map(group => group.id));
-        const orphans = categories.filter(category => !groupIds.has(category.id) && !category.parent_id);
-
-        const options = [];
-        for (const group of groups) {
-            options.push(`<option value="${group.id}">${escapeHtml(group.nom)} (bloque)</option>`);
-            for (const child of categories.filter(category => category.parent_id === group.id)) {
-                options.push(`<option value="${child.id}">&nbsp;&nbsp;&nbsp;${escapeHtml(child.nom)}</option>`);
-            }
-        }
-        for (const orphan of orphans) {
-            options.push(`<option value="${orphan.id}">${escapeHtml(orphan.nom)}</option>`);
-        }
-
-        document.getElementById('budget-category').innerHTML = options.join('');
+        // Aquí sí que es pot triar un bloc: un pressupost posat al bloc és el
+        // sostre del conjunt.
+        document.getElementById('budget-category').innerHTML = categoryOptions(categories, { groups: true });
     } catch (error) {
         console.error('Error loading categories:', error);
     }
@@ -945,10 +931,7 @@ function closeModal() {
 let loadedFixedCosts = [];
 
 /** Les fulles fixes: les úniques que poden tenir cost fix. */
-function fixedLeaves() {
-    const parentIds = new Set(categories.map(category => category.parent_id).filter(Boolean));
-    return categories.filter(category => category.es_fix && !parentIds.has(category.id));
-}
+const isFixedLeaf = (category) => category.es_fix;
 
 async function openFixedCosts() {
     const modal = document.getElementById('fixed-costs-modal');
@@ -957,10 +940,9 @@ async function openFixedCosts() {
     document.getElementById('fixed-costs-subtitle').textContent =
         `Se copian a cada mes. Los cambios valen desde ${MONTH_NAMES[month - 1]} ${year}; los meses anteriores no cambian.`;
 
-    const leaves = fixedLeaves();
-    document.getElementById('fixed-cost-category').innerHTML = leaves.length > 0
-        ? leaves.map(category => `<option value="${category.id}">${escapeHtml(category.nom)}</option>`).join('')
-        : '<option value="">No hay subcategorías fijas</option>';
+    const options = categoryOptions(categories, { sections: EXPENSE_SECTIONS, only: isFixedLeaf });
+    document.getElementById('fixed-cost-category').innerHTML = options
+        || '<option value="">No hay subcategorías fijas</option>';
 
     resetFixedCostForm();
     modal.classList.remove('hidden');

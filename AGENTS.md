@@ -34,7 +34,7 @@ scripts/migrate.sh                    # aplica las migraciones pendientes (copia
 
 cd backend-java && ./gradlew test              # 144 unitarios, sin Docker
 cd backend-java && ./gradlew integrationTest   # 126, requieren Docker
-cd frontend && npm test                        # 26
+cd frontend && npm test                        # 39
 ```
 
 **Ejecuta los tests antes de dar nada por terminado.** El backend hay que
@@ -198,7 +198,9 @@ divergencia hace fallar toda la suite. Así se descubrió que faltaba la tabla
 `Category.parent_id` define grupos y hojas. **Un movimiento asignado a un grupo
 se contaría dos veces**: por sí mismo y al agregar sus hijos. El backend lo
 rechaza al confirmar una importación; el frontend no debe ofrecer grupos donde
-se elige la categoría de un movimiento.
+se elige la categoría de un movimiento. Los desplegables salen de
+`categoryOptions.js`, que solo ofrece hojas salvo que se le pida lo contrario:
+no montes uno a mano.
 
 `tipus_cost` (`FIXED`/`VARIABLE`) **significa dos cosas distintas según dónde
 esté**, y confundirlas es fácil:

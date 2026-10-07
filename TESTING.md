@@ -154,6 +154,15 @@ No comprova que el codi sigui correcte; comprova que no tornin errors coneguts.
 Analitza el codi amb els comentaris eliminats, perquè uns quants comentaris
 expliquen precisament aquests errors i en citen els noms.
 
+### `frontend/test/categoryOptions.test.js`
+
+Els desplegables de categoria: que surtin per seccions en l'ordre del
+pressupost i un grup per bloc, que la secció d'un bloc sense secció declarada es
+dedueixi de les fulles igual que a `BudgetService`, que per defecte no s'ofereixi
+cap bloc (un moviment en un bloc comptaria dues vegades) i que els noms
+s'escapin. Abans cada pantalla muntava el seu, desendreçat, i algun oferia
+blocs on només hi poden anar fulles.
+
 ### `frontend/test/assets.test.js`
 
 Tailwind i les fonts es generen amb `npm run build:assets` i es desen a
