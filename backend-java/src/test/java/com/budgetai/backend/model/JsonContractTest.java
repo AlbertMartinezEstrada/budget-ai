@@ -187,6 +187,39 @@ class JsonContractTest {
     }
 
     @Test
+    @DisplayName("Transaction: l'altre compte d'un traspàs surt i es llegeix com a compte_contrapart_id")
+    void transactionExposesCounterpartAccountId() throws Exception {
+        Account revolut = new Account();
+        revolut.setId(7L);
+        revolut.setName("Revolut");
+        Transaction transfer = new Transaction();
+        transfer.setCounterpartAccount(revolut);
+
+        JsonNode json = mapper.valueToTree(transfer);
+        assertThat(json.get("compte_contrapart_id").asLong()).isEqualTo(7L);
+        assertThat(json.has("counterpartAccount")).isFalse();
+        assertThat(json.has("transfer")).isFalse();
+
+        assertThat(mapper.readValue("{\"compte_contrapart_id\":7}", Transaction.class)
+                .getCounterpartAccount().getId()).isEqualTo(7L);
+        // Un negatiu vol dir "ja no és un traspàs", com deute_id.
+        assertThat(mapper.readValue("{\"compte_contrapart_id\":-1}", Transaction.class)
+                .getCounterpartAccount().getId()).isEqualTo(-1L);
+        assertThat(mapper.readValue("{\"cost\":10}", Transaction.class).getCounterpartAccount()).isNull();
+    }
+
+    @Test
+    @DisplayName("ImportRule: el compte d'un traspàs surt i es llegeix com a compte_traspas_id")
+    void importRuleExposesTransferAccountId() throws Exception {
+        ImportRule rule = mapper.readValue("{\"patro\":\"REVOLUT\",\"compte_traspas_id\":7}", ImportRule.class);
+        assertThat(rule.getTransferAccount().getId()).isEqualTo(7L);
+
+        JsonNode json = mapper.valueToTree(rule);
+        assertThat(json.get("compte_traspas_id").asLong()).isEqualTo(7L);
+        assertThat(json.has("transferAccount")).isFalse();
+    }
+
+    @Test
     @DisplayName("Transaction: deute_id es llegeix del formulari, i un negatiu vol dir desvincular")
     void transactionReadsDebtId() throws Exception {
         Transaction linked = mapper.readValue("{\"deute_id\":4}", Transaction.class);

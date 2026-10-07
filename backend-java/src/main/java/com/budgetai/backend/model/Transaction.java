@@ -69,19 +69,18 @@ public class Transaction {
     private String originalConcept;
 
     /**
-     * Diners que no s'han de tornar a comptar al pressupost.
+     * Diners que no compten al pressupost: no són ni despesa ni ingrés.
      *
-     * Un cop surten del compte principal ja estan comptats: el traspàs cap a
-     * Revolut compta com a despesa, i a partir d'aquí l'entrada a Revolut i la
-     * compra que s'hi faci són el mateix diner una altra vegada. Sense això,
-     * 100 € traspassats i invertits sortien com a 200 € de despesa, i l'entrada
-     * al compte destí a més inflava el bot a repartir.
+     * Un traspàs entre comptes del dia a dia (compte_contrapart_id) es desa
+     * així: els diners només canvien de lloc, i el que compta és el que es
+     * paga des de l'altre compte. Sense això, 100 € passats a Revolut i
+     * gastats allà sortien com a 200 € de despesa, i l'entrada a Revolut a més
+     * inflava el bot a repartir.
      *
-     * Es diu "exclòs del pressupost" i no "és traspàs" perquè la compra de dins
-     * del compte destí no és cap traspàs, però tampoc s'ha de comptar.
+     * Es diu "exclòs del pressupost" i no "és traspàs" perquè també serveix
+     * per a coses que no són cap traspàs i tampoc han de comptar.
      *
-     * El saldo sí que es mou igualment: cada extracte és la veritat del seu
-     * compte i el moviment hi ha passat de debò.
+     * El saldo sí que es mou igualment: el moviment ha passat de debò.
      */
     @Column(name = "exclos_pressupost")
     @JsonProperty("exclos_pressupost")
@@ -125,6 +124,38 @@ public class Transaction {
     @ToString.Exclude
     @EqualsAndHashCode.Exclude
     private List<TransactionPart> parts;
+
+    /**
+     * L'altre compte propi d'un traspàs: on van a parar els diners que surten,
+     * o d'on venen els que entren. Null vol dir que no és cap traspàs.
+     *
+     * Un traspàs no és ni despesa ni ingrés: els diners continuen sent meus.
+     * Entre comptes del dia a dia (Principal → Revolut) no compta al
+     * pressupost, i el que es paga des de Revolut compta a la seva categoria.
+     * Cap a un compte d'estalvi (Trade Republic) compta com a estalvi.
+     *
+     * Mou el saldo dels dos comptes, així que el moviment de l'altre extracte,
+     * si s'importa, és el mateix diner: la importació el reconeix i no el torna
+     * a desar.
+     *
+     * Al JSON surt només l'identificador, com deute_id.
+     */
+    @ManyToOne
+    @JoinColumn(name = "compte_contrapart_id")
+    @JsonIgnore
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
+    private Account counterpartAccount;
+
+    /**
+     * En revisar un extracte, el traspàs ja desat del qual aquesta línia és
+     * l'altra pota. No es desa: només serveix perquè la pantalla la desmarqui.
+     */
+    @Transient
+    @JsonProperty(value = "traspas_registrat", access = JsonProperty.Access.READ_ONLY)
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
+    private Long registeredTransferId;
 
     @Column(name = "compte_nom")
     private String accountName;
@@ -183,6 +214,33 @@ public class Transaction {
         Debt reference = new Debt();
         reference.setId(debtId);
         this.debt = reference;
+    }
+
+    /** Si és un traspàs entre comptes propis. */
+    @Transient
+    @JsonIgnore
+    public boolean isTransfer() {
+        return counterpartAccount != null;
+    }
+
+    @JsonProperty("compte_contrapart_id")
+    public Long getCounterpartAccountId() {
+        return counterpartAccount != null ? counterpartAccount.getId() : null;
+    }
+
+    /**
+     * Com deute_id: només en guarda l'identificador, i el controlador el resol.
+     * Un negatiu vol dir "ja no és un traspàs".
+     */
+    @JsonProperty("compte_contrapart_id")
+    public void setCounterpartAccountId(Long accountId) {
+        if (accountId == null) {
+            this.counterpartAccount = null;
+            return;
+        }
+        Account reference = new Account();
+        reference.setId(accountId);
+        this.counterpartAccount = reference;
     }
 
     // Mètodes per assegurar entrada/sortida correcta del JSON

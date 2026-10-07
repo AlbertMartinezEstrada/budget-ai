@@ -55,6 +55,7 @@ public class AnalyticsService {
         List<Line> expenses = TransactionLines.expand(transactionRepository.findAll(), transactionPartRepository.findAll())
                 .stream()
                 .filter(line -> "EXPENSE".equals(line.type()))
+                .filter(line -> !line.transaction().isTransfer())
                 .filter(line -> line.isBetween(startDate, endDate))
                 .toList();
 
@@ -109,6 +110,9 @@ public class AnalyticsService {
     private static BigDecimal sumByType(List<Transaction> transactions, String type) {
         return transactions.stream()
                 .filter(transaction -> type.equals(transaction.getType()))
+                // Un traspàs entre comptes propis no és ni ingrés ni despesa:
+                // sumat aquí, 100 € passats a Revolut sortien com a despesa.
+                .filter(transaction -> !transaction.isTransfer())
                 .map(AnalyticsService::amountOf)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
     }

@@ -3,6 +3,7 @@ import {
     getImportRules, createImportRule, deleteImportRule, formatCurrency, escapeHtml
 } from '../../api.js';
 import { categoryOptions, leafCategories } from '../../categoryOptions.js';
+import { counterpartOptions, transferCounts } from '../../transfers.js';
 import { setUpSplitEditor } from '../transactions/SplitEditor.js';
 
 /**
@@ -51,16 +52,21 @@ export async function initUpload(container) {
             </summary>
             <div class="p-3">
                 <p class="text-sm text-muted mb-3">
-                    Si el concepte del moviment conté el text de la regla, es marca sol com a
-                    <strong>ja comptat</strong>. Per a les entrades que vénen d'un altre compte teu:
-                    els diners ja es van comptar en sortir del principal.
-                    Sempre pots desmarcar-ho a la revisió abans de confirmar.
+                    Si el concepte del moviment conté el text de la regla, s'hi aplica sola. Pot dir que
+                    és un <strong>traspàs</strong> a un altre compte teu («REVOLUT» → Revolut): entre comptes
+                    del dia a dia no compta, i cap a un compte d'estalvi compta com a estalvi. Si no és cap
+                    traspàs, el marca com a <strong>no comptar</strong>.
+                    Sempre pots canviar-ho a la revisió abans de confirmar.
                 </p>
                 <form id="rule-form" class="flex flex-wrap items-end gap-2 mb-3">
                     <div class="form-group" style="flex: 1; min-width: 12rem; margin: 0;">
                         <label for="rule-pattern">El concepte conté</label>
                         <input type="text" id="rule-pattern" class="form-control"
                                placeholder="p. ex. *9469" required>
+                    </div>
+                    <div class="form-group" style="min-width: 12rem; margin: 0;">
+                        <label for="rule-transfer">És un traspàs al compte</label>
+                        <select id="rule-transfer" class="form-control"></select>
                     </div>
                     <div class="form-group" style="min-width: 12rem; margin: 0;">
                         <label for="rule-category">Categoria (opcional)</label>
@@ -102,7 +108,7 @@ export async function initUpload(container) {
                             <th>Empresa (Editable)</th>
                             <th>Categoria (Seleccionar)</th>
                             <th class="text-right">Import</th>
-                            <th title="Diners que ja es van comptar en sortir del compte principal">No comptar</th>
+                            <th title="Diners que no compten al pressupost. Un traspàs entre comptes del dia a dia es marca sol.">No comptar</th>
                             <th style="width: 3rem;"></th>
                         </tr>
                     </thead>
@@ -166,14 +172,17 @@ export async function initUpload(container) {
 
     // Un extracte és d'un compte. Sense triar-lo, tot queia al principal i amb
     // tres comptes els saldos i el pressupost deixaven de voler dir res.
+    let accounts = [];
     try {
-        const accounts = await getAccounts();
+        accounts = await getAccounts();
         document.getElementById('upload-account').innerHTML = accounts
             .map(account => `<option value="${account.id}">${escapeHtml(account.nom)}</option>`)
             .join('');
     } catch (error) {
         console.error('Error loading accounts:', error);
     }
+    const accountsById = new Map(accounts.map(account => [account.id, account]));
+    const importAccount = () => accountsById.get(Number.parseInt(document.getElementById('upload-account').value, 10));
 
     // ============ REGLES ============
     const rulesList = document.getElementById('rules-list');
@@ -187,7 +196,9 @@ export async function initUpload(container) {
                     <div class="flex items-center justify-between gap-2 py-1 text-sm">
                         <span>
                             <code>${escapeHtml(rule.patro)}</code>
-                            ${rule.marca_exclos ? '→ no comptar al pressupost' : ''}
+                            ${rule.compte_traspas_id
+                                ? `→ traspàs a ${escapeHtml(accountsById.get(rule.compte_traspas_id)?.nom || 'un altre compte')}`
+                                : rule.marca_exclos ? '→ no comptar al pressupost' : ''}
                             ${rule.categoria ? `→ ${escapeHtml(rule.categoria)}` : ''}
                         </span>
                         <button class="btn btn-sm btn-outline" data-action="delete-rule"
@@ -204,18 +215,27 @@ export async function initUpload(container) {
     ruleCategorySelect.innerHTML = '<option value="">— No la toquis —</option>'
         + categoryOptions(categoriesList, { value: (category) => category.nom });
 
+    // Qualsevol compte: la regla s'aplica a tots els extractes, i al del
+    // mateix compte el backend no la fa servir.
+    const ruleTransferSelect = document.getElementById('rule-transfer');
+    ruleTransferSelect.innerHTML = counterpartOptions(accounts, null, null, '— No, no és un traspàs —');
+
     document.getElementById('rule-form').addEventListener('submit', async (event) => {
         event.preventDefault();
         const patro = document.getElementById('rule-pattern').value.trim();
         if (!patro) return;
 
         try {
+            const transferAccountId = Number.parseInt(ruleTransferSelect.value, 10);
             await createImportRule({
                 patro,
-                marca_exclos: true,
-                categoria: ruleCategorySelect.value || null
+                // Un traspàs no es marca: si compta, ho decideixen els comptes.
+                marca_exclos: !Number.isInteger(transferAccountId),
+                categoria: ruleCategorySelect.value || null,
+                ...(Number.isInteger(transferAccountId) ? { compte_traspas_id: transferAccountId } : {})
             });
             document.getElementById('rule-pattern').value = '';
+            ruleTransferSelect.value = '';
             await renderRules();
         } catch (error) {
             alert(error.message || 'No s\'ha pogut desar la regla.');
@@ -259,8 +279,12 @@ export async function initUpload(container) {
             const result = await uploadCsv(file, document.getElementById('upload-account').value);
             if (result.status === 'review') {
                 // Tot entra marcat: el cas normal és importar-ho sencer i
-                // descartar-ne quatre, no al revés.
-                currentReviewData = result.data.map(transaction => ({ ...transaction, inclos: true }));
+                // descartar-ne quatre, no al revés. Menys l'altra pota d'un
+                // traspàs ja desat: tornar-la a importar mouria el saldo dues vegades.
+                currentReviewData = result.data.map(transaction => ({
+                    ...transaction,
+                    inclos: !transaction.traspas_registrat
+                }));
                 document.getElementById('review-search').value = '';
                 renderReviewTable();
                 reviewSection.classList.remove('hidden');
@@ -340,7 +364,10 @@ export async function initUpload(container) {
                         <option value="INCOME" ${type === 'INCOME' ? 'selected' : ''}>Ingrés</option>
                     </select>
                 </td>
-                <td><input type="text" class="input input-sm w-full" value="${escapeHtml(transaction.empresa || '')}" name="empresa"></td>
+                <td>
+                    <input type="text" class="input input-sm w-full" value="${escapeHtml(transaction.empresa || '')}" name="empresa">
+                    ${transferCell(transaction)}
+                </td>
                 <td>
                     ${split
                         ? `<span class="badge badge-secondary" title="Cada part compta a la seva categoria">dividit en ${transaction.parts.length}</span>`
@@ -354,8 +381,11 @@ export async function initUpload(container) {
                 <td class="text-center">
                     ${split
                         ? '<span class="text-muted" title="Cada part diu si compta">—</span>'
-                        : `<input type="checkbox" name="exclos" ${transaction.exclos_pressupost ? 'checked' : ''}
-                                  title="Marca'l si aquests diners ja es van comptar en sortir del compte principal: una entrada per traspàs, o una compra feta amb diners ja traspassats.">`}
+                        : isNeutralTransfer(transaction)
+                            ? `<input type="checkbox" name="exclos" checked disabled
+                                      title="Un traspàs entre comptes del dia a dia no compta: comptarà el que es pagui des d'allà.">`
+                            : `<input type="checkbox" name="exclos" ${transaction.exclos_pressupost ? 'checked' : ''}
+                                      title="Marca'l si aquests diners no compten al pressupost: no són ni despesa ni ingrés teus.">`}
                 </td>
                 <td class="text-right">
                     <button type="button" class="btn btn-sm btn-outline" data-action="split-row" data-index="${index}"
@@ -370,6 +400,28 @@ export async function initUpload(container) {
 
         document.getElementById('review-empty').classList.toggle('hidden', rows.length > 0);
         updateSummary();
+    }
+
+    /** Un traspàs entre comptes del dia a dia: no compta, i no es pot fer comptar. */
+    const isNeutralTransfer = (transaction) => Boolean(transaction.compte_contrapart_id)
+        && !transaction.traspas_registrat
+        && !transferCounts(importAccount(), accountsById.get(transaction.compte_contrapart_id));
+
+    /**
+     * Si la fila és un traspàs, a quin compte. Una línia que ja és l'altra
+     * pota d'un traspàs desat ho diu, i surt desmarcada.
+     */
+    function transferCell(transaction) {
+        if (transaction.traspas_registrat) {
+            const from = accountsById.get(transaction.compte_contrapart_id)?.nom || 'un altre compte';
+            return `<div class="text-sm text-muted mt-1" title="Ja es va desar en importar l'altre extracte, i ja va moure aquest saldo">
+                        ⇄ Ja desat com a traspàs amb ${escapeHtml(from)}: no cal importar-lo
+                    </div>`;
+        }
+        return `<select class="input input-sm w-full mt-1" name="traspas"
+                        title="Si els diners van a un altre compte teu, o en vénen">
+                    ${counterpartOptions(accounts, importAccount()?.id, transaction.compte_contrapart_id, 'No és un traspàs')}
+                </select>`;
     }
 
     /** Una part, sota el seu moviment. Sense data-index: no és cap fila editable. */
@@ -460,6 +512,25 @@ export async function initUpload(container) {
     });
 
     reviewBody.addEventListener('change', (event) => {
+        if (event.target.name === 'traspas') {
+            const row = event.target.closest('tr[data-index]');
+            if (!row) return;
+            const record = currentReviewData[row.dataset.index];
+            const counterpart = accountsById.get(Number.parseInt(event.target.value, 10));
+            const wasNeutral = record.compte_contrapart_id
+                && !transferCounts(importAccount(), accountsById.get(record.compte_contrapart_id));
+            record.compte_contrapart_id = counterpart ? counterpart.id : null;
+            // El mateix que farà el backend: entre comptes del dia a dia no
+            // compta. Si la marca l'havia posat el traspàs, se'n va amb ell.
+            if (counterpart && !transferCounts(importAccount(), counterpart)) {
+                record.exclos_pressupost = true;
+            } else if (wasNeutral) {
+                record.exclos_pressupost = false;
+            }
+            renderReviewTable();
+            return;
+        }
+
         if (event.target.name !== 'inclos' && event.target.name !== 'exclos') return;
 
         const row = event.target.closest('tr[data-index]');
@@ -505,7 +576,11 @@ export async function initUpload(container) {
                 ...transaction,
                 // Tot el fitxer va al compte triat a dalt.
                 ...(Number.isInteger(accountId) ? { account: { id: accountId } } : {}),
-                exclos_pressupost: Boolean(transaction.exclos_pressupost)
+                exclos_pressupost: Boolean(transaction.exclos_pressupost),
+                // Una línia reconeguda com l'altra pota d'un traspàs que l'usuari
+                // torna a marcar és un altre moviment: desada com a traspàs,
+                // tornaria a moure el saldo de l'altre compte.
+                ...(transaction.traspas_registrat ? { compte_contrapart_id: -1 } : {})
             }));
 
         if (confirmedData.length === 0) {
