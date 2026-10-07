@@ -7,6 +7,7 @@ ninguna copia: si se borraba el volumen de Docker o fallaba el disco, se perdía
 |---|---|
 | `scripts/backup.bat` / `scripts/backup.sh` | Copia la base de datos a un fichero `.sql` con fecha |
 | `scripts/restore.bat` / `scripts/restore.sh` | Sustituye la base de datos por una copia |
+| `scripts/migrate.sh` | Antes de aplicar migraciones pendientes, hace una copia con `backup.sh` |
 
 `.bat` para Windows (`cmd`), `.sh` para Linux y macOS (y el futuro servidor).
 Hacen lo mismo; si cambias uno, cambia el otro.
