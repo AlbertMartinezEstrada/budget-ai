@@ -70,6 +70,15 @@ en sentit de retorn: l'entrada del préstec no.
 Al servei, que la reserva del pressupost no passi mai del que quedava per
 tornar a l'inici del mes, i que els deutes que em deuen no reservin res.
 
+### `InternalTransferServiceTest`
+
+Els traspassos entre comptes propis. Que entre comptes del dia a dia no
+comptin i cap a l'estalvi sí; que mouen el saldo de l'altre compte, i desfer-los
+el retorna; que un traspàs al mateix compte es rebutgi; i que, en revisar un
+extracte, l'altra pota d'un traspàs ja desat es reconegui només si té el mateix
+import, el sentit contrari i dates a tres dies o menys, i que cada traspàs en
+reconegui una sola línia.
+
 ### `TransactionLinesTest` i `TransactionPartServiceTest`
 
 Un moviment dividit en parts. El primer fixa que d'un moviment dividit surt una
@@ -163,6 +172,13 @@ cap bloc (un moviment en un bloc comptaria dues vegades) i que els noms
 s'escapin. Abans cada pantalla muntava el seu, desendreçat, i algun oferia
 blocs on només hi poden anar fulles.
 
+### `frontend/test/transfers.test.js`
+
+Els traspassos al navegador: que un traspàs entre comptes del dia a dia no
+compti i un cap a l'estalvi sí, amb el mateix criteri que el backend (si no, el
+formulari diria una cosa i en desar-lo en passaria una altra), que el
+desplegable no ofereixi el mateix compte i que els noms s'escapin.
+
 ### `frontend/test/assets.test.js`
 
 Tailwind i les fonts es generen amb `npm run build:assets` i es desen a
@@ -237,6 +253,14 @@ nova.
   li tregui el compte; i que un recurrent en un bloc, sense categoria o de
   l'altre sentit es rebutgi dient per què. Abans cap d'aquests casos donava
   error: el recurrent simplement no sortia al pressupost.
+- `InternalTransfersIntegrationTest`: traspassos entre comptes propis, per HTTP
+  com els fa la pantalla. Que el traspàs a Revolut no compti i el que s'hi paga
+  sí, a la seva categoria; que el de Trade Republic compti com a estalvi i el
+  que en torna el resti sense ser ingrés; que mogui el saldo dels dos comptes i
+  esborrar-lo els desfaci; que canviar-ne l'altre compte mogui el diner; que un
+  traspàs al mateix compte es rebutgi sense tocar res; que a l'extracte de
+  Revolut l'entrada d'un traspàs ja desat surti reconeguda; que una regla el
+  marqui sola; i que filtrar per Trade Republic el trobi.
 - `MonthlySummaryIntegrationTest`: el resum del mes que pinta Pressupostos.
   Entre d'altres, que l'estalvi es reparteixi després dels fixos i que els
   variables només es quedin el que en sobra, i que les seccions surtin en

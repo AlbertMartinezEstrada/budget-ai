@@ -34,7 +34,9 @@ public class ImportRuleService {
             for (ImportRule rule : rules) {
                 if (!matches(rule, transaction)) continue;
 
-                if (Boolean.TRUE.equals(rule.getMarksExcluded())) {
+                if (rule.getTransferAccount() != null) {
+                    transaction.setCounterpartAccount(rule.getTransferAccount());
+                } else if (Boolean.TRUE.equals(rule.getMarksExcluded())) {
                     transaction.setExcludedFromBudget(true);
                 }
                 if (rule.getCategoryName() != null && !rule.getCategoryName().isBlank()) {
