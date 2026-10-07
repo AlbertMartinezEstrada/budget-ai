@@ -16,6 +16,9 @@ import java.util.*;
 @Service
 public class CategoryHierarchyService {
 
+    /** La secció d'ingressos, tal com la declara el bloc al seu tipus_cost. */
+    private static final String INCOME = "INCOME";
+
     private final CategoryRepository categoryRepository;
 
     public CategoryHierarchyService(CategoryRepository categoryRepository) {
@@ -31,6 +34,21 @@ public class CategoryHierarchyService {
 
         public List<Category> roots() {
             return childrenByParent.getOrDefault(null, List.of());
+        }
+
+        /**
+         * Si una categoria és de la secció d'ingressos: si ho declara el bloc
+         * de primer nivell on penja. Allà el pressupost mira el que entra.
+         */
+        public boolean isIncome(Long categoryId) {
+            Category current = byId.get(categoryId);
+            // visited talla un possible cicle de parent_id mal informats.
+            Set<Long> visited = new HashSet<>();
+            while (current != null && current.getParentId() != null
+                    && byId.containsKey(current.getParentId()) && visited.add(current.getId())) {
+                current = byId.get(current.getParentId());
+            }
+            return current != null && INCOME.equals(current.getCostType());
         }
 
         /**
@@ -97,5 +115,35 @@ public class CategoryHierarchyService {
     /** Una categoria amb fills és un grup i no pot rebre transaccions. */
     public boolean isGroup(Long categoryId) {
         return categoryId != null && categoryRepository.existsByParentId(categoryId);
+    }
+
+    /**
+     * Comprova que un recurrent pugui comptar al pressupost a la categoria on va.
+     *
+     * Un recurrent és la previsió de la seva categoria. En un bloc es
+     * comptaria dues vegades (per ell i pels fills), i en processar-lo
+     * crearia un moviment en un bloc. Una despesa en una categoria
+     * d'ingressos, o al revés, no compta enlloc: el pressupost hi mira l'altre
+     * sentit. Abans s'acceptava tot, i el recurrent desapareixia del
+     * pressupost sense que res ho digués.
+     *
+     * @param type EXPENSE o INCOME, el del recurrent
+     */
+    public void requireRecurringCategory(Category category, String type) {
+        Tree tree = loadTree();
+        String name = category.getName();
+        if (tree.isGroup(category.getId())) {
+            throw new IllegalArgumentException("«" + name + "» és un bloc: tria una de les seves subcategories. "
+                    + "Un recurrent en un bloc es comptaria dues vegades al pressupost.");
+        }
+        boolean income = tree.isIncome(category.getId());
+        if (INCOME.equals(type) && !income) {
+            throw new IllegalArgumentException("Un ingrés recurrent ha d'anar a una categoria d'ingressos: "
+                    + "a «" + name + "» el pressupost no el comptaria.");
+        }
+        if (!INCOME.equals(type) && income) {
+            throw new IllegalArgumentException("Una despesa recurrent no pot anar a «" + name + "»: "
+                    + "és una categoria d'ingressos, i allà el pressupost només mira el que entra.");
+        }
     }
 }

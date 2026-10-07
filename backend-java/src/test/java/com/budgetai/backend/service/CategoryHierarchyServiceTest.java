@@ -12,6 +12,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -123,5 +125,68 @@ class CategoryHierarchyServiceTest {
         assertThat(service.loadTree().roots())
                 .extracting(Category::getName)
                 .containsExactly("Òrfena");
+    }
+
+    /**
+     *  Llar (10, FIXED)
+     *    └─ Llum (11, VARIABLE)
+     *  Ingressos (20, INCOME)
+     *    └─ Nòmina (21)
+     */
+    private void givenSections() {
+        Category home = category(10, "Llar", null);
+        home.setCostType(Category.FIXED);
+        Category electricity = category(11, "Llum", 10L);
+        electricity.setCostType(Category.VARIABLE);
+        Category income = category(20, "Ingressos", null);
+        income.setCostType("INCOME");
+        when(categoryRepository.findAll()).thenReturn(List.of(
+                home, electricity, income, category(21, "Nòmina", 20L)));
+    }
+
+    @Test
+    @DisplayName("Una categoria és d'ingressos si ho declara el bloc d'on penja")
+    void incomeComesFromTheBlock() {
+        givenSections();
+        CategoryHierarchyService.Tree tree = service.loadTree();
+
+        assertThat(tree.isIncome(21L)).isTrue();
+        assertThat(tree.isIncome(20L)).isTrue();
+        assertThat(tree.isIncome(11L)).isFalse();
+        assertThat(tree.isIncome(99L)).isFalse();
+    }
+
+    @Test
+    @DisplayName("Un recurrent de despesa pot anar a una fulla variable, com la llum")
+    void anExpenseRecurringFitsAVariableLeaf() {
+        givenSections();
+
+        assertThatCode(() -> service.requireRecurringCategory(category(11, "Llum", 10L), "EXPENSE"))
+                .doesNotThrowAnyException();
+        assertThatCode(() -> service.requireRecurringCategory(category(21, "Nòmina", 20L), "INCOME"))
+                .doesNotThrowAnyException();
+    }
+
+    @Test
+    @DisplayName("Un recurrent no pot anar a un bloc: es comptaria dues vegades")
+    void aRecurringCannotGoToABlock() {
+        givenSections();
+
+        assertThatThrownBy(() -> service.requireRecurringCategory(category(10, "Llar", null), "EXPENSE"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("«Llar» és un bloc");
+    }
+
+    @Test
+    @DisplayName("Un recurrent ha d'anar a una categoria del seu sentit, o no compta enlloc")
+    void aRecurringNeedsACategoryOfItsDirection() {
+        givenSections();
+
+        assertThatThrownBy(() -> service.requireRecurringCategory(category(21, "Nòmina", 20L), "EXPENSE"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("és una categoria d'ingressos");
+        assertThatThrownBy(() -> service.requireRecurringCategory(category(11, "Llum", 10L), "INCOME"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("ha d'anar a una categoria d'ingressos");
     }
 }

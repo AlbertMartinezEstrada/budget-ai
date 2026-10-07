@@ -32,9 +32,9 @@ docker compose logs -f backend        # logs
 scripts\backup.bat                    # copia de la base de datos (backup.sh fuera de Windows)
 scripts/migrate.sh                    # aplica las migraciones pendientes (copia antes; --estat para ver cuáles)
 
-cd backend-java && ./gradlew test              # 144 unitarios, sin Docker
-cd backend-java && ./gradlew integrationTest   # 126, requieren Docker
-cd frontend && npm test                        # 39
+cd backend-java && ./gradlew test              # 148 unitarios, sin Docker
+cd backend-java && ./gradlew integrationTest   # 133, requieren Docker
+cd frontend && npm test                        # 40
 ```
 
 **Ejecuta los tests antes de dar nada por terminado.** El backend hay que
@@ -230,8 +230,12 @@ un presupuesto de la nómina más largo que cubre el mes, no se toca: se sumarí
 El reparto es **en cascada**: un `percentatge` es del bote del nivel de encima,
 **no del total**. Ver [ARQUITECTURA.md](ARQUITECTURA.md).
 
-**Los costes fijos son las recurrentes de las hojas fijas**, y hacen de
-plantilla de cada mes. Un cambio vale **desde un mes en adelante**: no se
+**Las recurrentes de una hoja son su previsión**, y hacen de plantilla de cada
+mes: en una hoja fija son además lo que cuesta; en una variable, el tope con el
+que se compara lo gastado; en una de ingresos, lo que se espera cobrar. Por eso
+una recurrente va siempre a una hoja de su sentido (lo valida
+`requireRecurringCategory`): en un bloque o en el sentido contrario no contaba
+en ningún sitio y nada lo decía. Un cambio vale **desde un mes en adelante**: no se
 modifica la fila, se cierra la versión vieja (`vigent_fins`) y se abre otra
 (`vigent_des_de`). Todo lo que lea recurrentes para un mes tiene que filtrar
 por esa vigencia; si no, las dos versiones sumarían. Un importe puesto en el

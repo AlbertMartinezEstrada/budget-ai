@@ -238,9 +238,14 @@ Para un mes y una hoja:
 ```
                    FIXED                        VARIABLE
 coste de vida      prorrateo del recurrente     gasto real del mes
-plan               el mismo prorrateo           límite del presupuesto, si hay
+plan               el mismo prorrateo           el mismo prorrateo, si tiene recurrente
 caja               gasto real del mes           gasto real del mes
 ```
+
+En las dos, un importe asignado al mes manda sobre el prorrateo. En una
+variable el recurrente es el tope con el que se compara lo gastado: la luz
+prevé 60 € y gasta lo que diga la factura. Antes una variable no tomaba el plan
+de sus recurrentes, y el recurrente de la luz no salía en ningún sitio.
 
 Un grupo **no mide nada por su cuenta**: suma sus hijos, a cualquier
 profundidad. La excepción es el plan — si el usuario pone un límite
@@ -258,18 +263,29 @@ esa marca, ver 600 € de caja cuando el coste de vida dice 50 € parece un err
 **Las recurrentes no mueven dinero.** Definen cuánto cuesta algo al mes; el
 dinero real lo sigue poniendo la transacción importada del CSV.
 
-### Costes fijos: la plantilla de cada mes
+### Recurrentes: la plantilla de cada mes
 
-El menú **Costes fijos** de Presupuestos (`/fixed-costs`) no es una tabla
-aparte: son las recurrentes de gasto de las hojas fijas. Como el plan de una
-hoja fija sin importe propio ya sale del prorrateo de sus recurrentes, lo que
-se define ahí aparece solo en cada mes, sin copiar nada.
+El menú **Recurrentes** de Presupuestos (`/fixed-costs`; empezó llamándose
+«Costes fijos» y el código aún los llama así) no es una tabla aparte: son las
+recurrentes de gasto de las hojas de gasto, fijas o variables. Como el plan de
+una hoja sin importe propio ya sale del prorrateo de sus recurrentes, lo que se
+define ahí aparece solo en cada mes, sin copiar nada. Son las mismas filas que
+la pantalla de Recurrentes.
 
+- **Un ingreso recurrente es la previsión de su hoja de ingresos** cuando el
+  mes no tiene una propia, y entra en lo que se reparte igual que una previsión
+  puesta a mano: cuenta lo mayor entre lo previsto y lo recibido.
+- **Una recurrente va a una hoja de su sentido, y la categoría es
+  obligatoria.** `CategoryHierarchyService.requireRecurringCategory` rechaza un
+  bloque —se contaría dos veces, y al procesarla crearía un movimiento en un
+  bloque— y una hoja del otro sentido, donde no contaría: en una de ingresos el
+  presupuesto mira lo que entra. Antes se aceptaba todo y el recurrente
+  desaparecía del presupuesto sin avisar.
 - **Cambiar un importe solo en un mes** es asignarle un presupuesto a la hoja
-  para ese mes: manda sobre el coste fijo solo en ese mes. Quitarlo devuelve
-  el coste fijo. «Copiar mes anterior» no copia estos cambios puntuales en
-  hojas con coste fijo: si lo hiciera, dejarían de ser de un solo mes.
-- **Un cambio en el coste fijo vale desde el mes que se está mirando.** Las
+  para ese mes: manda sobre el recurrente solo en ese mes. Quitarlo devuelve
+  el recurrente. «Copiar mes anterior» no copia estos cambios puntuales en
+  hojas con recurrente: si lo hiciera, dejarían de ser de un solo mes.
+- **Un cambio en el recurrente vale desde el mes que se está mirando.** Las
   recurrentes tienen `vigent_des_de` y `vigent_fins` (`NULL` = sin límite).
   Editar una que ya contaba antes cierra la versión vieja el mes anterior y
   crea una nueva; quitarla la cierra en vez de borrarla. Si se modificara la
@@ -278,7 +294,7 @@ se define ahí aparece solo en cada mes, sin copiar nada.
 - Una versión cerrada no genera cargos posteriores a su cierre (`POST
   /recurring/process`), y la nueva empieza su calendario dentro de su
   vigencia: el mismo cargo no sale dos veces.
-- **En Presupuestos, el coste fijo es el plan, no el gasto.** «Gastado» sale
+- **En Presupuestos, el recurrente es el plan, no el gasto.** «Gastado» sale
   de `caixa_real`, los movimientos importados del mes, y no de
   `cost_vida_real`, que da un fijo por su prorrateo aunque no haya ningún
   movimiento: un alquiler salía «gastado 800 de 800» antes de subir el CSV.
@@ -288,6 +304,16 @@ se define ahí aparece solo en cada mes, sin copiar nada.
   pantalla de Recurrentes no las muestre como duplicados. Editar desde esa
   pantalla sí modifica la fila tal cual: el historial solo se conserva
   cambiando desde el menú de Presupuestos.
+- **Editar desde la pantalla de Recurrentes solo cambia lo que llega.** Antes
+  copiaba todos los campos, y como el formulario no envía `activa` la dejaba a
+  `null`: cada edición sacaba el recurrente del presupuesto, que solo lee los
+  activos, y le quitaba la cuenta. La migración `013` vuelve a activar los que
+  se quedaron así (nada de la interfaz pone nunca uno a `false` ni a `null`);
+  la cuenta no se puede recuperar.
+- **La pantalla de Recurrentes dice cómo cuenta cada uno**: la categoría y lo
+  que pone al mes en el presupuesto o, si no cuenta, por qué (inactivo, sin
+  categoría, en un bloque o en una categoría del otro sentido). El backend ya no
+  acepta ninguno de estos, pero los de antes siguen ahí.
 
 ### El endpoint
 
