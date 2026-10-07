@@ -1,9 +1,12 @@
 package com.budgetai.backend.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.*;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
+import lombok.ToString;
 
 import java.time.LocalDateTime;
 
@@ -45,6 +48,20 @@ public class ImportRule {
     @JsonProperty("categoria")
     private String categoryName;
 
+    /**
+     * Si el moviment és un traspàs, el compte de l'altre costat: «REVOLUT» →
+     * Revolut, «TRADE REPUBLIC» → Trade Republic. Null vol dir que no ho és.
+     *
+     * Quan n'hi ha, "marca_exclos" no s'aplica: si un traspàs compta o no ho
+     * decideix el tipus dels dos comptes, no la regla.
+     */
+    @ManyToOne
+    @JoinColumn(name = "compte_traspas_id")
+    @JsonIgnore
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
+    private Account transferAccount;
+
     @Column(name = "notes")
     @JsonProperty("notes")
     private String notes;
@@ -56,6 +73,23 @@ public class ImportRule {
     @Column(name = "created_at", updatable = false)
     @JsonProperty("created_at")
     private LocalDateTime createdAt;
+
+    @JsonProperty("compte_traspas_id")
+    public Long getTransferAccountId() {
+        return transferAccount != null ? transferAccount.getId() : null;
+    }
+
+    /** Només l'identificador; el servei el resol abans de desar. */
+    @JsonProperty("compte_traspas_id")
+    public void setTransferAccountId(Long accountId) {
+        if (accountId == null) {
+            this.transferAccount = null;
+            return;
+        }
+        Account reference = new Account();
+        reference.setId(accountId);
+        this.transferAccount = reference;
+    }
 
     @PrePersist
     void applyDefaults() {

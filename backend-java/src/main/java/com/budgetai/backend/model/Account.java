@@ -1,5 +1,6 @@
 package com.budgetai.backend.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.*;
 import lombok.Data;
@@ -60,5 +61,15 @@ public class Account {
         if (currency == null) currency = "EUR";
         if (active == null) active = Boolean.TRUE;
         if (createdAt == null) createdAt = LocalDateTime.now();
+    }
+
+    /**
+     * Un compte d'estalvi o d'inversió, com Trade Republic: el que hi entra
+     * s'aparta, no es gasta. Decideix com compta un traspàs al pressupost.
+     */
+    @Transient
+    @JsonIgnore
+    public boolean isSavings() {
+        return "AHORRO".equals(type) || "INVERSIONES".equals(type);
     }
 }

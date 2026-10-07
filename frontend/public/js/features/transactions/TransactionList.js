@@ -3,6 +3,7 @@ import {
     createTransaction, updateTransaction, deleteTransaction, saveTransactionParts, formatCurrency, escapeHtml
 } from '../../api.js';
 import { categoryOptions, leafCategories } from '../../categoryOptions.js';
+import { counterpartOptions, transferCounts, transferLabel } from '../../transfers.js';
 import { setUpSplitEditor } from './SplitEditor.js';
 
 /**
@@ -41,6 +42,8 @@ let currentTransactions = [];
 // Per posar nom a l'etiqueta dels moviments vinculats: el moviment només porta
 // l'identificador del deute.
 let debtsById = new Map();
+// Per dir a quin compte va un traspàs: el moviment només en porta l'id.
+let accountsById = new Map();
 // La fixa setUpManualEntry, que és qui té el formulari a mà, i la crida el
 // listener de la taula, que viu fora.
 let openEditor = () => {};
@@ -162,6 +165,13 @@ export async function initTransactions(container) {
                         <label class="block text-sm font-medium mb-1" for="new-account">Compte</label>
                         <select id="new-account" class="form-control"></select>
                     </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-1" for="new-counterpart">Traspàs amb un altre compte teu</label>
+                        <select id="new-counterpart" class="form-control"></select>
+                        <p class="text-xs text-gray-500 dark:text-slate-400 mt-1" id="new-counterpart-hint">
+                            Si els diners van a un altre compte teu, o en vénen. Mou el saldo dels dos.
+                        </p>
+                    </div>
                     <div data-unsplit-only>
                         <label class="block text-sm font-medium mb-1" for="new-debt">Deute</label>
                         <select id="new-debt" class="form-control"></select>
@@ -178,8 +188,8 @@ export async function initTransactions(container) {
                         <span>
                             No comptar al pressupost
                             <span class="block text-xs text-gray-500 dark:text-slate-400">
-                                Per a diners que ja es van comptar en sortir del compte principal:
-                                una entrada per traspàs, o una compra feta amb diners ja traspassats.
+                                Per a diners que no són ni despesa ni ingrés teus. Un traspàs entre els
+                                teus comptes del dia a dia es marca sol.
                             </span>
                         </span>
                     </label>
@@ -213,7 +223,9 @@ export async function initTransactions(container) {
         .insertAdjacentHTML('beforeend', categoryOptions(categories));
 
     const accountSelect = document.getElementById('filter-account');
-    (await getAccounts()).forEach(account => {
+    const accounts = await getAccounts();
+    accountsById = new Map(accounts.map(account => [account.id, account]));
+    accounts.forEach(account => {
         const option = document.createElement('option');
         option.value = account.id;
         option.textContent = account.nom;
@@ -326,10 +338,49 @@ function setUpManualEntry(categories, companies, debts) {
         document.getElementById('transaction-split-note').classList.toggle('hidden', !split);
     };
 
+    const ownSelect = document.getElementById('new-account');
+    const counterpartSelect = document.getElementById('new-counterpart');
+    const excludedBox = document.getElementById('new-excluded');
+    const counterpartHint = document.getElementById('new-counterpart-hint');
+    const defaultCounterpartHint = counterpartHint.textContent;
+
+    /**
+     * L'altre compte d'un traspàs, i com comptarà.
+     *
+     * Entre comptes del dia a dia no compta, i la casella de «no comptar» es
+     * marca i es bloqueja: el backend el desaria igualment com a exclòs, i
+     * ensenyar-la desmarcada diria una cosa que no passarà. Cap a l'estalvi,
+     * compta, i la casella torna a ser de l'usuari.
+     */
+    const refreshCounterpart = () => {
+        counterpartSelect.innerHTML = counterpartOptions([...accountsById.values()], ownSelect.value,
+            counterpartSelect.value);
+        const own = accountsById.get(Number.parseInt(ownSelect.value, 10));
+        const counterpart = accountsById.get(Number.parseInt(counterpartSelect.value, 10));
+        const wasForced = excludedBox.disabled;
+
+        if (counterpart && !transferCounts(own, counterpart)) {
+            excludedBox.checked = true;
+            excludedBox.disabled = true;
+            counterpartHint.textContent = 'Entre comptes del dia a dia no compta al pressupost: '
+                + 'comptarà el que paguis des d\'allà, a la seva categoria.';
+            return;
+        }
+        // Si l'havia marcat el traspàs, en deixar de ser-ho torna a comptar.
+        if (wasForced) excludedBox.checked = false;
+        excludedBox.disabled = false;
+        counterpartHint.textContent = counterpart
+            ? `${counterpart.nom} és un compte d'estalvi: compta com a estalvi, a la categoria que triïs.`
+            : defaultCounterpartHint;
+    };
+    ownSelect.addEventListener('change', refreshCounterpart);
+    counterpartSelect.addEventListener('change', refreshCounterpart);
+
     getAccounts().then(accounts => {
-        document.getElementById('new-account').innerHTML = accounts
+        ownSelect.innerHTML = accounts
             .map(account => `<option value="${account.id}">${escapeHtml(account.nom)}</option>`)
             .join('');
+        refreshCounterpart();
     }).catch(error => console.error('Error loading accounts:', error));
 
     document.getElementById('new-category').innerHTML =
@@ -377,6 +428,8 @@ function setUpManualEntry(categories, companies, debts) {
             "Per al que no surt de l'extracte: efectiu, un préstec, una devolució.";
         // Per defecte, avui: el cas normal és apuntar una cosa que acaba de passar.
         document.getElementById('new-date').value = todayInputValue();
+        counterpartSelect.value = '';
+        refreshCounterpart();
         showSplitFields(false);
         open();
     });
@@ -408,6 +461,13 @@ function setUpManualEntry(categories, companies, debts) {
         if (transaction.account?.id) {
             document.getElementById('new-account').value = transaction.account.id;
         }
+        // Les opcions depenen del compte: primer el compte, després l'altre.
+        counterpartSelect.value = '';
+        excludedBox.disabled = false;
+        refreshCounterpart();
+        counterpartSelect.value = transaction.compte_contrapart_id ? String(transaction.compte_contrapart_id) : '';
+        excludedBox.checked = Boolean(transaction.exclos_pressupost);
+        refreshCounterpart();
         showSplitFields(isSplit(transaction));
 
         open();
@@ -443,7 +503,9 @@ function setUpManualEntry(categories, companies, debts) {
             exclos_pressupost: document.getElementById('new-excluded').checked,
             // -1 desvincula: en una edició, no enviar-lo deixaria el vincle
             // que hi havia.
-            deute_id: Number.parseInt(document.getElementById('new-debt').value, 10) || -1
+            deute_id: Number.parseInt(document.getElementById('new-debt').value, 10) || -1,
+            // El mateix per al traspàs: -1 vol dir que ja no ho és.
+            compte_contrapart_id: Number.parseInt(counterpartSelect.value, 10) || -1
         };
         if (Number.isInteger(accountId)) payload.account = { id: accountId };
 
@@ -591,6 +653,15 @@ function budgetBadges(excluded, debtId) {
     `;
 }
 
+/** "⇄ a Revolut": un traspàs entre comptes teus no és ni despesa ni ingrés. */
+function transferBadge(transaction) {
+    if (!transaction.compte_contrapart_id) return '';
+    const counterpart = accountsById.get(transaction.compte_contrapart_id);
+    return `<span class="badge badge-outline text-sm" title="Traspàs entre comptes teus: ha mogut el saldo dels dos">
+                ${escapeHtml(transferLabel(transaction.type, counterpart?.nom))}
+            </span>`;
+}
+
 function buildTransactionRow(transaction) {
     const style = TYPES[typeOf(transaction)];
     const split = isSplit(transaction);
@@ -604,6 +675,7 @@ function buildTransactionRow(transaction) {
             <td class="text-sm ${style.classe}">${style.etiqueta}</td>
             <td>
                 ${escapeHtml(transaction.empresa || '-')}
+                ${transferBadge(transaction)}
                 ${split ? '' : budgetBadges(transaction.exclos_pressupost, transaction.deute_id)}
             </td>
             <td>

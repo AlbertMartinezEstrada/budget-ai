@@ -32,9 +32,9 @@ docker compose logs -f backend        # logs
 scripts\backup.bat                    # copia de la base de datos (backup.sh fuera de Windows)
 scripts/migrate.sh                    # aplica las migraciones pendientes (copia antes; --estat para ver cuáles)
 
-cd backend-java && ./gradlew test              # 148 unitarios, sin Docker
-cd backend-java && ./gradlew integrationTest   # 135, requieren Docker
-cd frontend && npm test                        # 41
+cd backend-java && ./gradlew test              # 158 unitarios, sin Docker
+cd backend-java && ./gradlew integrationTest   # 143, requieren Docker
+cd frontend && npm test                        # 45
 ```
 
 **Ejecuta los tests antes de dar nada por terminado.** El backend hay que
@@ -66,6 +66,8 @@ distintos de los campos Java:
 | `Debt.amount` | `import` |
 | `TransactionPart.amount` | `import` |
 | `Transaction.debt` | `deute_id` (solo el id) |
+| `Transaction.counterpartAccount` | `compte_contrapart_id` (solo el id) |
+| `ImportRule.transferAccount` | `compte_traspas_id` (solo el id) |
 
 **Dos excepciones que hay que recordar:**
 
@@ -115,8 +117,9 @@ antes de asignar.
 
 ### 4. Lo que mueve dinero es `@Transactional` y relanza excepciones
 
-Tres sitios tocan saldos: `POST /transfers`, `DELETE /transfers/{id}` y
-`POST /confirm-upload`.
+Tocan saldos `POST /transfers`, `DELETE /transfers/{id}`, `POST /confirm-upload`
+y el alta, edición y borrado de un movimiento. Un traspaso entre cuentas mueve
+las dos.
 
 ```java
 } catch (Exception e) {
@@ -247,13 +250,29 @@ modifica la fila, se cierra la versión vieja (`vigent_fins`) y se abre otra
 por esa vigencia; si no, las dos versiones sumarían. Un importe puesto en el
 presupuesto de un mes solo vale para ese mes.
 
-### 8. El dinero que se mueve entre tus cuentas solo se cuenta una vez
+### 8. Un traspaso entre tus cuentas no es ni gasto ni ingreso
 
-Con varias cuentas, el mismo euro aparece en dos extractos. La regla: **una vez
-sale de la cuenta principal, ya está contado**; lo que haga después mueve saldos
-pero no vuelve a contar. Es `exclos_pressupost`, y lo descuentan `spentIn` e
-`incomeIn`. Sin ello, 100 € traspasados e invertidos salían como 200 € de gasto,
-y la entrada en la cuenta destino además ensanchaba el bote a repartir.
+Con varias cuentas, el mismo euro aparece en dos extractos. Un movimiento con
+`compte_contrapart_id` es un **traspaso**: el dinero sigue siendo tuyo, y lo que
+cuenta es lo que se hace con él.
+
+- **Entre cuentas del día a día** (Principal → Revolut) no cuenta: se guarda
+  con `exclos_pressupost`. Cuenta lo que se paga desde Revolut, cada pago en su
+  categoría.
+- **Hacia una cuenta de ahorro** (tipo `AHORRO` o `INVERSIONES`, como Trade
+  Republic) cuenta como ahorro, en su categoría. Lo que vuelve de ella resta
+  ahorro y no es ingreso.
+
+Se guarda **una fila por traspaso**, y mueve el saldo de **las dos cuentas**
+(`InternalTransferService`). La línea del otro extracto es el mismo dinero: al
+importarlo se reconoce (mismo importe, sentido contrario, ±3 días) y sale
+desmarcada. Importarla otra vez movería el saldo dos veces.
+
+Antes la regla era «una vez sale de la cuenta principal, ya está contado», y lo
+que se pagaba desde Revolut se marcaba como no contado. Servía para el ahorro,
+pero cada pago desde Revolut perdía su categoría. `exclos_pressupost` sigue
+existiendo para lo que no es ni gasto ni ingreso y no es un traspaso, y lo
+descuentan `spentIn` e `incomeIn`.
 
 La identidad de un movimiento importado es **hash + cuenta**, no solo el hash: un
 traspaso deja el mismo importe el mismo día en dos extractos y la segunda pata se

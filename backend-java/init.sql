@@ -76,13 +76,16 @@ CREATE TABLE IF NOT EXISTS transactions (
     concepte_original TEXT,
     compte_nom VARCHAR(100) DEFAULT 'Principal', -- Per si tens diversos comptes
     moneda VARCHAR(5) DEFAULT 'EUR',
-    -- Un cop els diners surten del compte principal ja estan comptats: el que
-    -- facin després (arribar a un altre compte, comprar-hi alguna cosa) mou
-    -- saldos però no torna a comptar al pressupost.
+    -- Diners que no compten al pressupost. Un traspàs entre comptes del dia a
+    -- dia es desa així: els diners només canvien de lloc.
     exclos_pressupost BOOLEAN NOT NULL DEFAULT FALSE,
     -- Deute que mou: una devolució, o l'entrada o sortida del préstec. És
     -- independent de la categoria, que és la que diu com compta al pressupost.
     deute_id BIGINT REFERENCES debts(id) ON DELETE SET NULL,
+    -- L'altre compte propi d'un traspàs (Principal → Revolut). NULL = no ho és.
+    -- Mou el saldo dels dos comptes; la línia de l'altre extracte és el mateix
+    -- diner i en importar-la es reconeix.
+    compte_contrapart_id BIGINT REFERENCES accounts(id) ON DELETE SET NULL,
     hash_verificacio VARCHAR(64), -- Per evitar duplicats
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 
@@ -214,6 +217,8 @@ CREATE TABLE IF NOT EXISTS import_rules (
     marca_exclos BOOLEAN NOT NULL DEFAULT TRUE,
     -- NULL = la regla no toca la categoria.
     categoria VARCHAR(100),
+    -- Si el moviment és un traspàs, el compte de l'altre costat.
+    compte_traspas_id BIGINT REFERENCES accounts(id) ON DELETE SET NULL,
     notes TEXT,
     activa BOOLEAN NOT NULL DEFAULT TRUE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
