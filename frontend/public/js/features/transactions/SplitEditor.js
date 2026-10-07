@@ -1,4 +1,5 @@
 import { formatCurrency, escapeHtml } from '../../api.js';
+import { categoryOptions, leafCategories } from '../../categoryOptions.js';
 
 /**
  * Dividir un moviment en parts.
@@ -22,13 +23,13 @@ const toCents = (value) => Math.round((Number.parseFloat(value) || 0) * 100);
 
 /**
  * @param container  on s'afegeix el formulari
- * @param leaves     les categories on poden anar diners (cap grup)
+ * @param categories totes, tal com arriben de l'API: només s'ofereixen les fulles
  * @param debts      per vincular una part a un deute
  * @param save       async (moviment, parts) => desa-les; si llança, el missatge surt al formulari
  * @param remove     async (moviment) => treu la divisió
  * @returns la funció que obre el formulari per a un moviment
  */
-export function setUpSplitEditor(container, { leaves, debts, save, remove }) {
+export function setUpSplitEditor(container, { categories, debts, save, remove }) {
     container.insertAdjacentHTML('beforeend', `
         <div id="split-modal" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-50 p-4">
             <div class="bg-white dark:bg-slate-800 rounded-xl p-6 w-full max-w-3xl max-h-full overflow-y-auto">
@@ -57,12 +58,10 @@ export function setUpSplitEditor(container, { leaves, debts, save, remove }) {
     const rows = document.getElementById('split-rows');
     const error = document.getElementById('split-error');
     const saveButton = document.getElementById('split-save');
-    const leafIdByName = new Map(leaves.map(category => [category.nom, category.id]));
+    const leafIdByName = new Map(leafCategories(categories).map(category => [category.nom, category.id]));
     let current = null;
 
-    const categoryOptions = leaves
-        .map(category => `<option value="${category.id}">${escapeHtml(category.nom)}</option>`)
-        .join('');
+    const categoryChoices = categoryOptions(categories);
     const debtOptions = [
         '<option value="">Sense deute</option>',
         ...debts.map(debt => `<option value="${debt.id}">
@@ -82,7 +81,7 @@ export function setUpSplitEditor(container, { leaves, debts, save, remove }) {
                 <input type="number" step="0.01" min="0.01" class="form-control col-span-6 md:col-span-2"
                        data-field="amount" placeholder="Import" aria-label="Import de la part">
                 <select class="form-control col-span-6 md:col-span-4" data-field="category" aria-label="Categoria de la part">
-                    ${categoryOptions}
+                    ${categoryChoices}
                 </select>
                 <select class="form-control col-span-10 md:col-span-5" data-field="debt" aria-label="Deute de la part">
                     ${debtOptions}
