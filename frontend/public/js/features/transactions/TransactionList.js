@@ -2,6 +2,7 @@ import {
     getTransactions, getCategories, getCompanies, getAccounts, getDebts,
     createTransaction, updateTransaction, deleteTransaction, saveTransactionParts, formatCurrency, escapeHtml
 } from '../../api.js';
+import { categoryOptions, leafCategories } from '../../categoryOptions.js';
 import { setUpSplitEditor } from './SplitEditor.js';
 
 /**
@@ -45,18 +46,6 @@ let debtsById = new Map();
 let openEditor = () => {};
 // El mateix per al formulari de dividir.
 let openSplitter = () => {};
-
-/**
- * Les categories on poden anar diners.
- *
- * Al desplegable només hi van les fulles. Un grup existeix per agregar els
- * seus fills, i un moviment penjat d'un grup es comptaria dues vegades: el
- * backend ho rebutja, així que val més no oferir-ho.
- */
-function leafCategories(categories) {
-    const parents = new Set(categories.map(category => category.parent_id).filter(Boolean));
-    return categories.filter(category => !parents.has(category.id));
-}
 
 const isSplit = (transaction) => (transaction.parts || []).length > 0;
 
@@ -218,13 +207,10 @@ export async function initTransactions(container) {
     });
     debtsById = new Map(debts.map(debt => [debt.id, debt]));
     
-    const categorySelect = document.getElementById('filter-category');
-    categories.forEach(category => {
-        const option = document.createElement('option');
-        option.value = category.id;
-        option.textContent = category.nom;
-        categorySelect.appendChild(option);
-    });
+    // Només fulles: els moviments hi són assignats, i filtrar per un bloc no
+    // en trobava cap.
+    document.getElementById('filter-category')
+        .insertAdjacentHTML('beforeend', categoryOptions(categories));
 
     const accountSelect = document.getElementById('filter-account');
     (await getAccounts()).forEach(account => {
@@ -282,7 +268,7 @@ export async function initTransactions(container) {
     // Aquí les parts es desen de seguida, i la llista es torna a carregar
     // perquè el moviment surti amb les seves.
     openSplitter = setUpSplitEditor(container, {
-        leaves: leafCategories(categories),
+        categories,
         debts,
         save: async (transaction, parts) => {
             await saveTransactionParts(transaction.id, parts);
@@ -346,9 +332,8 @@ function setUpManualEntry(categories, companies, debts) {
             .join('');
     }).catch(error => console.error('Error loading accounts:', error));
 
-    document.getElementById('new-category').innerHTML = leaves
-        .map(category => `<option value="${escapeHtml(category.nom)}">${escapeHtml(category.nom)}</option>`)
-        .join('');
+    document.getElementById('new-category').innerHTML =
+        categoryOptions(categories, { value: (category) => category.nom });
 
     // Els saldats també hi són: un moviment antic pot ser d'un deute ja
     // tornat, i editar-lo no l'ha de desvincular.

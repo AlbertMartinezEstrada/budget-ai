@@ -2,6 +2,7 @@ import {
     uploadCsv, confirmTransactions, getCategories, getAccounts, getDebts,
     getImportRules, createImportRule, deleteImportRule, formatCurrency, escapeHtml
 } from '../../api.js';
+import { categoryOptions, leafCategories } from '../../categoryOptions.js';
 import { setUpSplitEditor } from '../transactions/SplitEditor.js';
 
 /**
@@ -142,15 +143,15 @@ export async function initUpload(container) {
         console.error('Error loading debts:', error);
     }
     const debtsById = new Map(debts.map(debt => [debt.id, debt]));
-    const leafParentIds = new Set(categoriesList.map(category => category.parent_id).filter(Boolean));
-    const leaves = categoriesList.filter(category => !leafParentIds.has(category.id));
+    const leaves = leafCategories(categoriesList);
     const leafNameById = new Map(leaves.map(category => [category.id, category.nom]));
+    const leafNames = new Set(leaves.map(category => category.nom));
 
     // Dividir un moviment abans d'importar-lo: les parts es guarden a la fila
     // i s'envien amb la confirmació. El backend les valida abans de moure cap
     // saldo, i si alguna no quadra no s'importa res.
     const openSplitter = setUpSplitEditor(container, {
-        leaves,
+        categories: categoriesList,
         debts,
         save: async (transaction, parts) => {
             transaction.parts = parts;
@@ -200,11 +201,8 @@ export async function initUpload(container) {
     // Només fulles: una regla que assignés un grup faria que el moviment es
     // rebutgés en confirmar.
     const ruleCategorySelect = document.getElementById('rule-category');
-    const parentIds = new Set(categoriesList.map(category => category.parent_id).filter(Boolean));
     ruleCategorySelect.innerHTML = '<option value="">— No la toquis —</option>'
-        + categoriesList.filter(category => !parentIds.has(category.id))
-            .map(category => `<option value="${escapeHtml(category.nom)}">${escapeHtml(category.nom)}</option>`)
-            .join('');
+        + categoryOptions(categoriesList, { value: (category) => category.nom });
 
     document.getElementById('rule-form').addEventListener('submit', async (event) => {
         event.preventDefault();
@@ -305,12 +303,14 @@ export async function initUpload(container) {
             // navegador seleccionava la primera opció sense dir res i el
             // moviment s'acabava desant com a "Menjar i supermercat". Ara es
             // marca explícitament perquè es vegi que cal revisar-la.
-            const known = categoriesList.some(category => category.nom === transaction.categoria);
+            // Un bloc tampoc hi és: només s'hi ofereixen fulles, i si la IA en
+            // proposa un, la fila ha de demanar que se'n triï una.
+            const known = leafNames.has(transaction.categoria);
 
-            const options = categoriesList.map(category => {
-                const isSelected = known && transaction.categoria === category.nom;
-                return `<option value="${escapeHtml(category.nom)}" ${isSelected ? 'selected' : ''}>${escapeHtml(category.nom)}</option>`;
-            }).join('');
+            const options = categoryOptions(categoriesList, {
+                value: (category) => category.nom,
+                selected: known ? transaction.categoria : null
+            });
 
             const unknownOption = known
                 ? ''

@@ -1,6 +1,7 @@
 import {
     getCategories, createCategory, updateCategory, deleteCategory, escapeHtml
 } from '../../api.js';
+import { categoryOptions } from '../../categoryOptions.js';
 
 // Tailwind no pot generar classes construïdes en temps d'execució.
 const BADGE_CLASSES = {
@@ -203,12 +204,8 @@ function parentOptions(editingId) {
 
     // Qualsevol categoria pot fer de grup: en penjar-li un fill, passa a
     // ser-ho automàticament.
-    const options = ['<option value="">— Sin grupo —</option>'];
-    for (const category of categories) {
-        if (excluded.has(category.id)) continue;
-        options.push(`<option value="${category.id}">${escapeHtml(category.nom)}</option>`);
-    }
-    return options.join('');
+    return '<option value="">— Sin grupo —</option>'
+        + categoryOptions(categories, { groups: true, exclude: excluded });
 }
 
 function openModal(category = null) {
