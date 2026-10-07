@@ -1,6 +1,7 @@
 import {
     getDebts, createDebt, updateDebt, deleteDebt, getCategories, formatCurrency, escapeHtml
 } from '../../api.js';
+import { categoryOptions, leafCategories, EXPENSE_SECTIONS } from '../../categoryOptions.js';
 
 /**
  * Deutes i préstecs, en els dos sentits.
@@ -43,7 +44,7 @@ const INSTALLMENT_STATUS = {
 const DEFAULT_REPAYMENT_LEAF = 'Pagament de deutes';
 
 let debts = [];
-let reservableLeaves = [];
+let categories = [];
 const expandedDebts = new Set();
 
 export async function initDebts(container) {
@@ -161,7 +162,7 @@ export async function initDebts(container) {
     }
 
     try {
-        reservableLeaves = expenseLeaves(await getCategories());
+        categories = await getCategories();
         fillCategorySelect();
     } catch (error) {
         console.error('Error carregant categories:', error);
@@ -187,26 +188,9 @@ async function loadDebts() {
  * Una fulla d'ingressos no reserva res —el backend hi mira el que entra— i un
  * grup es tornaria a sumar pels seus fills, així que cap dels dos s'ofereix.
  */
-function expenseLeaves(categories) {
-    const byId = new Map(categories.map(category => [category.id, category]));
-    const parentIds = new Set(categories.map(category => category.parent_id).filter(Boolean));
-    const rootOf = (category) => {
-        let current = category;
-        while (current.parent_id && byId.has(current.parent_id)) current = byId.get(current.parent_id);
-        return current;
-    };
-    return categories
-        .filter(category => !parentIds.has(category.id))
-        .filter(category => rootOf(category).tipus_cost !== 'INCOME')
-        .sort((first, second) => first.nom.localeCompare(second.nom, 'ca'));
-}
-
 function fillCategorySelect() {
-    document.getElementById('debt-category').innerHTML = [
-        '<option value="-1">No reservar-la</option>',
-        ...reservableLeaves.map(category =>
-            `<option value="${category.id}">${escapeHtml(category.nom)}</option>`)
-    ].join('');
+    document.getElementById('debt-category').innerHTML = '<option value="-1">No reservar-la</option>'
+        + categoryOptions(categories, { sections: EXPENSE_SECTIONS });
 }
 
 // ============ LLISTA ============
@@ -459,7 +443,7 @@ function openModal(debt = null) {
     // Un deute nou que dec es reserva per defecte a "Pagament de deutes":
     // és on anirà la devolució, i sense reserva el pressupost donaria per
     // lliures uns diners que ja estan compromesos.
-    const defaultLeaf = reservableLeaves.find(category => category.nom === DEFAULT_REPAYMENT_LEAF);
+    const defaultLeaf = leafCategories(categories).find(category => category.nom === DEFAULT_REPAYMENT_LEAF);
     const categoryId = debt ? debt.category?.id : defaultLeaf?.id;
     document.getElementById('debt-category').value = categoryId ? String(categoryId) : '-1';
 

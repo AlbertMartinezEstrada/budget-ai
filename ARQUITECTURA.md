@@ -204,6 +204,17 @@ Si un movimiento colgara de un grupo, se contaría dos veces: una por sí mismo 
 otra al sumar sus hijos. El backend rechaza esa asignación al confirmar una
 importación.
 
+**Los desplegables de categoría salen todos de `categoryOptions.js`**, agrupados
+como el presupuesto: primero Gastos fijos, luego Gastos variables e Ingresos, y
+dentro un grupo por bloque («Gastos fijos · Llar») con sus hojas por orden
+alfabético. La sección de cada bloque se calcula igual que en
+`BudgetService.sectionOf`: si se calculara de otra forma, el desplegable diría
+una sección y el presupuesto contaría otra. Por defecto solo ofrece hojas; los
+bloques, solo donde tienen sentido (asignar un presupuesto, elegir el grupo de
+una categoría). Antes cada pantalla montaba el suyo: unos en el orden de la base
+de datos, otros con bloques que no se podían elegir, y con cuarenta categorías
+no se encontraba nada.
+
 Las hojas llevan además `tipus_cost`: `FIXED` o `VARIABLE`. En los grupos se
 deja a `null`, porque un grupo puede mezclar ambos. **Una hoja con `null` cuenta
 como variable**: es el comportamiento que tenían todas las categorías antes de
