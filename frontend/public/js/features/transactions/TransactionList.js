@@ -52,6 +52,12 @@ let openSplitter = () => {};
 
 const isSplit = (transaction) => (transaction.parts || []).length > 0;
 
+// Les parts d'un moviment dividit surten plegades: amb quatre parts per
+// moviment, la llista es feia el doble de llarga i el que es buscava quedava
+// enterrat. Es despleguen amb la pastilla "dividit en N", i el que s'ha
+// desplegat es manté en filtrar o tornar a carregar la llista.
+const expandedSplits = new Set();
+
 export async function initTransactions(container) {
     container.innerHTML = `
         <div class="card mb-4">
@@ -103,6 +109,7 @@ export async function initTransactions(container) {
                         + Afegir moviment
                     </button>
                     <button class="btn btn-sm btn-outline" id="toggle-transaction-sort" type="button"></button>
+                    <button class="btn btn-sm btn-outline hidden" id="toggle-all-parts" type="button"></button>
                     <span class="badge badge-secondary" id="transaction-count">0</span>
                 </div>
             </div>
@@ -260,6 +267,7 @@ export async function initTransactions(container) {
     document.getElementById('filter-type').addEventListener('change', loadData);
     document.getElementById('filter-month').addEventListener('change', loadData);
     document.getElementById('toggle-transaction-sort').addEventListener('click', toggleSortMode);
+    document.getElementById('toggle-all-parts').addEventListener('click', toggleAllParts);
     document.getElementById('clear-filters').addEventListener('click', () => {
         document.getElementById('filter-category').value = '';
         document.getElementById('filter-company').value = '';
@@ -299,6 +307,13 @@ async function handleRowAction(event) {
 
     const id = Number.parseInt(button.dataset.id, 10);
     if (!Number.isInteger(id)) return;
+
+    if (button.dataset.action === 'toggle-parts') {
+        if (expandedSplits.has(id)) expandedSplits.delete(id);
+        else expandedSplits.add(id);
+        renderTable(currentTransactions, currentSortMode);
+        return;
+    }
 
     if (button.dataset.action === 'edit-transaction' || button.dataset.action === 'split-transaction') {
         const transaction = currentTransactions.find(candidate => candidate.id === id);
@@ -569,6 +584,25 @@ async function loadData() {
     }
 }
 
+/** Desplega totes les parts o, si ja ho estan totes, les plega. */
+function toggleAllParts() {
+    const splitIds = currentTransactions.filter(isSplit).map(transaction => transaction.id);
+    const allExpanded = splitIds.every(id => expandedSplits.has(id));
+    splitIds.forEach(id => (allExpanded ? expandedSplits.delete(id) : expandedSplits.add(id)));
+    renderTable(currentTransactions, currentSortMode);
+}
+
+/** El botó només surt si a la llista hi ha algun moviment dividit. */
+function updatePartsButton(transactions) {
+    const button = document.getElementById('toggle-all-parts');
+    if (!button) return;
+    const splitIds = transactions.filter(isSplit).map(transaction => transaction.id);
+    button.classList.toggle('hidden', splitIds.length === 0);
+    button.textContent = splitIds.length > 0 && splitIds.every(id => expandedSplits.has(id))
+        ? 'Plegar les parts'
+        : 'Desplegar les parts';
+}
+
 function toggleSortMode() {
     currentSortMode = currentSortMode === 'month-desc' ? 'month-asc' : 'month-desc';
     updateSortButton();
@@ -591,6 +625,7 @@ function updateSortButton() {
 function renderTable(transactions, sortBy = 'month-desc') {
     const tbody = document.getElementById('transactions-body');
     document.getElementById('transaction-count').textContent = transactions.length;
+    updatePartsButton(transactions);
 
     if (transactions.length === 0) {
         renderMessageRow('No s\'han trobat resultats.');
@@ -665,6 +700,7 @@ function transferBadge(transaction) {
 function buildTransactionRow(transaction) {
     const style = TYPES[typeOf(transaction)];
     const split = isSplit(transaction);
+    const expanded = split && expandedSplits.has(transaction.id);
 
     // D'un moviment dividit manen les parts: la categoria, l'exclòs i el
     // deute del moviment ja no compten, i ensenyar-los confondria.
@@ -680,7 +716,7 @@ function buildTransactionRow(transaction) {
             </td>
             <td>
                 ${split
-                    ? `<span class="badge badge-secondary" title="Cada part compta a la seva categoria">dividit en ${transaction.parts.length}</span>`
+                    ? partsToggle(transaction, expanded)
                     : `<span class="badge badge-outline">${escapeHtml(transaction.categoria || '-')}</span>`}
             </td>
             <td class="text-muted text-sm">${escapeHtml(transaction.descripcio_curta || '-')}</td>
@@ -702,8 +738,24 @@ function buildTransactionRow(transaction) {
                 </button>
             </td>
         </tr>
-        ${split ? transaction.parts.map(part => buildPartRow(part, style)).join('') : ''}
+        ${expanded ? transaction.parts.map(part => buildPartRow(part, style)).join('') : ''}
     `;
+}
+
+/**
+ * La pastilla "dividit en N", que plega i desplega les parts. Plegada, el
+ * títol ja diu on va cada part, per no haver-la d'obrir per saber-ho.
+ */
+function partsToggle(transaction, expanded) {
+    const summary = transaction.parts
+        .map(part => `${part.category?.nom || '-'}: ${formatAmount(part.import)}`)
+        .join(' · ');
+    return `<button type="button" class="badge badge-secondary parts-toggle" data-action="toggle-parts"
+                    data-id="${transaction.id}" aria-expanded="${expanded}"
+                    title="${escapeHtml((expanded ? 'Amagar les parts. ' : 'Veure les parts. ') + summary)}">
+                dividit en ${transaction.parts.length}
+                <span class="material-symbols-outlined text-sm">${expanded ? 'expand_less' : 'expand_more'}</span>
+            </button>`;
 }
 
 /** Una part, just a sota del seu moviment. */
