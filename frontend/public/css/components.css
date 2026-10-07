@@ -342,3 +342,30 @@ select optgroup option {
     font-weight: 400;
     color: var(--text-main);
 }
+
+/* La pastilla "dividit en N" de Transaccions és un botó: plega i desplega
+   les parts del moviment. */
+/* Amb ".badge" davant: el preflight de Tailwind, que es carrega després, posa
+   el fons dels botons transparent i amb la mateixa especificitat guanyaria. */
+.badge.parts-toggle {
+    border: 0;
+    cursor: pointer;
+    gap: 0.125rem;
+    font-family: inherit;
+    white-space: nowrap;
+    background-color: #f3f4f6;
+    color: #374151;
+}
+
+.badge.parts-toggle:hover {
+    background-color: #e5e7eb;
+}
+
+html.dark .badge.parts-toggle {
+    background-color: #334155;
+    color: #e2e8f0;
+}
+
+html.dark .badge.parts-toggle:hover {
+    background-color: #475569;
+}
