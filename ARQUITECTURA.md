@@ -353,8 +353,7 @@ niveles, y **cada nivel se reparte dentro de lo que le ha tocado al de encima**:
 INGRESOS  ──> nómina, regalos, premios, trabajos puntuales
     │         su suma es lo que hay para repartir
     ├──> FIJOS       importe exacto de cada bloque
-    ├──> AHORRO      lo que dejan los fijos: ingresos − fijos
-    └──> VARIABLES   lo que queda: ingresos − fijos − ahorro
+    └──> VARIABLES   lo que queda: ingresos − fijos (el ahorro es uno más)
                      └─> bloques       % del bote de variables
                                        └─> subsecciones  % de su bloque
 ```
@@ -434,8 +433,8 @@ que cuenta es lo que se hace con el dinero:
 | Traspaso | Cómo cuenta | Ejemplo |
 |---|---|---|
 | Entre cuentas del día a día | No cuenta: se guarda con `exclos_pressupost` | Principal → Revolut. Cuenta lo que se paga desde Revolut, cada pago en su categoría (Claude en Subscripcions) |
-| Hacia una cuenta de ahorro (`AHORRO`, `INVERSIONES`) | Como ahorro, en su categoría | Principal → Trade Republic, en Estalvis |
-| Desde una cuenta de ahorro | Resta ahorro; no es ingreso | Sacar 200 € de Trade Republic |
+| Hacia una cuenta de ahorro (`AHORRO`, `INVERSIONES`) | Cuenta, en su categoría | Principal → Trade Republic, en Estalvis |
+| Desde una cuenta de ahorro | Resta de la categoría donde se apartó; no es ingreso | Sacar 200 € de Trade Republic |
 
 ```
 Principal  −100  «traspàs a Revolut»   ⇄ Revolut, no cuenta
@@ -492,7 +491,7 @@ identidad vieja y volver a subir el mismo fichero los duplicaría.
 | Dónde | Qué significa |
 |---|---|
 | En una **hoja** | Cómo se mide: un fijo por su prorrateo, un variable por el gasto real |
-| En un **bloque** de primer nivel | A qué sección va el bloque: `FIXED`, `SAVINGS`, `VARIABLE` o `INCOME` |
+| En un **bloque** de primer nivel | A qué sección va el bloque: `FIXED`, `VARIABLE` o `INCOME` |
 
 **`INCOME` solo tiene sentido en un bloque**, y no es una tercera forma de
 gastar: es de donde sale el dinero. Sus hojas no se prorratean ni se comparan
@@ -501,20 +500,17 @@ estuvieron entre los gastos, una categoría de ingreso caía en variables por
 descarte y salía como un bloque de cero euros compitiendo por un bote que es
 justamente suyo.
 
-**`SAVINGS` es el ahorro**: el dinero que se aparta cada mes. Tampoco es un
-gasto, y se reparte **después de los fijos y antes de los variables**: primero
-se aparta lo que se quiere ahorrar, y lo que queda es lo que hay para vivir el
-mes. Sus hojas se miden por lo que se ha movido a ellas, como un variable, pero
-pasar del previsto no se pinta en rojo. Mientras fue un bloque variable más
-—se llamaba «Trade Republic», que es dónde está el dinero y no para qué es—
-salía como «gastado 300 de 300» y competía con el supermercado por el mismo
-bote. La migración `014` lo renombra a «Estalvis» y lo pasa a esta sección;
-no crea ninguna categoría.
+**El ahorro es un bloque variable más**, a propósito: «Estalvis». De lo que
+sobra de los fijos se reparten porcentajes, y el ahorro es uno de ellos. Se
+probó una sección de ahorro aparte, entre fijos y variables (migración `014`),
+y se quitó (migración `016`): el porcentaje del ahorro dejaba de salir del
+mismo bote que los demás, y el reparto ya no era el que se hace de verdad. Lo
+que sí se quedó de aquel cambio es el nombre: la categoría se llamaba «Trade
+Republic», que dice dónde está el dinero y no para qué es.
 
-Como `INCOME`, `SAVINGS` **solo se declara**: unas hojas no pueden decir si su
-dinero se aparta o se gasta. Y una categoría de primer nivel sin subcategorías
-(Estalvis) también elige su sección en Categorías: con el desplegable de fijo o
-variable, editarla le quitaba la de ahorro.
+Una categoría de primer nivel sin subcategorías también elige su sección en
+Categorías, no su naturaleza: con el desplegable de fijo o variable, editar un
+bloque de ingresos sin hojas le quitaba la sección.
 
 Son preguntas separadas porque las respuestas no tienen por qué coincidir.
 **«Llar» es un gasto fijo** —el alquiler no se negocia cada mes— pero la luz y
@@ -533,8 +529,7 @@ actualización parcial no distingue «vacío» de «no enviado». El valor centi
 es **`AUTO`**, el mismo criterio que el `parent_id` negativo.
 
 El bote de los fijos es el sueldo entero —son la primera mordida, no hay nada
-por encima—. El del ahorro es lo que queda después de ellos, y el de los
-variables, lo que queda después del ahorro. Así, marcar
+por encima—. El de los variables es lo que queda después de ellos. Así, marcar
 una categoría como fija en la pantalla de Categorías es lo único que hace falta
 para mover un bloque de sección.
 
@@ -572,17 +567,15 @@ calculado:
       "percentatge_del_sou": null, "restant": null, "grups": [ ... ] },
     { "tipus": "FIXED",    "base": 2000.00, "assignat": 800.00,
       "percentatge_del_sou": 40.00, "restant": 1200.00, "grups": [ ... ] },
-    { "tipus": "SAVINGS",  "base": 1200.00, "assignat": 300.00,
-      "percentatge_del_sou": 15.00, "restant":  900.00, "grups": [ ... ] },
-    { "tipus": "VARIABLE", "base":  900.00, "assignat": 600.00,
-      "percentatge_del_sou": 30.00, "restant":  300.00, "grups": [ ... ] }
+    { "tipus": "VARIABLE", "base": 1200.00, "assignat": 900.00,
+      "percentatge_del_sou": 45.00, "restant":  300.00, "grups": [ ... ] }
   ],
   "grups": [ ... ]
 }
 ```
 
 Los ingresos van **primero**: leído de arriba abajo, el mes se explica solo —lo
-que entra, lo que está comprometido, lo que se aparta, lo que queda—. Su sección no reparte nada,
+que entra, lo que está comprometido, lo que queda—. Su sección no reparte nada,
 así que no tiene `base` ni porcentaje, y sus hojas traen `aporta_al_disponible`
 con lo que cada una pone en el total.
 

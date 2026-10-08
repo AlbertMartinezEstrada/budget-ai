@@ -6,9 +6,9 @@ import { escapeHtml } from './api.js';
  * Un traspàs no és ni despesa ni ingrés: els diners continuen sent teus. Entre
  * comptes del dia a dia (Principal → Revolut) no compta al pressupost, i el que
  * es paga des de Revolut compta a la seva categoria. Cap a un compte d'estalvi
- * (Trade Republic) compta com a estalvi. El backend decideix el mateix a
- * InternalTransferService; aquí només serveix perquè el formulari ho ensenyi
- * abans de desar.
+ * (Trade Republic) compta, a la seva categoria (Estalvis). El backend decideix
+ * el mateix a InternalTransferService; aquí només serveix perquè el formulari
+ * ho ensenyi abans de desar.
  */
 
 /** Un compte d'estalvi o d'inversió: el que hi entra s'aparta, no es gasta. */

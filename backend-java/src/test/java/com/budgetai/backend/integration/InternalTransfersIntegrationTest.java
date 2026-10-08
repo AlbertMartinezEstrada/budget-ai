@@ -76,7 +76,7 @@ class InternalTransfersIntegrationTest extends AbstractIntegrationTest {
         categoryRepository.save(new Category("Altres"));
         Category subscriptions = saveCategory("Subscripcions", null, Category.FIXED);
         claude = saveCategory("Claude", subscriptions.getId(), Category.FIXED);
-        savings = saveCategory("Estalvis", null, "SAVINGS");
+        savings = saveCategory("Estalvis", null, Category.VARIABLE);
 
         principal = saveAccount("Compte Principal", "CORRIENTE", "1000.00");
         revolut = saveAccount("Revolut", "CORRIENTE", "0.00");
