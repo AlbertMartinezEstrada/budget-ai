@@ -334,34 +334,25 @@ class MonthlySummaryIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("L'estalvi es reparteix després dels fixos, i els variables es queden el que en sobra")
-    void savingsComeBeforeVariables() {
+    @DisplayName("L'estalvi és un variable més: el seu percentatge surt del que sobra dels fixos, com els altres")
+    void savingsShareTheVariablePot() {
         settingsService.updateSettings(settingsWithIncome("2000.00"));
         Long rent = saveCategory("Lloguer", null, Category.FIXED).getId();
         saveBudget(rent, "800.00", null);
-        Long savings = saveCategory("Estalvis", null, "SAVINGS").getId();
-        saveBudget(savings, "300.00", null);
-        saveTransaction("300.00", LocalDate.of(2026, 3, 2), savings, "h-estalvi");
+        Long savings = saveCategory("Estalvis", null, Category.VARIABLE).getId();
+        // quantitat_limit és NOT NULL; mana el percentatge.
+        saveBudget(savings, "0.00", "25.00");
 
-        // 2000 − 800 de fixos: el que hi ha per apartar.
-        assertThat((BigDecimal) section("SAVINGS").get("base")).isEqualByComparingTo("1200.00");
-        assertThat((BigDecimal) section("SAVINGS").get("assignat")).isEqualByComparingTo("300.00");
-        assertThat((BigDecimal) section("SAVINGS").get("real")).isEqualByComparingTo("300.00");
-        // I als variables els queda el que hi ha després d'apartar-lo: abans
-        // l'estalvi era un variable més i competia pel mateix bot.
-        assertThat((BigDecimal) section("VARIABLE").get("base")).isEqualByComparingTo("900.00");
-        assertThat(section("VARIABLE").get("grups").toString()).doesNotContain("Estalvis");
-        // 800 de fixos + 300 d'estalvi + els 50 de l'assegurança del cotxe, que
-        // és un bloc variable: les tres seccions sumen.
-        assertThat((BigDecimal) budgetService.getMonthlySummary(2026, 3).get("total_assignat"))
-                .isEqualByComparingTo("1150.00");
-    }
-
-    @Test
-    @DisplayName("Les seccions surten en l'ordre en què es reparteix: ingressos, fixos, estalvi i variables")
-    void sectionsComeInTheOrderTheyAreDistributed() {
+        // 2000 − 800 de fixos = 1200 per repartir, i el 25% en són 300. Es va
+        // provar de posar l'estalvi en una secció abans dels variables, i el
+        // percentatge deixava de ser del mateix bot que la resta.
+        Map<String, Object> estalvis = groupsOf(2026, 3).stream()
+                .filter(node -> "Estalvis".equals(((Category) node.get("categoria")).getName()))
+                .findFirst().orElseThrow();
+        assertThat((BigDecimal) estalvis.get("cost_vida_pla")).isEqualByComparingTo("300.00");
+        assertThat(section("VARIABLE").get("grups").toString()).contains("Estalvis");
         assertThat(sectionsOf(2026, 3)).extracting(section -> section.get("tipus"))
-                .containsExactly("INCOME", "FIXED", "SAVINGS", "VARIABLE");
+                .containsExactly("INCOME", "FIXED", "VARIABLE");
     }
 
     @Test

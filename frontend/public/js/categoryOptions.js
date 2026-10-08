@@ -17,17 +17,13 @@ import { escapeHtml } from './api.js';
 
 const SECTION_LABELS = {
     FIXED: 'Gastos fijos',
-    SAVINGS: 'Ahorro',
     VARIABLE: 'Gastos variables',
     INCOME: 'Ingresos'
 };
 
 // Les despeses primer: són la gran majoria dels moviments que es classifiquen.
-// L'estalvi hi va entremig, com al pressupost: s'aparta abans dels variables.
-export const ALL_SECTIONS = ['FIXED', 'SAVINGS', 'VARIABLE', 'INCOME'];
-// Tot el que surt del compte: un recurrent, una quota o un traspàs a
-// l'estalvi hi poden anar.
-export const EXPENSE_SECTIONS = ['FIXED', 'SAVINGS', 'VARIABLE'];
+export const ALL_SECTIONS = ['FIXED', 'VARIABLE', 'INCOME'];
+export const EXPENSE_SECTIONS = ['FIXED', 'VARIABLE'];
 export const INCOME_SECTIONS = ['INCOME'];
 
 const DECLARED_SECTIONS = new Set(ALL_SECTIONS);

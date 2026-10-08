@@ -87,20 +87,6 @@ test('un bloc sense subcategories surt com a bloc i es pot triar', () => {
     assert.deepEqual(texts(html, 'Gastos variables · Trade Republic'), ['Trade Republic']);
 });
 
-test('l\'estalvi va entre els fixos i els variables, com al pressupost', () => {
-    const estalvis = category('Estalvis', 'SAVINGS');
-    const withSavings = [...CATEGORIES, estalvis, category('Colxó', null, estalvis)];
-
-    const sections = labels(module.categoryOptions(withSavings)).map(label => label.split(' · ')[0]);
-    const firstSavings = sections.indexOf('Ahorro');
-    assert.ok(firstSavings > sections.lastIndexOf('Gastos fijos'));
-    assert.ok(firstSavings < sections.indexOf('Gastos variables'));
-    // I compta com a despesa: un recurrent o una quota hi poden anar.
-    assert.ok(labels(module.categoryOptions(withSavings, { sections: module.EXPENSE_SECTIONS }))
-        .includes('Ahorro · Estalvis'));
-    assert.equal(module.sectionOfCategory(withSavings, estalvis.id), 'SAVINGS');
-});
-
 test('dins de cada bloc, les fulles van per ordre alfabètic', () => {
     const html = module.categoryOptions(CATEGORIES);
     assert.deepEqual(texts(html, 'Gastos fijos · Llar'), ['Casa', 'Llum']);

@@ -255,16 +255,16 @@ nova.
   error: el recurrent simplement no sortia al pressupost.
 - `InternalTransfersIntegrationTest`: traspassos entre comptes propis, per HTTP
   com els fa la pantalla. Que el traspàs a Revolut no compti i el que s'hi paga
-  sí, a la seva categoria; que el de Trade Republic compti com a estalvi i el
+  sí, a la seva categoria; que el de Trade Republic compti a Estalvis i el
   que en torna el resti sense ser ingrés; que mogui el saldo dels dos comptes i
   esborrar-lo els desfaci; que canviar-ne l'altre compte mogui el diner; que un
   traspàs al mateix compte es rebutgi sense tocar res; que a l'extracte de
   Revolut l'entrada d'un traspàs ja desat surti reconeguda; que una regla el
   marqui sola; i que filtrar per Trade Republic el trobi.
 - `MonthlySummaryIntegrationTest`: el resum del mes que pinta Pressupostos.
-  Entre d'altres, que l'estalvi es reparteixi després dels fixos i que els
-  variables només es quedin el que en sobra, i que les seccions surtin en
-  l'ordre en què es reparteixen: ingressos, fixos, estalvi i variables.
+  Entre d'altres, que Estalvis sigui un variable més: el seu percentatge surt
+  del que sobra dels fixos, com el dels altres, i no hi ha cap secció d'estalvi
+  a part.
 - `FixedCostIntegrationTest`: el menú de recurrents de Pressupostos. Que un
   canvi valgui des d'un mes sense tocar els anteriors, que un import posat en un
   sol mes no es copiï als següents, i que s'hi pugui posar la llum, una fulla
