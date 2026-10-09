@@ -33,8 +33,8 @@ scripts\backup.bat                    # copia de la base de datos (backup.sh fue
 scripts/migrate.sh                    # aplica las migraciones pendientes (copia antes; --estat para ver cuáles)
 
 cd backend-java && ./gradlew test              # 158 unitarios, sin Docker
-cd backend-java && ./gradlew integrationTest   # 143, requieren Docker
-cd frontend && npm test                        # 45
+cd backend-java && ./gradlew integrationTest   # 142, requieren Docker
+cd frontend && npm test                        # 44
 ```
 
 **Ejecuta los tests antes de dar nada por terminado.** El backend hay que
@@ -210,9 +210,9 @@ esté**, y confundirlas es fácil:
 
 - En una **hoja**, cómo se mide: un fijo entra por su prorrateo y un variable
   por su gasto real. `null` cuenta como variable.
-- En un **bloque** de primer nivel, a qué sección va: `FIXED`, `SAVINGS`,
-  `VARIABLE` o `INCOME`. A `null`, se deduce: es fijo si todas sus hojas lo
-  son. `SAVINGS` e `INCOME` nunca se deducen: se declaran.
+- En un **bloque** de primer nivel, a qué sección va: `FIXED`, `VARIABLE` o
+  `INCOME`. A `null`, se deduce: es fijo si todas sus hojas lo son. `INCOME`
+  nunca se deduce: se declara.
 
 Por eso un bloque fijo puede tener hojas variables dentro (el alquiler no se
 mueve, la luz sí). Para vaciar el campo hace falta el centinela `AUTO`: una
@@ -222,10 +222,10 @@ actualización parcial no distingue «vacío» de «no enviado».
 movimientos de entrada, no los de gasto. Con el filtro de gasto sumaban siempre
 cero.
 
-**`SAVINGS` es el ahorro y va entre fijos y variables**: su bote es lo que
-dejan los fijos, y el de los variables lo que queda después de apartarlo. Antes
-era un bloque variable («Trade Republic») y el ahorro salía como un gasto que
-competía con el supermercado por el mismo bote.
+**El ahorro («Estalvis») es un bloque variable más**: de lo que sobra de los
+fijos se reparten porcentajes, y el ahorro es uno. Una sección de ahorro aparte
+se probó y se quitó (migraciones 014 y 016): no la vuelvas a separar sin
+preguntar.
 
 **Lo que se reparte es la suma de los ingresos**, no el sueldo: el sueldo es un
 bloque de ingreso más. Cada hoja aporta el **mayor** entre su previsión y lo
@@ -260,8 +260,8 @@ cuenta es lo que se hace con él.
   con `exclos_pressupost`. Cuenta lo que se paga desde Revolut, cada pago en su
   categoría.
 - **Hacia una cuenta de ahorro** (tipo `AHORRO` o `INVERSIONES`, como Trade
-  Republic) cuenta como ahorro, en su categoría. Lo que vuelve de ella resta
-  ahorro y no es ingreso.
+  Republic) cuenta, en su categoría (Estalvis). Lo que vuelve de ella resta de
+  esa categoría y no es ingreso.
 
 Se guarda **una fila por traspaso**, y mueve el saldo de **las dos cuentas**
 (`InternalTransferService`). La línea del otro extracto es el mismo dinero: al

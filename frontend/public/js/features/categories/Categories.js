@@ -61,7 +61,6 @@ export async function initCategories(container) {
                         <select id="category-section" class="w-full px-3 py-2 border rounded-lg">
                             <option value="AUTO">Deducir de las subcategorías</option>
                             <option value="FIXED">Gastos fijos</option>
-                            <option value="SAVINGS">Ahorro — se aparta después de los fijos y antes de los variables</option>
                             <option value="VARIABLE">Gastos variables</option>
                             <option value="INCOME">Ingresos — dinero que entra, no se reparte</option>
                         </select>
@@ -101,7 +100,7 @@ async function loadCategories() {
 const childrenOf = (id) => categories.filter(category => category.parent_id === id);
 
 /** Seccions que no diuen com es mesura una fulla, només on va el bloc. */
-const SECTION_ONLY = new Set(['SAVINGS', 'INCOME']);
+const SECTION_ONLY = new Set(['INCOME']);
 const isGroup = (category) => childrenOf(category.id).length > 0;
 
 function renderTree() {
@@ -142,8 +141,8 @@ function renderTree() {
 function renderRow(category, asGroupHeader) {
     const group = isGroup(category);
     // Els grups no tenen naturalesa pròpia: poden barrejar fixos i variables.
-    // Un bloc d'estalvi o d'ingressos sense subcategories tampoc: el que diu el
-    // seu camp és la secció, i "variable" hauria estat mentida.
+    // Un bloc d'ingressos sense subcategories tampoc: el que diu el seu camp és
+    // la secció, i "variable" hauria estat mentida.
     const badge = group
         ? { text: 'grupo', cls: BADGE_CLASSES.group }
         : SECTION_ONLY.has(category.tipus_cost)
@@ -181,7 +180,7 @@ function renderRow(category, asGroupHeader) {
  */
 function sectionBadge(category, group) {
     if (category.parent_id || !category.tipus_cost) return '';
-    // Una fulla de primer nivell només en porta si és d'estalvi o d'ingressos:
+    // Una fulla de primer nivell només en porta si és d'ingressos:
     // si és fixa o variable, ja ho diu la seva pastilla.
     if (!group && !SECTION_ONLY.has(category.tipus_cost)) return '';
 
@@ -190,9 +189,6 @@ function sectionBadge(category, group) {
     }
     if (category.tipus_cost === 'INCOME') {
         return '<span class="text-xs px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">en ingresos</span>';
-    }
-    if (category.tipus_cost === 'SAVINGS') {
-        return '<span class="text-xs px-2 py-0.5 rounded-full bg-teal-100 text-teal-700">en ahorro</span>';
     }
     return '<span class="text-xs px-2 py-0.5 rounded-full bg-violet-100 text-violet-700">en gastos variables</span>';
 }
@@ -243,8 +239,9 @@ function openModal(category = null) {
 
         // A un bloc de primer nivell, el camp no diu com es mesura —això ho diu
         // cada subcategoria— sinó a quina secció del repartiment va. També si
-        // no té subcategories, com Estalvis: amb el desplegable de naturalesa,
-        // que només té fix i variable, editar-lo li treia la secció d'estalvi.
+        // no té subcategories: amb el desplegable de naturalesa, que només té
+        // fix i variable, editar un bloc d'ingressos sense fulles li treia la
+        // secció.
         const group = isGroup(category);
         const root = !category.parent_id;
         natureWrapper.style.display = root || group ? 'none' : '';

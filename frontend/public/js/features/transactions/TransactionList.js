@@ -385,7 +385,7 @@ function setUpManualEntry(categories, companies, debts) {
         if (wasForced) excludedBox.checked = false;
         excludedBox.disabled = false;
         counterpartHint.textContent = counterpart
-            ? `${counterpart.nom} és un compte d'estalvi: compta com a estalvi, a la categoria que triïs.`
+            ? `${counterpart.nom} és un compte d'estalvi: el traspàs compta al pressupost, a la categoria que triïs (Estalvis).`
             : defaultCounterpartHint;
     };
     ownSelect.addEventListener('change', refreshCounterpart);
