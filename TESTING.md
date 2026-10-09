@@ -61,14 +61,18 @@ d'ajustar l'expectativa del test.
 
 ### `RepaymentScheduleTest` i `DebtServiceTest`
 
-El calendari de retorn d'un deute i com es compara amb el que s'ha retornat.
-Fixen les dues trampes del calendari —l'última quota és el que falta, i els
-mesos es compten des del primer pagament perquè el 31 no es perdi al febrer—,
-que els pagaments es cobreixen per ordre, i que només descompten els moviments
-en sentit de retorn: l'entrada del préstec no.
+El calendari de retorn d'un deute i què paga cada pagament. Fixen les dues
+trampes del calendari —l'última quota és el que falta, i els mesos es compten
+des del primer pagament perquè el 31 no es perdi al febrer—, i el cas de la
+Steam Deck: un rebut no va endarrerit fins que el seu mes s'acaba, un pagament
+paga el rebut triat o el primer sense pagar, uns cèntims de menys no el deixen a
+mitges, el que sobra acorta el final (no avança el mes següent), i un rebut es
+pot saltar (passa al final) o descomptar del deute. També els períodes setmanal
+i trimestral, i que només descompten els moviments en sentit de retorn.
 
-Al servei, que la reserva del pressupost no passi mai del que quedava per
-tornar a l'inici del mes, i que els deutes que em deuen no reservin res.
+Al servei, que la reserva del pressupost sigui el rebut del mes (cap si està
+saldat o el mes s'ha saltat), que els deutes que em deuen no reservin res, i que
+un rebut que un pagament ha triat no es pugui treure.
 
 ### `InternalTransferServiceTest`
 
@@ -172,6 +176,14 @@ cap bloc (un moviment en un bloc comptaria dues vegades) i que els noms
 s'escapin. Abans cada pantalla muntava el seu, desendreçat, i algun oferia
 blocs on només hi poden anar fulles.
 
+### `frontend/test/debtReceipts.test.js`
+
+Els rebuts d'un deute al navegador: que es diguin pel mes i no pel dia, que el
+desplegable de Transaccions comenci per «el que toca», no ofereixi els rebuts
+trets i reconegui el triat pel mes com el backend (`samePeriod`), i que un rebut
+triat que ja no és al calendari surti igualment perquè editar el moviment no el
+canviï sense voler.
+
 ### `frontend/test/transfers.test.js`
 
 Els traspassos al navegador: que un traspàs entre comptes del dia a dia no
@@ -227,8 +239,11 @@ nova.
 - `DebtIntegrationTest`: que les devolucions vinculades descomptin del pendent
   i l'entrada del préstec no; que editar un moviment el vinculi, el conservi i
   el desvinculi; que un deute inexistent es rebutgi abans de moure cap saldo;
-  que esborrar el deute deixi els moviments; i que el pressupost reservi la
-  quota del mes i deixi de fer-ho quan el deute ja està saldat.
+  que esborrar el deute deixi els moviments (i esborri els seus rebuts trets);
+  que el pressupost reservi la quota del mes i deixi de fer-ho quan el deute ja
+  està saldat; que un pagament pagui el rebut triat i, editant-lo, el que toca;
+  que desvincular el deute buidi el rebut; i que saltar, descomptar i desfer un
+  rebut passin per HTTP, amb un 400 si un pagament l'havia triat.
 - `ApiErrorsIntegrationTest`: els errors per HTTP, amb la sessió de debò. Que
   una ruta desconeguda digui que cal reconstruir el backend, que un moviment o
   un compte que no existeixen diguin quin, que un JSON mal escrit o un

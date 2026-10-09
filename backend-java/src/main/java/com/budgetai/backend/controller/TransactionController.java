@@ -325,6 +325,8 @@ public class TransactionController {
         List<TransactionPart> parts;
         try {
             transaction.setDebt(debtService.resolveForLink(transaction.getDebt()));
+            // Un rebut sense deute no vol dir res.
+            if (transaction.getDebt() == null) transaction.setDebtReceipt(null);
             internalTransfers.link(transaction, own,
                     internalTransfers.resolve(transaction.getCounterpartAccount(), own));
             parts = splitBeforeSaving(transaction);
@@ -436,6 +438,11 @@ public class TransactionController {
         revertFromBalance(existing);
 
         existing.setDebt(debt);
+        // El rebut va amb el deute: qui envia el deute diu també quin rebut
+        // paga, i null és el que toca. Sense deute, no en paga cap.
+        if (changes.getDebt() != null || changes.getDebtReceipt() != null) {
+            existing.setDebtReceipt(debt != null ? changes.getDebtReceipt() : null);
+        }
         if (changes.getDate() != null) existing.setDate(changes.getDate());
         if (changes.getAmount() != null) existing.setAmount(changes.getAmount());
         if (changes.getType() != null) existing.setType(changes.getType());
@@ -521,6 +528,7 @@ public class TransactionController {
                 // de llegir igual per les tres portes d'entrada: sense resoldre'l,
                 // un -1 arribaria a la base de dades com a clau forana.
                 transaction.setDebt(debtService.resolveForLink(transaction.getDebt()));
+                if (transaction.getDebt() == null) transaction.setDebtReceipt(null);
             }
 
             Set<String> incomingHashes = confirmedTransactions.stream()
@@ -614,6 +622,7 @@ public class TransactionController {
         if (!parts.isEmpty()) {
             transaction.setCategoryName(parts.get(0).getCategory().getName());
             transaction.setDebt(null);
+            transaction.setDebtReceipt(null);
         }
         return parts;
     }

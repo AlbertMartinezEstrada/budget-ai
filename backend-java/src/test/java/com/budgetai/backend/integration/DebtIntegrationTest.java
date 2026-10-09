@@ -39,6 +39,7 @@ class DebtIntegrationTest extends AbstractIntegrationTest {
     @Autowired private BudgetRepository budgetRepository;
     @Autowired private AccountRepository accountRepository;
     @Autowired private CategoryRepository categoryRepository;
+    @Autowired private DebtRemovedReceiptRepository removedReceiptRepository;
 
     private Long accountId;
     private Long repaymentLeafId;
@@ -224,6 +225,147 @@ class DebtIntegrationTest extends AbstractIntegrationTest {
         assertThat((BigDecimal) october.get("quotes_deutes")).isEqualByComparingTo("100.00");
         assertThat((BigDecimal) october.get("cost_vida_pla")).isEqualByComparingTo("100.00");
         assertThat((BigDecimal) october.get("caixa_real")).isEqualByComparingTo("100.00");
+    }
+
+    // ============ REBUTS ============
+
+    private static final LocalDate JANUARY_5 = LocalDate.of(2025, 1, 5);
+    private static final LocalDate FEBRUARY_5 = LocalDate.of(2025, 2, 5);
+
+    /**
+     * 1.000 € a 100 € al mes des del 5 de gener de 2025: tots els mesos del
+     * principi ja s'han acabat, i els estats no depenen de quin dia és avui.
+     */
+    private Debt createPastDebt() {
+        Debt request = new Debt();
+        request.setName("Steam Deck");
+        request.setDirection(Debt.I_OWE);
+        request.setAmount(new BigDecimal("1000.00"));
+        request.setDate(LocalDate.of(2024, 12, 20));
+        request.setRepaymentPlan(Debt.PLAN_INSTALLMENTS);
+        request.setInstallment(new BigDecimal("100.00"));
+        request.setFrequency("MENSUAL");
+        request.setFirstPaymentDate(JANUARY_5);
+        return (Debt) debtController.create(request).getBody();
+    }
+
+    private Long recordPaymentFor(Long debtId, LocalDate date, LocalDate receipt) {
+        Transaction transaction = new Transaction();
+        transaction.setType("EXPENSE");
+        transaction.setAmount(new BigDecimal("100.00"));
+        transaction.setDate(date);
+        transaction.setCategoryName("Altres");
+        transaction.setDebtId(debtId);
+        transaction.setDebtReceipt(receipt);
+        ResponseEntity<?> response = transactionController.createTransaction(transaction);
+        assertThat(response.getStatusCode().is2xxSuccessful()).isTrue();
+        return idOf(response);
+    }
+
+    private static List<String> firstStatuses(Debt debt, int count) {
+        return debt.getSchedule().stream().limit(count).map(Debt.Installment::status).toList();
+    }
+
+    @Test
+    @DisplayName("Un pagament paga el rebut triat; sense, el que toca. Editant-lo es canvia")
+    void paymentPaysTheChosenReceipt() {
+        Debt debt = createPastDebt();
+        Long paymentId = recordPaymentFor(debt.getId(), LocalDate.of(2025, 2, 3), FEBRUARY_5);
+
+        Debt chosen = reload(debt.getId());
+        assertThat(firstStatuses(chosen, 2)).containsExactly("ENDARRERIT", "PAGAT");
+        assertThat(chosen.getMovements().get(0).receipt()).isEqualTo(FEBRUARY_5);
+        assertThat(chosen.getMovements().get(0).receiptChosen()).isTrue();
+        assertThat(transactionRepository.findById(paymentId).orElseThrow().getDebtReceipt()).isEqualTo(FEBRUARY_5);
+
+        // El formulari envia sempre el deute; sense rebut, és el que toca.
+        Transaction automatic = new Transaction();
+        automatic.setDebtId(debt.getId());
+        transactionController.updateTransaction(paymentId, automatic);
+
+        Debt reassigned = reload(debt.getId());
+        assertThat(firstStatuses(reassigned, 2)).containsExactly("PAGAT", "ENDARRERIT");
+        assertThat(reassigned.getMovements().get(0).receipt()).isEqualTo(JANUARY_5);
+        assertThat(reassigned.getMovements().get(0).receiptChosen()).isFalse();
+    }
+
+    @Test
+    @DisplayName("Desvincular el deute buida el rebut: sense deute no en paga cap")
+    void unlinkingClearsTheReceipt() {
+        Debt debt = createPastDebt();
+        Long paymentId = recordPaymentFor(debt.getId(), LocalDate.of(2025, 2, 3), FEBRUARY_5);
+
+        Transaction unlink = new Transaction();
+        unlink.setDebtId(-1L);
+        transactionController.updateTransaction(paymentId, unlink);
+
+        Transaction stored = transactionRepository.findById(paymentId).orElseThrow();
+        assertThat(stored.getDebt()).isNull();
+        assertThat(stored.getDebtReceipt()).isNull();
+    }
+
+    @Test
+    @DisplayName("Saltar un rebut el treu del calendari i el pla s'allarga; desfer-ho el torna")
+    void skipAndRestoreAReceipt() {
+        Debt debt = createPastDebt();
+        recordPaymentFor(debt.getId(), LocalDate.of(2025, 2, 3), null);
+        assertThat(firstStatuses(reload(debt.getId()), 2)).containsExactly("PAGAT", "ENDARRERIT");
+
+        ResponseEntity<?> skipped = debtController.removeReceipt(debt.getId(),
+                new DebtController.ReceiptRemoval(JANUARY_5, false));
+        assertThat(skipped.getStatusCode().is2xxSuccessful()).isTrue();
+
+        Debt afterSkip = reload(debt.getId());
+        assertThat(firstStatuses(afterSkip, 2)).containsExactly("SALTAT", "PAGAT");
+        assertThat(afterSkip.getSchedule().stream().filter(receipt -> !"SALTAT".equals(receipt.status())))
+                .hasSize(10);
+        assertThat(afterSkip.getSchedule().get(afterSkip.getSchedule().size() - 1).date())
+                .isEqualTo(LocalDate.of(2025, 11, 5));
+        assertThat(afterSkip.getPending()).isEqualByComparingTo("900.00");
+
+        debtController.restoreReceipt(debt.getId(), JANUARY_5);
+        assertThat(firstStatuses(reload(debt.getId()), 2)).containsExactly("PAGAT", "ENDARRERIT");
+    }
+
+    @Test
+    @DisplayName("Descomptar un rebut el resta del deute")
+    void discountAReceipt() {
+        Debt debt = createPastDebt();
+
+        debtController.removeReceipt(debt.getId(), new DebtController.ReceiptRemoval(JANUARY_5, true));
+
+        Debt discounted = reload(debt.getId());
+        assertThat(discounted.getDiscounted()).isEqualByComparingTo("100.00");
+        assertThat(discounted.getPending()).isEqualByComparingTo("900.00");
+        assertThat(discounted.getAmount()).isEqualByComparingTo("1000.00");
+        assertThat(discounted.getSchedule().get(0).status()).isEqualTo("DESCOMPTAT");
+        assertThat(discounted.getSchedule().stream().filter(receipt -> "DESCOMPTAT".equals(receipt.status())
+                || "SALTAT".equals(receipt.status()))).hasSize(1);
+        assertThat(discounted.getSchedule()).hasSize(10);
+    }
+
+    @Test
+    @DisplayName("Un rebut que un pagament ha triat no es pot treure: 400 amb el motiu")
+    void chosenReceiptCannotBeRemoved() {
+        Debt debt = createPastDebt();
+        recordPaymentFor(debt.getId(), LocalDate.of(2025, 2, 3), FEBRUARY_5);
+
+        ResponseEntity<?> response = debtController.removeReceipt(debt.getId(),
+                new DebtController.ReceiptRemoval(FEBRUARY_5, false));
+
+        assertThat(response.getStatusCode().value()).isEqualTo(400);
+        assertThat(response.getBody().toString()).contains("canvia'ls de rebut");
+    }
+
+    @Test
+    @DisplayName("Esborrar un deute esborra també els seus rebuts trets")
+    void deletingDebtDeletesRemovedReceipts() {
+        Debt debt = createPastDebt();
+        debtController.removeReceipt(debt.getId(), new DebtController.ReceiptRemoval(JANUARY_5, false));
+
+        debtController.delete(debt.getId());
+
+        assertThat(removedReceiptRepository.findAll()).isEmpty();
     }
 
     @Test

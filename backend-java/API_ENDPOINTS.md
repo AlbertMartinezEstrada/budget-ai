@@ -220,6 +220,46 @@ Un límite puesto directamente sobre un grupo manda sobre la suma de sus hijos.
 
 ---
 
+## 🤝 **Deudas y préstamos** (`/debts`)
+
+Lo devuelto no se guarda: sale de los movimientos con `deute_id`. Cada deuda
+llega con `retornat`, `descomptat`, `pendent`, `endarrerit`, `proper_pagament`,
+`calendari` (los recibos) y `moviments`.
+
+- `GET /debts` - Lista las deudas, las abiertas primero
+- `GET /debts/{id}` - Una deuda
+- `POST /debts` - Crea una deuda
+  ```json
+  {
+    "nom": "Steam Deck",
+    "direccio": "DEC",
+    "import": 779.00,
+    "data": "2026-09-01",
+    "forma_retorn": "QUOTES",
+    "quota": 97.38,
+    "frequencia": "MENSUAL",
+    "data_primer_pagament": "2026-09-08",
+    "category": {"id": 41}
+  }
+  ```
+- `PUT /debts/{id}` - Actualización parcial
+- `DELETE /debts/{id}` - Borra la deuda; los movimientos se quedan, sin vínculo
+- `POST /debts/{id}/rebuts-eliminats` - Quita un recibo del calendario
+  ```json
+  {"data": "2026-09-08", "descomptar": false}
+  ```
+  Con `descomptar: false` se salta (el plan se alarga un recibo); con `true`, su
+  importe se resta de la deuda. 400 si algún pago eligió ese recibo.
+- `DELETE /debts/{id}/rebuts-eliminats/{data}` - Lo vuelve a poner
+
+Cada recibo de `calendari`: `data`, `import`, `pagat`, `eliminable` y `estat`
+(`PAGAT`, `PARCIAL`, `TOCA` —el del mes en curso, sin pagar—, `PENDENT`,
+`ENDARRERIT` —su mes ya acabó—, `SALTAT` o `DESCOMPTAT`). Un movimiento elige el
+recibo que paga con `deute_rebut` en `POST`/`PUT /gastos`; sin él, paga el
+primero sin pagar.
+
+---
+
 ## 📈 **Analytics y Reportes** (`/analytics`)
 
 ### Resumen Mensual
