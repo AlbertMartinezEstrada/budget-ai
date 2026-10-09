@@ -134,7 +134,9 @@ public class TransactionPartService {
      */
     public void store(Transaction transaction, List<TransactionPart> parts) {
         parts.forEach(part -> part.setTransaction(transaction));
+        // El rebut triat també: les parts paguen sempre el que toca.
         transaction.setDebt(null);
+        transaction.setDebtReceipt(null);
         transactionRepository.save(transaction);
         partRepository.saveAll(parts);
     }

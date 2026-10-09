@@ -644,18 +644,47 @@ envía `deute_id: -1`, por la misma razón que el `parent_id` negativo.
 ### La forma de devolverlo
 
 `forma_retorn` es `LLIURE` (sin calendario), `UNIC` (todo de golpe un día) o
-`QUOTES` (una cuota cada semana, mes o trimestre). El calendario sale del
-importe original, no de lo que queda: es el plan pactado, y compararlo con lo
-devuelto es lo que dice si se va al día.
+`QUOTES` (una cuota cada semana, mes o trimestre). El calendario lo calcula
+`RepaymentSchedule` y es una lista de **recibos**.
 
 - **La última cuota es lo que falte**: 1.000 a 300 son 300, 300, 300 y 100.
 - **Los meses se cuentan desde el primer pago**, no desde el anterior: si no,
   un calendario que empieza el 31 de enero se quedaría en el 28 desde febrero.
-- Los pagos se cubren **por orden**: con 250 devueltos de 100 al mes, los dos
-  primeros están pagados y el tercero a medias, sin importar qué día llegó
-  cada euro. Un pago vencido que no está cubierto del todo sale como
-  `ENDARRERIT`, y `endarrerit` suma lo que falta de todos ellos.
 - Más de 600 pagos se rechaza: es una cuota mal escrita, no un plan.
+
+**Los recibos van por periodos, no por días.** El recibo del 8 de octubre es
+el de octubre: mientras dura el mes sale como `TOCA`, y solo pasa a
+`ENDARRERIT` cuando el mes se ha acabado sin pagarlo. Antes se comparaba con el
+día exacto, y un recibo del día 8 pagado el 10 salía atrasado. El periodo es la
+semana (de lunes a domingo) en los semanales, el mes en los mensuales y en
+`UNIC`, y los tres meses que empiezan el del recibo en los trimestrales.
+`endarrerit` suma lo que falta de los recibos atrasados.
+
+**Cada pago paga un recibo**: el que se eligió al vincularlo
+(`transactions.deute_rebut`, el día del recibo) o, si no, **el que toca**: el
+primero que no está pagado. Primero se reparten los que eligieron, y los demás
+llenan por orden de fecha los que quedan libres. Las partes de un movimiento
+dividido pagan siempre el que toca.
+
+- Un recibo está **pagado** cuando lo que le ha llegado lo cubre. Una
+  diferencia de céntimos —el 1 % del recibo, como mucho 1 €— también lo da por
+  pagado: es redondeo, y dejarlo a medias por 0,03 € haría que el pago del mes
+  siguiente fuera a taparlo y ese mes quedara sin pagar.
+- **Lo que sobra acorta el final**, no adelanta los meses siguientes: 200 € en
+  un recibo de 100 dejan ese mes pagado y el plan acaba un mes antes. Los
+  céntimos que faltan de un recibo pagado van al último. Si al final quedarían
+  solo céntimos, el último recibo se los queda: no hay recibos de 0,20 €.
+- Un recibo a medias se queda lo que vale, y lo que falta es suyo (`PARCIAL`, o
+  `ENDARRERIT` cuando acaba su periodo).
+
+**Un recibo se puede quitar del calendario** (`debt_removed_receipts`), de dos
+maneras: **saltado** (`SALTAT`, descuento cero), y ese mes no toca pagar pero lo
+que se debe no cambia, así que el plan se alarga un recibo; o **descontado**
+(`DESCOMPTAT`), y su importe se resta de la deuda (una rebaja). `import` sigue
+siendo lo prestado; el descuento sale aparte como `descomptat` y se resta de
+`pendent`. Un recibo que algún pago eligió no se puede quitar: el pago no
+tendría adónde ir. Los que solo tienen pagos que les tocaron sí: esos pagos
+pasan al siguiente. Se deshace con `DELETE /debts/{id}/rebuts-eliminats/{data}`.
 
 ### La cuota se reserva sola
 
@@ -665,10 +694,10 @@ defecto «Pagament de deutes») y lo expone como `quotes_deutes`. Va aparte del
 prorrateo porque no es un coste fijo: no tiene versiones y se acaba al saldar
 la deuda.
 
-Cada deuda reserva **como mucho lo que le quedaba por devolver al empezar el
-mes**. Si se adelanta dinero, las últimas cuotas dejan de reservarse antes; si
-ya está saldada, no reserva nada aunque el calendario original dijera otra
-cosa. Una asignación puesta a mano en la hoja manda sobre la reserva, como con
+Cada deuda reserva **lo que vale su recibo de ese mes** en el calendario de
+verdad, el que ya tiene en cuenta lo pagado: si se adelanta dinero, el plan
+acaba antes y los últimos meses no reservan nada; un mes saltado tampoco. Una
+asignación puesta a mano en la hoja manda sobre la reserva, como con
 cualquier coste fijo.
 
 Lo que me deben **no se reserva ni se prevé**. Un dinero que aún no ha llegado

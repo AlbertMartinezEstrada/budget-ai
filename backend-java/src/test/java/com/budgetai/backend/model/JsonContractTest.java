@@ -187,6 +187,20 @@ class JsonContractTest {
     }
 
     @Test
+    @DisplayName("Transaction: el rebut del deute que paga surt i es llegeix com a deute_rebut")
+    void transactionDebtReceipt() throws Exception {
+        Transaction transaction = new Transaction();
+        transaction.setDebtReceipt(LocalDate.of(2026, 10, 8));
+
+        JsonNode json = mapper.valueToTree(transaction);
+
+        assertThat(json.get("deute_rebut").asText()).isEqualTo("2026-10-08");
+        assertThat(json.has("debtReceipt")).isFalse();
+        assertThat(mapper.readValue("{\"deute_rebut\":\"2026-10-08\"}", Transaction.class).getDebtReceipt())
+                .isEqualTo(LocalDate.of(2026, 10, 8));
+    }
+
+    @Test
     @DisplayName("Transaction: l'altre compte d'un traspàs surt i es llegeix com a compte_contrapart_id")
     void transactionExposesCounterpartAccountId() throws Exception {
         Account revolut = new Account();
@@ -245,26 +259,34 @@ class JsonContractTest {
         debt.setFirstPaymentDate(LocalDate.of(2026, 10, 1));
         debt.setRepaid(new BigDecimal("250.00"));
         debt.setOverdue(new BigDecimal("50.00"));
-        debt.setNextPayment(new Debt.Installment(LocalDate.of(2026, 12, 1), new BigDecimal("50.00"), null));
+        debt.setDiscounted(new BigDecimal("100.00"));
+        debt.setNextPayment(new Debt.Installment(LocalDate.of(2026, 12, 1), new BigDecimal("50.00"),
+                new BigDecimal("50.00"), "PARCIAL", true));
         debt.setSchedule(java.util.List.of(
-                new Debt.Installment(LocalDate.of(2026, 10, 1), new BigDecimal("100.00"), "PAGAT")));
+                new Debt.Installment(LocalDate.of(2026, 10, 1), new BigDecimal("100.00"),
+                        new BigDecimal("100.00"), "PAGAT", false)));
         debt.setMovements(java.util.List.of());
 
         JsonNode json = mapper.valueToTree(debt);
 
         for (String key : new String[] {"nom", "direccio", "import", "data", "forma_retorn", "quota",
                 "frequencia", "data_primer_pagament", "category", "notes", "retornat", "pendent",
-                "saldat", "endarrerit", "proper_pagament", "calendari", "moviments"}) {
+                "saldat", "endarrerit", "proper_pagament", "calendari", "moviments", "descomptat"}) {
             assertThat(json.has(key)).as(key).isTrue();
         }
-        assertThat(json.get("pendent").decimalValue()).isEqualByComparingTo("750.00");
+        // El descomptat es resta del que queda, però "import" segueix sent el
+        // que es va deixar.
+        assertThat(json.get("pendent").decimalValue()).isEqualByComparingTo("650.00");
+        assertThat(json.get("import").decimalValue()).isEqualByComparingTo("1000.00");
         assertThat(json.get("saldat").asBoolean()).isFalse();
         assertThat(json.get("data_primer_pagament").asText()).isEqualTo("2026-10-01");
 
         JsonNode installment = json.get("calendari").get(0);
         assertThat(installment.get("data").asText()).isEqualTo("2026-10-01");
         assertThat(installment.has("import")).isTrue();
+        assertThat(installment.has("pagat")).isTrue();
         assertThat(installment.get("estat").asText()).isEqualTo("PAGAT");
+        assertThat(installment.get("eliminable").asBoolean()).isFalse();
         assertThat(json.get("proper_pagament").get("data").asText()).isEqualTo("2026-12-01");
 
         // Els noms Java no s'exposen.
@@ -273,6 +295,8 @@ class JsonContractTest {
         assertThat(json.has("repaid")).isFalse();
         assertThat(json.has("pending")).isFalse();
         assertThat(json.has("owedByMe")).isFalse();
+        assertThat(json.has("discounted")).isFalse();
+        assertThat(installment.has("removable")).isFalse();
     }
 
     @Test
@@ -281,7 +305,7 @@ class JsonContractTest {
         String payload = """
             {"nom":"Joan, sopar","direccio":"EM_DEUEN","import":45.50,"data":"2026-09-20",
              "forma_retorn":"UNIC","data_primer_pagament":"2026-10-01","category":{"id":3},
-             "retornat":999}
+             "retornat":999,"descomptat":999}
             """;
 
         Debt debt = mapper.readValue(payload, Debt.class);
@@ -292,8 +316,10 @@ class JsonContractTest {
         assertThat(debt.getRepaymentPlan()).isEqualTo(Debt.PLAN_SINGLE);
         assertThat(debt.getFirstPaymentDate()).isEqualTo(LocalDate.of(2026, 10, 1));
         assertThat(debt.getCategory().getId()).isEqualTo(3L);
-        // El retornat surt dels moviments; el que digui la petició no compta.
+        // El retornat surt dels moviments, i el descomptat dels rebuts trets:
+        // el que digui la petició no compta.
         assertThat(debt.getRepaid()).isNull();
+        assertThat(debt.getDiscounted()).isNull();
     }
 
     @Test
@@ -368,15 +394,18 @@ class JsonContractTest {
         Debt debt = new Debt();
         debt.setMovements(java.util.List.of(new Debt.Movement(
                 10L, LocalDate.of(2026, 10, 5), "EXPENSE", new BigDecimal("100.00"),
-                "Trade Republic", "Autopréstec", true)));
+                "Trade Republic", "Autopréstec", true, LocalDate.of(2026, 10, 8), true)));
 
         JsonNode movement = mapper.valueToTree(debt).get("moviments").get(0);
 
-        for (String key : new String[] {"id", "data", "type", "cost", "empresa", "descripcio_curta", "es_part"}) {
+        for (String key : new String[] {"id", "data", "type", "cost", "empresa", "descripcio_curta", "es_part",
+                "rebut", "rebut_triat"}) {
             assertThat(movement.has(key)).as(key).isTrue();
         }
         assertThat(movement.get("data").asText()).isEqualTo("2026-10-05");
         assertThat(movement.get("es_part").asBoolean()).isTrue();
+        assertThat(movement.get("rebut").asText()).isEqualTo("2026-10-08");
+        assertThat(movement.get("rebut_triat").asBoolean()).isTrue();
     }
 
     @Test

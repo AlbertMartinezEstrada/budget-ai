@@ -60,6 +60,18 @@ CREATE TABLE IF NOT EXISTS debts (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Rebuts trets del calendari d'un deute a quotes. Amb descompte zero, saltat:
+-- aquell mes no toca i el pla s'allarga pel final. Amb descompte, el rebut
+-- desapareix i el seu import es resta del deute (una rebaixa).
+CREATE TABLE IF NOT EXISTS debt_removed_receipts (
+    id BIGSERIAL PRIMARY KEY,
+    deute_id BIGINT NOT NULL REFERENCES debts(id) ON DELETE CASCADE,
+    data DATE NOT NULL,
+    descompte DECIMAL(15, 2) NOT NULL DEFAULT 0 CHECK (descompte >= 0),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT debt_removed_receipts_deute_data_key UNIQUE (deute_id, data)
+);
+
 -- Taula de Transaccions (Evolució de 'despeses')
 CREATE TABLE IF NOT EXISTS transactions (
     id BIGSERIAL PRIMARY KEY,
@@ -80,6 +92,9 @@ CREATE TABLE IF NOT EXISTS transactions (
     -- Deute que mou: una devolució, o l'entrada o sortida del préstec. És
     -- independent de la categoria, que és la que diu com compta al pressupost.
     deute_id BIGINT REFERENCES debts(id) ON DELETE SET NULL,
+    -- El rebut del deute que paga, pel seu dia. NULL = el que toca: el primer
+    -- que encara no està pagat.
+    deute_rebut DATE,
     -- L'altre compte propi d'un traspàs (Principal → Revolut). NULL = no ho és.
     -- Mou el saldo dels dos comptes; la línia de l'altre extracte és el mateix
     -- diner i en importar-la es reconeix.

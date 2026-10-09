@@ -32,9 +32,9 @@ docker compose logs -f backend        # logs
 scripts\backup.bat                    # copia de la base de datos (backup.sh fuera de Windows)
 scripts/migrate.sh                    # aplica las migraciones pendientes (copia antes; --estat para ver cuáles)
 
-cd backend-java && ./gradlew test              # 158 unitarios, sin Docker
-cd backend-java && ./gradlew integrationTest   # 142, requieren Docker
-cd frontend && npm test                        # 44
+cd backend-java && ./gradlew test              # 181 unitarios, sin Docker
+cd backend-java && ./gradlew integrationTest   # 148, requieren Docker
+cd frontend && npm test                        # 52
 ```
 
 **Ejecuta los tests antes de dar nada por terminado.** El backend hay que
@@ -66,6 +66,7 @@ distintos de los campos Java:
 | `Debt.amount` | `import` |
 | `TransactionPart.amount` | `import` |
 | `Transaction.debt` | `deute_id` (solo el id) |
+| `Transaction.debtReceipt` | `deute_rebut` (el día del recibo que paga) |
 | `Transaction.counterpartAccount` | `compte_contrapart_id` (solo el id) |
 | `ImportRule.transferAccount` | `compte_traspas_id` (solo el id) |
 
@@ -326,9 +327,16 @@ guarda**: sale de los movimientos con `deute_id`, en el sentido de devolución
 (salidas si lo debo, entradas si me lo deben). Una tabla de pagos aparte
 duplicaría cada línea del extracto.
 
+Los recibos van **por mes, no por día**: el del mes en curso «toca» y solo se
+atrasa cuando el mes acaba. Cada pago paga el recibo que se eligió
+(`deute_rebut`) o el primero sin pagar; lo que sobra **acorta el final**, no
+adelanta los meses siguientes, y una diferencia de céntimos da el recibo por
+pagado. Un recibo se puede saltar (pasa al final) o descontar de la deuda
+(`debt_removed_receipts`). Todo eso lo decide `RepaymentSchedule`: no lo repitas
+en otro sitio.
+
 Las cuotas pactadas de lo que debo se reservan solas en el plan de la hoja que
-diga la deuda (`quotes_deutes`), como mucho lo que quedaba por devolver al
-empezar el mes. Lo que me deben no se reserva ni se prevé: un dinero que no ha
+diga la deuda (`quotes_deutes`): lo que vale el recibo de ese mes. Lo que me deben no se reserva ni se prevé: un dinero que no ha
 llegado no ensancha el bote.
 
 ### 12. De un movimiento dividido mandan las partes: suma líneas, no movimientos
