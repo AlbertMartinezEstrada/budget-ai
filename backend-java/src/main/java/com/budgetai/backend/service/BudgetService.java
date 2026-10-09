@@ -339,13 +339,6 @@ public class BudgetService {
      * mesuraven no tenia res a veure amb el que mesuraven els seus veïns.
      */
     private static final String SECTION_INCOME = "INCOME";
-    /**
-     * L'estalvi tampoc és una despesa: són diners que s'aparten. Barrejat amb
-     * els variables sortia com a "gastat 300 de 300", i competia amb el
-     * supermercat pel mateix bot. Va després dels fixos i abans dels variables:
-     * primer s'aparta el que es vol estalviar, i el que queda és per gastar.
-     */
-    private static final String SECTION_SAVINGS = "SAVINGS";
 
     /** El sentit d'un recurrent, al seu camp tipus. */
     private static final String EXPENSE = "EXPENSE";
@@ -386,41 +379,38 @@ public class BudgetService {
         boolean fromIncomeSection = income.total().signum() > 0;
         BigDecimal available = fromIncomeSection ? income.total() : salary;
 
-        // Es reparteix en cascada: fixos, estalvi i variables, i el bot de cada
-        // secció és el que deixa l'anterior. Els fixos es mesuren contra tot el
-        // disponible: són la primera mossegada, no hi ha cap bot per sobre seu.
+        // Els fixos es reparteixen primer perquè el bot dels variables és
+        // justament el que en queda. Es mesuren contra tot el disponible: són
+        // la primera mossegada, no hi ha cap bot per sobre seu.
+        //
+        // L'estalvi és un variable més, a posta: del que sobra dels fixos es
+        // reparteixen percentatges, i l'estalvi n'és un. Es va provar de fer-ne
+        // una secció entre fixos i variables, i el repartiment deixava de ser
+        // el que l'usuari fa de debò.
         List<Map<String, Object>> fixedNodes = new ArrayList<>();
         List<Map<String, Object>> incomeNodes = new ArrayList<>();
-        List<Category> savingsRoots = new ArrayList<>();
         List<Category> variableRoots = new ArrayList<>();
         for (Category root : tree.roots()) {
             switch (sectionOf(root, tree)) {
                 case SECTION_FIXED -> fixedNodes.add(context.buildNode(root, available, SECTION_FIXED));
                 // Els ingressos no es reparteixen: no tenen bot del qual penjar.
                 case SECTION_INCOME -> incomeNodes.add(context.buildNode(root, null, SECTION_INCOME));
-                case SECTION_SAVINGS -> savingsRoots.add(root);
                 default -> variableRoots.add(root);
             }
         }
 
         BigDecimal fixedTotal = sumPlans(fixedNodes);
-        // Si no hi ha sou definit no hi ha bots després dels fixos, i els
-        // percentatges no donen cap xifra: val més no ensenyar-ne cap que
-        // ensenyar-ne una d'inventada.
-        BigDecimal savingsPot = remainder(available, fixedTotal);
-        List<Map<String, Object>> savingsNodes = new ArrayList<>();
-        for (Category root : savingsRoots) {
-            savingsNodes.add(context.buildNode(root, savingsPot, SECTION_SAVINGS));
-        }
-        BigDecimal savingsTotal = sumPlans(savingsNodes);
+        // Si no hi ha sou definit no hi ha bot de variables, i els percentatges
+        // no donen cap xifra: val més no ensenyar-ne cap que ensenyar-ne una
+        // d'inventada.
+        BigDecimal variablePot = remainder(available, fixedTotal);
 
-        BigDecimal variablePot = remainder(savingsPot, savingsTotal);
         List<Map<String, Object>> variableNodes = new ArrayList<>();
         for (Category root : variableRoots) {
             variableNodes.add(context.buildNode(root, variablePot, SECTION_VARIABLE));
         }
         BigDecimal variableTotal = sumPlans(variableNodes);
-        BigDecimal assignedTotal = fixedTotal.add(savingsTotal).add(variableTotal);
+        BigDecimal assignedTotal = fixedTotal.add(variableTotal);
 
         Map<String, Object> summary = new LinkedHashMap<>();
         summary.put("periode", period.toString());
@@ -439,12 +429,10 @@ public class BudgetService {
                 // No reparteixen res, així que no tenen bot ni percentatge.
                 section(SECTION_INCOME, null, sumPlans(incomeNodes), null, incomeNodes),
                 section(SECTION_FIXED, available, fixedTotal, available, fixedNodes),
-                section(SECTION_SAVINGS, savingsPot, savingsTotal, available, savingsNodes),
                 section(SECTION_VARIABLE, variablePot, variableTotal, available, variableNodes)));
         // L'arbre pla de primer nivell es manté: hi ha consultes que només
         // volen els grups i no els importa a quina secció cauen.
         List<Map<String, Object>> allRoots = new ArrayList<>(fixedNodes);
-        allRoots.addAll(savingsNodes);
         allRoots.addAll(variableNodes);
         allRoots.addAll(incomeNodes);
         summary.put("grups", allRoots);
@@ -473,9 +461,6 @@ public class BudgetService {
         if (SECTION_FIXED.equals(root.getCostType())) return SECTION_FIXED;
         if (SECTION_VARIABLE.equals(root.getCostType())) return SECTION_VARIABLE;
         if (SECTION_INCOME.equals(root.getCostType())) return SECTION_INCOME;
-        // Com els ingressos, l'estalvi només es declara: unes fulles no poden
-        // dir si els seus diners s'aparten o es gasten.
-        if (SECTION_SAVINGS.equals(root.getCostType())) return SECTION_SAVINGS;
 
         List<Category> leaves = tree.leavesOf(root.getId());
         if (leaves.isEmpty()) return SECTION_VARIABLE;
@@ -486,9 +471,8 @@ public class BudgetService {
                                         BigDecimal available, List<Map<String, Object>> nodes) {
         Map<String, Object> section = new LinkedHashMap<>();
         section.put("tipus", type);
-        // El bot dels fixos és tot el disponible; el de l'estalvi, el que en
-        // queda, i el dels variables, el que queda després de l'estalvi. Els
-        // ingressos no en tenen: no reparteixen res.
+        // El bot dels fixos és tot el disponible; el dels variables, el que en
+        // queda. Els ingressos no en tenen: no reparteixen res.
         section.put("base", pot);
         section.put("assignat", assigned);
         // Als ingressos, el "real" és el que ha entrat de debò; a la resta, el
@@ -503,7 +487,7 @@ public class BudgetService {
         return section;
     }
 
-    /** El que queda d'un bot després d'una secció. Null si no hi ha bot. */
+    /** El que queda d'un bot després dels fixos. Null si no hi ha bot. */
     private static BigDecimal remainder(BigDecimal pot, BigDecimal assigned) {
         return pot == null ? null : pot.subtract(assigned).max(BigDecimal.ZERO);
     }
@@ -598,10 +582,15 @@ public class BudgetService {
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
-    /** El que ha tornat d'una categoria d'estalvi: les entrades que hi compten. */
+    /**
+     * El que ha tornat d'un compte d'estalvi a una categoria: els traspassos
+     * d'entrada que hi compten. Només traspassos: un reemborsament d'una
+     * botiga no es resta, com no s'ha restat mai.
+     */
     private BigDecimal withdrawnFrom(List<Line> lines, Long categoryId, LocalDate from, LocalDate to) {
         return lines.stream()
                 .filter(line -> "INCOME".equals(line.type()))
+                .filter(line -> line.transaction().isTransfer())
                 .filter(line -> !line.excludedFromBudget())
                 .filter(line -> line.category() != null && categoryId.equals(line.category().getId()))
                 .filter(line -> line.isBetween(from, to))
@@ -734,12 +723,11 @@ public class BudgetService {
                 return expected;
             }
 
-            BigDecimal real = spentIn(lines, Set.of(category.getId()), from, to);
-            // A l'estalvi, el que en torna resta: treure'n 200 € el mateix mes
-            // que se n'aparten 300 vol dir que se n'han estalviat 100.
-            if (SECTION_SAVINGS.equals(section)) {
-                real = real.subtract(withdrawnFrom(lines, category.getId(), from, to));
-            }
+            // El que torna d'un compte d'estalvi resta del que s'hi va apartar:
+            // treure'n 200 € de Trade Republic el mateix mes que se n'aparten
+            // 300 a Estalvis vol dir que se n'han estalviat 100.
+            BigDecimal real = spentIn(lines, Set.of(category.getId()), from, to)
+                    .subtract(withdrawnFrom(lines, category.getId(), from, to));
             BigDecimal prorated = proratedFor(category, recurring, EXPENSE);
             // Les quotes pactades dels deutes que dec: diners que aquest mes ja
             // estan compromesos. Van a part del prorrateig perquè no són cap

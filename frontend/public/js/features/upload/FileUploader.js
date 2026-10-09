@@ -54,7 +54,7 @@ export async function initUpload(container) {
                 <p class="text-sm text-muted mb-3">
                     Si el concepte del moviment conté el text de la regla, s'hi aplica sola. Pot dir que
                     és un <strong>traspàs</strong> a un altre compte teu («REVOLUT» → Revolut): entre comptes
-                    del dia a dia no compta, i cap a un compte d'estalvi compta com a estalvi. Si no és cap
+                    del dia a dia no compta, i cap a un compte d'estalvi compta a la seva categoria. Si no és cap
                     traspàs, el marca com a <strong>no comptar</strong>.
                     Sempre pots canviar-ho a la revisió abans de confirmar.
                 </p>
