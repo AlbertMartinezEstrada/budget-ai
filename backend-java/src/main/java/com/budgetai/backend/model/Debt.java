@@ -118,12 +118,23 @@ public class Debt {
     @JsonProperty(value = "retornat", access = JsonProperty.Access.READ_ONLY)
     private BigDecimal repaid;
 
-    /** El que ja hauria d'estar retornat segons el calendari i encara no ho està. */
+    /**
+     * El que s'ha rebaixat del deute descomptant rebuts. Es resta del que es
+     * deu, però "import" continua sent el que es va deixar.
+     */
+    @Transient
+    @JsonProperty(value = "descomptat", access = JsonProperty.Access.READ_ONLY)
+    private BigDecimal discounted;
+
+    /**
+     * El que hauria d'estar retornat i encara no ho està: el que falta dels
+     * rebuts dels mesos que ja s'han acabat.
+     */
     @Transient
     @JsonProperty(value = "endarrerit", access = JsonProperty.Access.READ_ONLY)
     private BigDecimal overdue;
 
-    /** El primer pagament del calendari que encara no està cobert del tot. */
+    /** El primer rebut que encara no està pagat, pel que en falta. */
     @Transient
     @JsonProperty(value = "proper_pagament", access = JsonProperty.Access.READ_ONLY)
     private Installment nextPayment;
@@ -151,7 +162,8 @@ public class Debt {
     public BigDecimal getPending() {
         if (amount == null) return null;
         BigDecimal returned = repaid != null ? repaid : BigDecimal.ZERO;
-        return amount.subtract(returned).max(BigDecimal.ZERO);
+        BigDecimal rebate = discounted != null ? discounted : BigDecimal.ZERO;
+        return amount.subtract(rebate).subtract(returned).max(BigDecimal.ZERO);
     }
 
     @JsonProperty("saldat")
@@ -181,6 +193,9 @@ public class Debt {
      *
      * @param transactionId el moviment d'on surt, per poder-lo trobar
      * @param part si és només un tros del moviment
+     * @param receipt el dia del rebut on compta; null si no en paga cap (el
+     *                préstec mateix, o uns diners de més quan ja estava saldat)
+     * @param receiptChosen si el rebut el va triar l'usuari; si no, és el que tocava
      */
     public record Movement(
             @JsonProperty("id") Long transactionId,
@@ -189,18 +204,29 @@ public class Debt {
             @JsonProperty("cost") BigDecimal amount,
             @JsonProperty("empresa") String company,
             @JsonProperty("descripcio_curta") String description,
-            @JsonProperty("es_part") boolean part) {
+            @JsonProperty("es_part") boolean part,
+            @JsonProperty("rebut") @JsonFormat(pattern = "yyyy-MM-dd") LocalDate receipt,
+            @JsonProperty("rebut_triat") boolean receiptChosen) {
     }
 
     /**
-     * Un pagament del calendari de retorn.
+     * Un rebut del calendari de retorn.
      *
-     * @param status PAGAT, PARCIAL, PENDENT o ENDARRERIT; null quan encara no
-     *               s'ha comparat amb el que s'ha retornat.
+     * @param amount    el que val el rebut. D'un de descomptat, el que s'ha
+     *                  rebaixat; d'un de saltat, zero.
+     * @param paid      el que hi ha arribat. Pot passar del que val: el que
+     *                  sobra treu rebuts del final.
+     * @param status    PAGAT, PARCIAL, TOCA (és el del període en curs i encara
+     *                  no s'ha pagat), PENDENT, ENDARRERIT (el seu període ja
+     *                  s'ha acabat i no està pagat), SALTAT o DESCOMPTAT.
+     * @param removable si es pot treure del calendari: no, si algun pagament
+     *                  l'ha triat a ell, ni si ja està tret.
      */
     public record Installment(
             @JsonProperty("data") @JsonFormat(pattern = "yyyy-MM-dd") LocalDate date,
             @JsonProperty("import") BigDecimal amount,
-            @JsonProperty("estat") String status) {
+            @JsonProperty("pagat") BigDecimal paid,
+            @JsonProperty("estat") String status,
+            @JsonProperty("eliminable") boolean removable) {
     }
 }

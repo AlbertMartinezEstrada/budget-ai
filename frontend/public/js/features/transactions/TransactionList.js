@@ -4,6 +4,7 @@ import {
 } from '../../api.js';
 import { categoryOptions, leafCategories } from '../../categoryOptions.js';
 import { counterpartOptions, transferCounts, transferLabel } from '../../transfers.js';
+import { hasReceiptsToChoose, receiptOptions } from '../../debtReceipts.js';
 import { setUpSplitEditor } from './SplitEditor.js';
 
 /**
@@ -184,6 +185,13 @@ export async function initTransactions(container) {
                         <select id="new-debt" class="form-control"></select>
                         <p class="text-xs text-gray-500 dark:text-slate-400 mt-1">
                             Si és un préstec o la seva devolució. El que queda per tornar surt d'aquí.
+                        </p>
+                    </div>
+                    <div id="new-debt-receipt-field" class="hidden">
+                        <label class="block text-sm font-medium mb-1" for="new-debt-receipt">Rebut que paga</label>
+                        <select id="new-debt-receipt" class="form-control"></select>
+                        <p class="text-xs text-gray-500 dark:text-slate-400 mt-1">
+                            Si el pagament és d'un altre rebut que el que toca. El que sobri treu rebuts del final.
                         </p>
                     </div>
                     <div>
@@ -410,8 +418,24 @@ function setUpManualEntry(categories, companies, debts) {
         </option>`)
     ].join('');
 
+    /**
+     * El desplegable del rebut, només per als deutes a quotes: amb un sol
+     * rebut, o sense calendari, no hi ha res a triar.
+     */
+    const refreshReceipts = (selected = null) => {
+        const debt = debtsById.get(Number.parseInt(document.getElementById('new-debt').value, 10));
+        const field = document.getElementById('new-debt-receipt-field');
+        const select = document.getElementById('new-debt-receipt');
+        const show = hasReceiptsToChoose(debt);
+        // En un moviment dividit, el deute és de cada part, i les parts paguen
+        // sempre el que toca.
+        field.classList.toggle('hidden', !show || !document.getElementById('transaction-split-note').classList.contains('hidden'));
+        select.innerHTML = show ? receiptOptions(debt, selected) : '';
+    };
+
     const leafNames = new Set(leaves.map(category => category.nom));
     document.getElementById('new-debt').addEventListener('change', (event) => {
+        refreshReceipts();
         const debt = debtsById.get(Number.parseInt(event.target.value, 10));
         if (!debt) return;
         const suggested = DEBT_CATEGORIES[debt.direccio]?.[document.getElementById('new-type').value];
@@ -446,6 +470,7 @@ function setUpManualEntry(categories, companies, debts) {
         counterpartSelect.value = '';
         refreshCounterpart();
         showSplitFields(false);
+        refreshReceipts();
         open();
     });
 
@@ -484,6 +509,7 @@ function setUpManualEntry(categories, companies, debts) {
         excludedBox.checked = Boolean(transaction.exclos_pressupost);
         refreshCounterpart();
         showSplitFields(isSplit(transaction));
+        refreshReceipts(transaction.deute_rebut || null);
 
         open();
     };
@@ -519,6 +545,8 @@ function setUpManualEntry(categories, companies, debts) {
             // -1 desvincula: en una edició, no enviar-lo deixaria el vincle
             // que hi havia.
             deute_id: Number.parseInt(document.getElementById('new-debt').value, 10) || -1,
+            // Buit és "el que toca". Va sempre amb el deute: sense, no en paga cap.
+            deute_rebut: document.getElementById('new-debt-receipt').value || null,
             // El mateix per al traspàs: -1 vol dir que ja no ho és.
             compte_contrapart_id: Number.parseInt(counterpartSelect.value, 10) || -1
         };
@@ -534,6 +562,8 @@ function setUpManualEntry(categories, companies, debts) {
             }
             close();
             await loadData();
+            // Els rebuts del desplegable han canviat d'estat amb aquest pagament.
+            await refreshDebts();
         } catch (failure) {
             error.textContent = failure.message || 'No s\'ha pogut afegir el moviment.';
             error.classList.remove('hidden');
@@ -543,6 +573,16 @@ function setUpManualEntry(categories, companies, debts) {
             submitButton.disabled = false;
         }
     });
+}
+
+/** Torna a llegir els deutes: el calendari de cadascun depèn dels pagaments. */
+async function refreshDebts() {
+    try {
+        const debts = await getDebts();
+        debtsById = new Map(debts.map(debt => [debt.id, debt]));
+    } catch (error) {
+        console.error('Error carregant deutes:', error);
+    }
 }
 
 /** Avui en el format que espera un <input type="date">. */

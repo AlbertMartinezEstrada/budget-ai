@@ -689,6 +689,31 @@ export async function deleteDebt(id) {
     return handleResponse(response);
 }
 
+/**
+ * Treu un rebut del calendari d'un deute a quotes.
+ *
+ * @param date     el dia del rebut, "AAAA-MM-DD"
+ * @param discount true per restar-ne l'import del deute; false per saltar-lo,
+ *                 i el pla s'allarga pel final
+ * @returns el deute, amb el calendari nou
+ */
+export async function removeDebtReceipt(id, date, discount) {
+    const response = await apiFetch(`/debts/${id}/rebuts-eliminats`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ data: date, descomptar: Boolean(discount) }),
+    });
+    return handleResponse(response);
+}
+
+/** Torna al calendari un rebut tret. */
+export async function restoreDebtReceipt(id, date) {
+    const response = await apiFetch(`/debts/${id}/rebuts-eliminats/${encodeURIComponent(date)}`, {
+        method: 'DELETE'
+    });
+    return handleResponse(response);
+}
+
 // ============ ANALYTICS ============
 export async function getMonthlySummary(year, month) {
     const params = new URLSearchParams({ year, month });
