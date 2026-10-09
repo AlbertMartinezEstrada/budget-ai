@@ -107,6 +107,21 @@ public class Transaction {
     private Debt debt;
 
     /**
+     * El rebut del deute que paga aquest moviment, pel dia del rebut.
+     *
+     * Null vol dir "el que toca": el primer rebut que encara no està pagat. Es
+     * tria quan el pagament no és el del rebut que tocaria, per exemple el que
+     * es fa a l'octubre per pagar el rebut d'octubre quan el de setembre no
+     * tocava. Sense deute no vol dir res: el controlador el buida.
+     *
+     * Les parts d'un moviment dividit no en porten: paguen sempre el que toca.
+     */
+    @Column(name = "deute_rebut")
+    @JsonFormat(pattern = "yyyy-MM-dd")
+    @JsonProperty("deute_rebut")
+    private LocalDate debtReceipt;
+
+    /**
      * Les parts en què està dividit, si n'hi ha. Quan n'hi ha, manen elles:
      * la categoria, la marca d'exclòs i el deute del moviment deixen de
      * comptar.

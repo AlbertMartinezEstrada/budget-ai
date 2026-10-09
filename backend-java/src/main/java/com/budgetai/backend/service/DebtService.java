@@ -3,12 +3,17 @@ package com.budgetai.backend.service;
 import com.budgetai.backend.model.Category;
 import com.budgetai.backend.model.Debt;
 import com.budgetai.backend.model.Debt.Installment;
+import com.budgetai.backend.model.DebtRemovedReceipt;
 import com.budgetai.backend.model.Transaction;
 import com.budgetai.backend.model.TransactionPart;
 import com.budgetai.backend.repository.CategoryRepository;
+import com.budgetai.backend.repository.DebtRemovedReceiptRepository;
 import com.budgetai.backend.repository.DebtRepository;
 import com.budgetai.backend.repository.TransactionPartRepository;
 import com.budgetai.backend.repository.TransactionRepository;
+import com.budgetai.backend.service.RepaymentSchedule.Payment;
+import com.budgetai.backend.service.RepaymentSchedule.Plan;
+import com.budgetai.backend.service.RepaymentSchedule.Removal;
 import com.budgetai.backend.service.TransactionLines.Line;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -18,9 +23,11 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * Deutes i préstecs: qui deu què, com s'ha de tornar i com es va.
@@ -34,6 +41,10 @@ import java.util.Set;
  * Es compta per línies (TransactionLines), no per moviments: una part d'un
  * moviment dividit també pot ser una devolució, i només per l'import de la
  * part.
+ *
+ * Com es reparteix el retornat entre els rebuts ho decideix RepaymentSchedule:
+ * cada pagament paga el rebut triat o el que toca, i el que sobra escurça el
+ * final.
  */
 @Service
 public class DebtService {
@@ -47,19 +58,22 @@ public class DebtService {
     private final TransactionLines transactionLines;
     private final CategoryRepository categoryRepository;
     private final CategoryHierarchyService hierarchyService;
+    private final DebtRemovedReceiptRepository removedReceiptRepository;
 
     public DebtService(DebtRepository debtRepository,
                        TransactionRepository transactionRepository,
                        TransactionPartRepository partRepository,
                        TransactionLines transactionLines,
                        CategoryRepository categoryRepository,
-                       CategoryHierarchyService hierarchyService) {
+                       CategoryHierarchyService hierarchyService,
+                       DebtRemovedReceiptRepository removedReceiptRepository) {
         this.debtRepository = debtRepository;
         this.transactionRepository = transactionRepository;
         this.partRepository = partRepository;
         this.transactionLines = transactionLines;
         this.categoryRepository = categoryRepository;
         this.hierarchyService = hierarchyService;
+        this.removedReceiptRepository = removedReceiptRepository;
     }
 
     /** Tots, amb els oberts primer: els saldats ja no demanen res. */
@@ -67,8 +81,9 @@ public class DebtService {
     public List<Debt> list() {
         LocalDate today = LocalDate.now();
         List<Line> lines = transactionLines.all();
+        Map<Long, List<Removal>> removals = removalsByDebt();
         List<Debt> debts = new ArrayList<>(debtRepository.findAllByOrderByDateDesc());
-        debts.forEach(debt -> describe(debt, today, lines));
+        debts.forEach(debt -> describe(debt, today, lines, removals.getOrDefault(debt.getId(), List.of())));
         debts.sort(Comparator.comparing(Debt::isSettled));
         return debts;
     }
@@ -157,14 +172,66 @@ public class DebtService {
     }
 
     /**
+     * Treu un rebut del calendari d'un deute a quotes.
+     *
+     * @param date     el dia del rebut, o qualsevol dia del seu període
+     * @param discount true per restar-ne l'import del deute (una rebaixa);
+     *                 false per saltar-lo, i el que es deu passa al final
+     */
+    @Transactional
+    public Debt removeReceipt(Long id, LocalDate date, boolean discount) {
+        Debt debt = find(id);
+        if (!Debt.PLAN_INSTALLMENTS.equals(debt.getRepaymentPlan())) {
+            throw new IllegalArgumentException("Només es poden treure rebuts d'un deute a quotes.");
+        }
+        if (date == null) {
+            throw new IllegalArgumentException("Falta quin rebut.");
+        }
+
+        Installment receipt = describe(debt, LocalDate.now(), transactionLines.all()).getSchedule().stream()
+                .filter(RepaymentSchedule::isActive)
+                .filter(candidate -> RepaymentSchedule.samePeriod(candidate.date(), date, debt.getFrequency()))
+                .findFirst()
+                .orElseThrow(() -> new IllegalArgumentException("Aquest rebut no és al calendari."));
+        // Un pagament que l'ha triat a ell no té on anar: el que toca podria
+        // ser un altre mes que ja està pagat. Que el canviïn ells, sabent-ho.
+        if (!receipt.removable()) {
+            throw new IllegalArgumentException("Hi ha pagaments que paguen precisament aquest rebut. "
+                    + "Des de Transaccions, canvia'ls de rebut abans de treure'l.");
+        }
+
+        DebtRemovedReceipt removal = new DebtRemovedReceipt();
+        removal.setDebt(debt);
+        removal.setDate(receipt.date());
+        removal.setDiscount(discount ? receipt.amount() : BigDecimal.ZERO);
+        removedReceiptRepository.save(removal);
+        return describe(debt, LocalDate.now(), transactionLines.all());
+    }
+
+    /** Torna al calendari un rebut tret, saltat o descomptat. */
+    @Transactional
+    public Debt restoreReceipt(Long id, LocalDate date) {
+        Debt debt = find(id);
+        List<DebtRemovedReceipt> matching = removedReceiptRepository.findByDebt(id).stream()
+                .filter(removal -> removal.getDate().equals(date))
+                .toList();
+        if (matching.isEmpty()) {
+            throw new IllegalArgumentException("Aquest rebut no està tret del calendari.");
+        }
+        removedReceiptRepository.deleteAll(matching);
+        return describe(debt, LocalDate.now(), transactionLines.all());
+    }
+
+    /**
      * Quotes dels deutes que dec que cauen dins del període, per categoria.
      *
      * És el que el pressupost ha de reservar aquell mes: uns diners que ja
      * estan compromesos no es poden repartir com si fossin lliures.
      *
-     * Cada deute reserva com a molt el que li quedava per tornar quan va
-     * començar el període. Si s'ha avançat feina i ja està saldat, deixa de
-     * reservar, encara que el calendari original digués que quedaven quotes.
+     * Es reserva el que val el rebut d'aquell mes segons el calendari de debò,
+     * el que ja té en compte el que s'ha pagat: si s'ha avançat feina, l'últim
+     * rebut és més petit o el deute ja està saldat i no en queda cap, i un mes
+     * saltat no reserva res.
      */
     @Transactional(readOnly = true)
     public Map<Long, BigDecimal> installmentsDueByCategory(LocalDate from, LocalDate to) {
@@ -173,17 +240,16 @@ public class DebtService {
             if (line.debt() == null) continue;
             linesByDebt.computeIfAbsent(line.debt().getId(), missingDebtId -> new ArrayList<>()).add(line);
         }
+        Map<Long, List<Removal>> removals = removalsByDebt();
 
         Map<Long, BigDecimal> reserved = new HashMap<>();
         for (Debt debt : debtRepository.findAll()) {
             if (!debt.isOwedByMe() || debt.getCategory() == null) continue;
 
-            BigDecimal due = RepaymentSchedule.dueBetween(RepaymentSchedule.of(debt), from, to);
-            if (due.signum() == 0) continue;
-
-            BigDecimal repaidBefore = repaid(debt, linesByDebt.getOrDefault(debt.getId(), List.of()), from);
-            BigDecimal pendingAtStart = debt.getAmount().subtract(repaidBefore).max(BigDecimal.ZERO);
-            BigDecimal reservation = due.min(pendingAtStart);
+            List<Line> lines = linesByDebt.getOrDefault(debt.getId(), List.of());
+            Plan plan = RepaymentSchedule.plan(debt, removals.getOrDefault(debt.getId(), List.of()),
+                    payments(debt, lines), to);
+            BigDecimal reservation = plan.dueBetween(from, to);
             if (reservation.signum() > 0) {
                 reserved.merge(debt.getCategory().getId(), reservation, BigDecimal::add);
             }
@@ -197,22 +263,55 @@ public class DebtService {
      * @param allLines les línies de tots els moviments; se'n queda les del deute
      */
     Debt describe(Debt debt, LocalDate today, List<Line> allLines) {
+        List<Removal> removals = debt.getId() != null
+                ? removedReceiptRepository.findByDebt(debt.getId()).stream().map(DebtService::toRemoval).toList()
+                : List.of();
+        return describe(debt, today, allLines, removals);
+    }
+
+    private Debt describe(Debt debt, LocalDate today, List<Line> allLines, List<Removal> removals) {
         List<Line> lines = allLines.stream()
                 .filter(line -> line.belongsTo(debt))
                 .sorted(Comparator.comparing(Line::date, Comparator.nullsLast(Comparator.naturalOrder())))
                 .toList();
-        BigDecimal repaid = repaid(debt, lines, null);
-        List<Installment> payments = RepaymentSchedule.of(debt);
+        List<Line> repayments = lines.stream().filter(line -> isRepayment(debt, line)).toList();
+        Plan plan = RepaymentSchedule.plan(debt, removals, payments(debt, lines), today);
+
+        // El rebut de cada moviment, per ensenyar-lo al costat: els pagaments
+        // del pla van en el mateix ordre que les devolucions.
+        // Per identitat: dues línies iguals (dos pagaments de 50 el mateix dia)
+        // són dos pagaments.
+        Map<Line, Integer> paymentIndex = new IdentityHashMap<>();
+        for (int index = 0; index < repayments.size(); index++) paymentIndex.put(repayments.get(index), index);
 
         debt.setMovements(lines.stream()
-                .map(line -> new Debt.Movement(line.transaction().getId(), line.date(), line.type(),
-                        line.amount(), line.transaction().getEmpresa(), line.description(), line.isPart()))
+                .map(line -> {
+                    Integer index = paymentIndex.get(line);
+                    return new Debt.Movement(line.transaction().getId(), line.date(), line.type(),
+                            line.amount(), line.transaction().getEmpresa(), line.description(), line.isPart(),
+                            index != null ? plan.receiptOfPayment().get(index) : null,
+                            index != null && plan.chosen().get(index));
+                })
                 .toList());
-        debt.setRepaid(repaid);
-        debt.setSchedule(RepaymentSchedule.withStatus(payments, repaid, today));
-        debt.setOverdue(RepaymentSchedule.overdue(payments, repaid, today));
-        debt.setNextPayment(RepaymentSchedule.next(payments, repaid));
+        debt.setRepaid(repaid(debt, lines, null));
+        debt.setDiscounted(plan.discounted());
+        debt.setSchedule(plan.receipts());
+        debt.setOverdue(plan.overdue());
+        debt.setNextPayment(plan.next());
         return debt;
+    }
+
+    /** Les devolucions com a pagaments del pla, en el mateix ordre que les línies. */
+    private static List<Payment> payments(Debt debt, List<Line> lines) {
+        return lines.stream()
+                .filter(line -> isRepayment(debt, line))
+                .map(line -> new Payment(line.date(), line.amount(), line.debtReceipt()))
+                .toList();
+    }
+
+    /** Si la línia torna el deute: una sortida si el dec, una entrada si me'l deuen. */
+    private static boolean isRepayment(Debt debt, Line line) {
+        return (debt.isOwedByMe() ? "EXPENSE" : "INCOME").equals(line.type());
     }
 
     /**
@@ -222,12 +321,23 @@ public class DebtService {
      * @param before si no és null, només les d'abans d'aquest dia
      */
     static BigDecimal repaid(Debt debt, List<Line> lines, LocalDate before) {
-        String repaymentType = debt.isOwedByMe() ? "EXPENSE" : "INCOME";
         return lines.stream()
-                .filter(line -> repaymentType.equals(line.type()))
+                .filter(line -> isRepayment(debt, line))
                 .filter(line -> before == null || (line.date() != null && line.date().isBefore(before)))
                 .map(Line::amount)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
+    private Map<Long, List<Removal>> removalsByDebt() {
+        return removedReceiptRepository.findAll().stream()
+                .filter(removal -> removal.getDebt() != null)
+                .sorted(Comparator.comparing(DebtRemovedReceipt::getDate))
+                .collect(Collectors.groupingBy(removal -> removal.getDebt().getId(),
+                        Collectors.mapping(DebtService::toRemoval, Collectors.toList())));
+    }
+
+    private static Removal toRemoval(DebtRemovedReceipt removal) {
+        return new Removal(removal.getDate(), removal.getDiscount() != null ? removal.getDiscount() : BigDecimal.ZERO);
     }
 
     private Debt find(Long id) {

@@ -2,9 +2,11 @@ package com.budgetai.backend.service;
 
 import com.budgetai.backend.model.Category;
 import com.budgetai.backend.model.Debt;
+import com.budgetai.backend.model.DebtRemovedReceipt;
 import com.budgetai.backend.model.Transaction;
 import com.budgetai.backend.model.TransactionPart;
 import com.budgetai.backend.repository.CategoryRepository;
+import com.budgetai.backend.repository.DebtRemovedReceiptRepository;
 import com.budgetai.backend.repository.DebtRepository;
 import com.budgetai.backend.repository.TransactionPartRepository;
 import com.budgetai.backend.repository.TransactionRepository;
@@ -12,6 +14,7 @@ import com.budgetai.backend.service.TransactionLines.Line;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -25,6 +28,8 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -36,6 +41,7 @@ class DebtServiceTest {
     @Mock private TransactionLines transactionLines;
     @Mock private CategoryRepository categoryRepository;
     @Mock private CategoryHierarchyService hierarchyService;
+    @Mock private DebtRemovedReceiptRepository removedReceiptRepository;
     @InjectMocks private DebtService service;
 
     private static final LocalDate LOAN_DATE = LocalDate.of(2026, 9, 10);
@@ -261,6 +267,149 @@ class DebtServiceTest {
         assertThat(described.getMovements().get(0).amount()).isEqualByComparingTo("100.00");
         assertThat(described.getMovements().get(0).part()).isTrue();
         assertThat(described.getMovements().get(0).transactionId()).isEqualTo(10L);
+    }
+
+    // ============ REBUTS TRETS ============
+
+    private static final LocalDate SEPTEMBER_8 = LocalDate.of(2026, 9, 8);
+    private static final LocalDate OCTOBER_8 = LocalDate.of(2026, 10, 8);
+
+    /** La Steam Deck, desada: el servei la troba pel seu id. */
+    private Debt storedSteamDeck() {
+        Debt debt = steamDeck();
+        when(debtRepository.findById(1L)).thenReturn(Optional.of(debt));
+        return debt;
+    }
+
+    /** La Steam Deck: 779 € a 97,38 € al mes des del 8 de setembre. */
+    private static Debt steamDeck() {
+        Debt debt = request(Debt.I_OWE);
+        debt.setId(1L);
+        debt.setAmount(new BigDecimal("779.00"));
+        debt.setDate(LocalDate.of(2026, 9, 1));
+        debt.setRepaymentPlan(Debt.PLAN_INSTALLMENTS);
+        debt.setInstallment(new BigDecimal("97.38"));
+        debt.setFrequency("MENSUAL");
+        debt.setFirstPaymentDate(SEPTEMBER_8);
+        return debt;
+    }
+
+    private DebtRemovedReceipt savedRemoval() {
+        ArgumentCaptor<DebtRemovedReceipt> captor = ArgumentCaptor.forClass(DebtRemovedReceipt.class);
+        verify(removedReceiptRepository).save(captor.capture());
+        return captor.getValue();
+    }
+
+    @Test
+    @DisplayName("Saltar un rebut el desa sense descompte, pel dia que tenia al calendari")
+    void skipReceipt() {
+        Debt debt = storedSteamDeck();
+        when(transactionLines.all()).thenReturn(List.of(line(debt, "EXPENSE", "97.35", LocalDate.of(2026, 10, 6))));
+
+        // Qualsevol dia del mes serveix per dir quin rebut és.
+        service.removeReceipt(1L, LocalDate.of(2026, 9, 30), false);
+
+        DebtRemovedReceipt removal = savedRemoval();
+        assertThat(removal.getDate()).isEqualTo(SEPTEMBER_8);
+        assertThat(removal.getDiscount()).isEqualByComparingTo("0");
+        assertThat(removal.getDebt()).isSameAs(debt);
+    }
+
+    @Test
+    @DisplayName("Descomptar un rebut en desa l'import, el que valia al calendari")
+    void discountReceipt() {
+        storedSteamDeck();
+        when(transactionLines.all()).thenReturn(List.of());
+
+        service.removeReceipt(1L, SEPTEMBER_8, true);
+
+        assertThat(savedRemoval().getDiscount()).isEqualByComparingTo("97.38");
+    }
+
+    @Test
+    @DisplayName("Un rebut que algun pagament ha triat no es pot treure: el pagament no tindria on anar")
+    void receiptChosenByAPaymentCannotBeRemoved() {
+        Debt debt = storedSteamDeck();
+        Transaction payment = movement(debt, "EXPENSE", "97.35", LocalDate.of(2026, 10, 6));
+        payment.setDebtReceipt(OCTOBER_8);
+        when(transactionLines.all()).thenReturn(TransactionLines.expand(List.of(payment), List.of()));
+
+        assertThatThrownBy(() -> service.removeReceipt(1L, OCTOBER_8, false))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("canvia'ls de rebut");
+        verify(removedReceiptRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("Només es treuen rebuts d'un deute a quotes, i que siguin al calendari")
+    void onlyInstallmentReceiptsCanBeRemoved() {
+        Debt single = request(Debt.I_OWE);
+        single.setId(2L);
+        single.setRepaymentPlan(Debt.PLAN_SINGLE);
+        single.setFirstPaymentDate(LocalDate.of(2026, 10, 1));
+        when(debtRepository.findById(2L)).thenReturn(Optional.of(single));
+
+        assertThatThrownBy(() -> service.removeReceipt(2L, LocalDate.of(2026, 10, 1), false))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("a quotes");
+
+        storedSteamDeck();
+        when(transactionLines.all()).thenReturn(List.of());
+        assertThatThrownBy(() -> service.removeReceipt(1L, LocalDate.of(2026, 8, 8), false))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("no és al calendari");
+    }
+
+    @Test
+    @DisplayName("Un rebut tret es pot tornar al calendari")
+    void restoreReceipt() {
+        Debt debt = storedSteamDeck();
+        DebtRemovedReceipt removal = new DebtRemovedReceipt(5L, debt, SEPTEMBER_8, BigDecimal.ZERO, null);
+        when(removedReceiptRepository.findByDebt(1L)).thenReturn(List.of(removal));
+        when(transactionLines.all()).thenReturn(List.of());
+
+        service.restoreReceipt(1L, SEPTEMBER_8);
+
+        verify(removedReceiptRepository).deleteAll(List.of(removal));
+        assertThatThrownBy(() -> service.restoreReceipt(1L, OCTOBER_8))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("no està tret");
+    }
+
+    @Test
+    @DisplayName("El calendari descriu els rebuts trets i resta el descompte del que queda")
+    void describeIncludesRemovedReceipts() {
+        Debt debt = steamDeck();
+        when(removedReceiptRepository.findByDebt(1L)).thenReturn(List.of(
+                new DebtRemovedReceipt(5L, debt, SEPTEMBER_8, new BigDecimal("97.38"), null)));
+
+        Debt described = service.describe(debt, LocalDate.of(2026, 10, 9),
+                List.of(line(debt, "EXPENSE", "97.35", LocalDate.of(2026, 10, 6))));
+
+        assertThat(described.getDiscounted()).isEqualByComparingTo("97.38");
+        assertThat(described.getPending()).isEqualByComparingTo("584.27");
+        assertThat(described.getSchedule().get(0).status()).isEqualTo("DESCOMPTAT");
+        assertThat(described.getSchedule().get(1).status()).isEqualTo("PAGAT");
+        assertThat(described.getMovements().get(0).receipt()).isEqualTo(OCTOBER_8);
+        assertThat(described.getOverdue()).isEqualByComparingTo("0");
+    }
+
+    @Test
+    @DisplayName("Un mes saltat no reserva res al pressupost: la quota passa al final")
+    void skippedMonthReservesNothing() {
+        Category leaf = new Category("Pagament de deutes");
+        leaf.setId(3L);
+        Debt debt = steamDeck();
+        debt.setCategory(leaf);
+        DebtRemovedReceipt skipped = new DebtRemovedReceipt(5L, debt, OCTOBER_8, BigDecimal.ZERO, null);
+        when(removedReceiptRepository.findAll()).thenReturn(List.of(skipped));
+        when(transactionLines.all()).thenReturn(List.of());
+        when(debtRepository.findAll()).thenReturn(List.of(debt));
+
+        assertThat(service.installmentsDueByCategory(LocalDate.of(2026, 10, 1), LocalDate.of(2026, 10, 31)))
+                .doesNotContainKey(3L);
+        assertThat(service.installmentsDueByCategory(LocalDate.of(2027, 5, 1), LocalDate.of(2027, 5, 31)).get(3L))
+                .isEqualByComparingTo("97.34");
     }
 
     private static TransactionPart part(Transaction transaction, Long id, String amount, Debt debt) {

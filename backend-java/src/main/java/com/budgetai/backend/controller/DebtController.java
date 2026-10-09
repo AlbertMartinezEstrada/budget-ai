@@ -2,9 +2,13 @@ package com.budgetai.backend.controller;
 
 import com.budgetai.backend.model.Debt;
 import com.budgetai.backend.service.DebtService;
+import com.fasterxml.jackson.annotation.JsonFormat;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Supplier;
@@ -44,6 +48,28 @@ public class DebtController {
     @PutMapping("/{id}")
     public ResponseEntity<?> update(@PathVariable Long id, @RequestBody Debt changes) {
         return respond(() -> debtService.update(id, changes));
+    }
+
+    /**
+     * Treu un rebut del calendari. {"data": "2026-09-08", "descomptar": false}
+     * el salta (el pla s'allarga pel final); amb "descomptar": true, el seu
+     * import es resta del deute.
+     */
+    @PostMapping("/{id}/rebuts-eliminats")
+    public ResponseEntity<?> removeReceipt(@PathVariable Long id, @RequestBody ReceiptRemoval request) {
+        return respond(() -> debtService.removeReceipt(id, request.date(), Boolean.TRUE.equals(request.discount())));
+    }
+
+    /** Torna al calendari un rebut tret. */
+    @DeleteMapping("/{id}/rebuts-eliminats/{date}")
+    public ResponseEntity<?> restoreReceipt(@PathVariable Long id,
+                                            @PathVariable @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
+        return respond(() -> debtService.restoreReceipt(id, date));
+    }
+
+    public record ReceiptRemoval(
+            @JsonProperty("data") @JsonFormat(pattern = "yyyy-MM-dd") LocalDate date,
+            @JsonProperty("descomptar") Boolean discount) {
     }
 
     @DeleteMapping("/{id}")

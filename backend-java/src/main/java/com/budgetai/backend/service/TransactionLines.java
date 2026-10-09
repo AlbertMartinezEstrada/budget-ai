@@ -77,6 +77,15 @@ public class TransactionLines {
             return date != null && !date.isBefore(from) && !date.isAfter(to);
         }
 
+        /**
+         * El rebut del deute que s'ha triat que pagui; null, el que toca.
+         *
+         * Només el moviment sencer en pot triar: les parts paguen sempre el que toca.
+         */
+        public LocalDate debtReceipt() {
+            return part == null ? transaction.getDebtReceipt() : null;
+        }
+
         public boolean belongsTo(Debt candidate) {
             return debt != null && candidate.getId() != null && candidate.getId().equals(debt.getId());
         }
