@@ -32,8 +32,8 @@ docker compose logs -f backend        # logs
 scripts\backup.bat                    # copia de la base de datos (backup.sh fuera de Windows)
 scripts/migrate.sh                    # aplica las migraciones pendientes (copia antes; --estat para ver cuáles)
 
-cd backend-java && ./gradlew test              # 181 unitarios, sin Docker
-cd backend-java && ./gradlew integrationTest   # 148, requieren Docker
+cd backend-java && ./gradlew test              # 193 unitarios, sin Docker
+cd backend-java && ./gradlew integrationTest   # 150, requieren Docker
 cd frontend && npm test                        # 52
 ```
 
@@ -282,9 +282,10 @@ descartaba como duplicada.
 ### 9. Cada banco exporta a su manera
 
 El lector **deduce el formato de la cabecera**, no se le pregunta a quien sube
-el fichero. Hoy entiende dos: el clásico (`Fecha;Concepto;Importe`, con `;`) y
-el de Revolut (con `,`). Tres trampas del segundo, todas descubiertas leyendo un
-extracto real:
+el fichero. Hoy entiende tres: el clásico (`Fecha;Concepto;Importe`; el
+separador se deduce de la cabecera, normalmente `;`), el de Revolut y el de Trade
+Republic (los dos con `,` y campos entre comillas). Tres trampas de Revolut,
+todas descubiertas leyendo un extracto real:
 
 - **El importe no es solo `Montante`.** La comisión va aparte, y una fila de
   mantenimiento trae `Montante=0` y `Comissão=4.99`: leyendo solo el primero,
@@ -293,6 +294,20 @@ extracto real:
   se mueve el segundo, así que manda `Data de Conclusão`.
 - **No todo está hecho.** Revolut exporta también pendientes y revertidos.
   Importarlos movería saldos de dinero que no se movió.
+
+Y dos de Trade Republic (se reconoce por `transaction_id` y `account_type`):
+
+- **El importe es formato de máquina** (`-553.330000`). Se lee tal cual, no con
+  el lector heurístico de los demás: `500.000` serían 500 €, no medio millón.
+- **Comprar o vender valores no se importa** (categoría `TRADING`): es dinero
+  que pasa de efectivo a inversión dentro de la misma cuenta. Los dividendos e
+  intereses sí. La comisión y el impuesto van en columnas aparte y se restan.
+
+**Un fichero que no se puede leer es culpa del fichero**: el lector lanza una
+`IllegalArgumentException` en catalán que dice la línea, qué se esperaba y qué
+formatos sabe leer. Nunca deja escapar la `CSVException` de commons-csv, que
+acababa en «Error intern» y una traza al log. `ClientErrors` apunta también
+estos errores del usuario en una línea `WARN`, con el fichero y la causa técnica.
 
 Las **reglas de importación** (`import_rules`) miran el concepto original y
 marcan solos los movimientos que no deben contar. Se aplican **después** de la

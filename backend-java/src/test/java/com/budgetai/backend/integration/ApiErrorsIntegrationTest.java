@@ -14,9 +14,11 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.util.Map;
 
@@ -140,6 +142,40 @@ class ApiErrorsIntegrationTest extends AbstractIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON).content("{\"amount\":0}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message", containsString("més gran que zero")));
+    }
+
+    @Test
+    @DisplayName("Un extracte que no es pot llegir és un 400 que diu la línia, no un error intern")
+    void unreadableStatementIsExplained() throws Exception {
+        // Un text enganxat després de tancar unes cometes: el mateix error de
+        // commons-csv que donava l'extracte de Trade Republic abans de
+        // reconèixer-lo, i que arribava com "Error intern".
+        MockMultipartFile broken = new MockMultipartFile(
+                "file", "trencat.csv", "text/csv",
+                "Fecha;Concepto;Importe\n01/07/2026;\"COMPRA\"x;-45.30\n".getBytes(StandardCharsets.UTF_8));
+
+        mockMvc.perform(multipart("/upload-csv").file(broken).cookie(session))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error", containsString("a la línia 2")))
+                .andExpect(jsonPath("$.error", containsString("Trade Republic")))
+                .andExpect(content().string(org.hamcrest.Matchers.not(containsString("Error intern"))));
+    }
+
+    @Test
+    @DisplayName("L'extracte de Trade Republic es llegeix i arriba a la pantalla de revisió")
+    void tradeRepublicStatementIsRead() throws Exception {
+        String content = """
+                "datetime","date","account_type","category","type","asset_class","name","symbol","shares","price","amount","fee","tax","currency","original_amount","original_currency","fx_rate","description","transaction_id","counterparty_name","counterparty_iban","payment_reference","mcc_code"
+                "2026-10-01T03:24:22.922096Z","2026-10-01","DEFAULT","CASH","INTEREST_PAYMENT","","","","","","6.520000","","","EUR","","","","Interest payment for payout collection 01a0","id-1","","","",""
+                "2026-10-06T15:24:18.913169Z","2026-10-06","DEFAULT","CASH","TRANSFER_INSTANT_INBOUND","","TITULAR DE PROVA","","","","1276.000000","","","EUR","","","","Incoming transfer from TITULAR DE PROVA","id-2","TITULAR DE PROVA","","",""
+                """;
+        MockMultipartFile statement = new MockMultipartFile(
+                "file", "extractoTradeRepublic.csv", "text/csv", content.getBytes(StandardCharsets.UTF_8));
+
+        mockMvc.perform(multipart("/upload-csv").file(statement).cookie(session))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("review"))
+                .andExpect(jsonPath("$.data.length()").value(2));
     }
 
     private Long altresId() {
