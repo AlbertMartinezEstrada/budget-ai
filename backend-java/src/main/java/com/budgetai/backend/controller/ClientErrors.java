@@ -33,14 +33,28 @@ final class ClientErrors {
      * Un error intern porta una referència curta que surt tant al missatge com
      * al log. Sense ella, "el detall és al log" obligava a endevinar quina de
      * les línies d'error era la d'aquell moment.
+     *
+     * Un error per a l'usuari també s'apunta, en una línia d'avís: el mateix
+     * missatge que ha vist i, si en té, la causa tècnica (la de commons-csv,
+     * la del parser de dates). Abans no deixava cap rastre, i davant d'un "no
+     * m'ho importa" el log no deia res.
      */
     static String messageFor(Exception exception, String context) {
         if (isForTheUser(exception) && exception.getMessage() != null) {
+            LOGGER.warn("{}: {}{}", context, exception.getMessage(), causeOf(exception));
             return exception.getMessage();
         }
         String reference = UUID.randomUUID().toString().substring(0, 8);
         LOGGER.error("{}: error inesperat [ref {}]", context, reference, exception);
         return GENERIC + " Referència " + reference + ": busca-la amb «docker compose logs backend».";
+    }
+
+    /** " (causa: CSVException: Invalid character…)", o res si no en té. */
+    private static String causeOf(Exception exception) {
+        Throwable root = exception.getCause();
+        if (root == null) return "";
+        while (root.getCause() != null && root.getCause() != root) root = root.getCause();
+        return " (causa: " + root.getClass().getSimpleName() + ": " + root.getMessage() + ")";
     }
 
     static boolean isForTheUser(Exception exception) {
