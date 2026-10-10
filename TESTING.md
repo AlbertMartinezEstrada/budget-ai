@@ -110,6 +110,13 @@ multiplicava per 100 qualsevol import anglosaxó (`45.30` → `4530`). Es cobrei
 els cinc formats que pot enviar un banc, i que un import il·legible aturi la
 importació en comptes de desar-se com a zero.
 
+També l'extracte de Trade Republic (comes i cometes, import en format de
+màquina, compres de valors que no s'importen, dividends i comissions), i que un
+fitxer il·legible —unes cometes mal tancades, un format desconegut, una data
+dolenta— doni un missatge en català amb la línia i els formats coneguts, no
+l'excepció de commons-csv. I que el separador del format clàssic es dedueixi de
+la capçalera.
+
 ### `AccountServiceTest` i `FinancialGoalServiceTest`
 
 Actualitzacions parcials i aritmètica de saldos.
@@ -247,8 +254,10 @@ nova.
 - `ApiErrorsIntegrationTest`: els errors per HTTP, amb la sessió de debò. Que
   una ruta desconeguda digui que cal reconstruir el backend, que un moviment o
   un compte que no existeixen diguin quin, que un JSON mal escrit o un
-  paràmetre invàlid s'expliquin sense classes de Java, i que les validacions
-  que abans tornaven un 400 buit diguin què falla.
+  paràmetre invàlid s'expliquin sense classes de Java, que les validacions
+  que abans tornaven un 400 buit diguin què falla, i que un extracte
+  il·legible sigui un 400 amb la línia (no un «Error intern») i el de Trade
+  Republic arribi a la pantalla de revisió.
 - `TransactionPartsIntegrationTest`: la transferència a Trade Republic dividida
   en quatre parts. Que cadascuna compti a la seva categoria i l'exclosa enlloc,
   sense tornar a moure el saldo; que la part vinculada descompti del deute
