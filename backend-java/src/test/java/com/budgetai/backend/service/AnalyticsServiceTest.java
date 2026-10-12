@@ -1,7 +1,9 @@
 package com.budgetai.backend.service;
 
+import com.budgetai.backend.model.Account;
 import com.budgetai.backend.model.Category;
 import com.budgetai.backend.model.Transaction;
+import com.budgetai.backend.model.TransactionPart;
 import com.budgetai.backend.repository.TransactionPartRepository;
 import com.budgetai.backend.repository.TransactionRepository;
 import org.junit.jupiter.api.DisplayName;
@@ -130,5 +132,76 @@ class AnalyticsServiceTest {
 
         assertThat((BigDecimal) summary.get("total_expense")).isEqualByComparingTo("0");
         assertThat((BigDecimal) summary.get("balance")).isEqualByComparingTo("0");
+    }
+
+    // ============ EL QUE NO ÉS NI INGRÉS NI DESPESA ============
+
+    private static Account account(long id, String name) {
+        Account account = new Account();
+        account.setId(id);
+        account.setName(name);
+        account.setType("CORRIENTE");
+        return account;
+    }
+
+    @Test
+    @DisplayName("Un traspàs entre comptes propis no surt a l'anàlisi: ni al resum, ni al desglossament, ni a la tendència")
+    void transfersDoNotCount() {
+        Transaction transfer = transaction("EXPENSE", "1276.00", LocalDate.of(2026, 10, 6), "Estalvis");
+        transfer.setAccount(account(1L, "Compte Principal"));
+        transfer.setCounterpartAccount(account(2L, "Trade Republic"));
+        when(transactionRepository.findAll()).thenReturn(List.of(
+                transfer,
+                transaction("EXPENSE", "553.33", LocalDate.of(2026, 10, 1), "Lloguer")));
+
+        Map<String, Object> summary = service.getMonthlySummary(2026, 10);
+        assertThat((BigDecimal) summary.get("total_expense")).isEqualByComparingTo("553.33");
+        assertThat(summary.get("transaction_count")).isEqualTo(1);
+
+        assertThat(service.getCategoryBreakdown(2026, 10)).extracting(item -> item.get("category"))
+                .containsExactly("Lloguer");
+        assertThat((BigDecimal) service.getMonthlyTrend(2026).get(9).get("total_expense"))
+                .isEqualByComparingTo("553.33");
+        assertThat((BigDecimal) service.getYearlySummary(2026).get("total_expense"))
+                .isEqualByComparingTo("553.33");
+    }
+
+    @Test
+    @DisplayName("El que està marcat com a «no comptar» tampoc surt a l'anàlisi")
+    void excludedDoesNotCount() {
+        Transaction excluded = transaction("INCOME", "200.00", LocalDate.of(2026, 10, 3), null);
+        excluded.setExcludedFromBudget(true);
+        when(transactionRepository.findAll()).thenReturn(List.of(
+                excluded,
+                transaction("INCOME", "1500.00", LocalDate.of(2026, 10, 1), null)));
+
+        Map<String, Object> summary = service.getMonthlySummary(2026, 10);
+
+        assertThat((BigDecimal) summary.get("total_income")).isEqualByComparingTo("1500.00");
+        assertThat(summary.get("transaction_count")).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("D'un moviment dividit, la part marcada com a «no comptar» no suma, i el moviment compta una vegada")
+    void excludedPartDoesNotCount() {
+        Transaction split = transaction("EXPENSE", "500.00", LocalDate.of(2026, 10, 5), null);
+        split.setId(10L);
+        TransactionPart counted = new TransactionPart();
+        counted.setId(1L);
+        counted.setTransaction(split);
+        counted.setAmount(new BigDecimal("460.00"));
+        counted.setExcludedFromBudget(false);
+        TransactionPart excluded = new TransactionPart();
+        excluded.setId(2L);
+        excluded.setTransaction(split);
+        excluded.setAmount(new BigDecimal("40.00"));
+        excluded.setExcludedFromBudget(true);
+        when(transactionRepository.findAll()).thenReturn(List.of(split));
+        when(transactionPartRepository.findAll()).thenReturn(List.of(counted, excluded));
+
+        Map<String, Object> summary = service.getMonthlySummary(2026, 10);
+
+        assertThat((BigDecimal) summary.get("total_expense")).isEqualByComparingTo("460.00");
+        assertThat(summary.get("transaction_count")).isEqualTo(1);
     }
 }

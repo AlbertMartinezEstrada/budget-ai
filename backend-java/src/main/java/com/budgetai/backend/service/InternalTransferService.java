@@ -2,15 +2,25 @@ package com.budgetai.backend.service;
 
 import com.budgetai.backend.model.Account;
 import com.budgetai.backend.model.Transaction;
+import com.budgetai.backend.model.TransactionPart;
 import com.budgetai.backend.repository.AccountRepository;
+import com.budgetai.backend.repository.TransactionPartRepository;
 import com.budgetai.backend.repository.TransactionRepository;
 import org.springframework.stereotype.Service;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * Traspassos entre comptes propis: Principal → Revolut, Principal → Trade
@@ -32,6 +42,13 @@ import java.util.Optional;
  * Es desa una sola fila per traspàs, al compte de l'extracte d'on surt, i mou
  * el saldo dels dos comptes. La línia de l'altre extracte és el mateix diner:
  * en importar-lo, es reconeix i no es torna a desar.
+ *
+ * Si l'altra pota ja s'havia desat com un moviment normal —els dos extractes
+ * importats abans de marcar el traspàs—, el mateix diner hi és dues vegades:
+ * una despesa en un compte i un ingrés en l'altre, que l'anàlisi comptava
+ * totes dues. Es poden trobar (unmarkedPairs) i ajuntar en un sol traspàs; i
+ * en marcar-ne un, l'altra pota es busca sola (findUnmarkedOtherLeg) perquè
+ * el saldo no es mogui dos cops.
  */
 @Service
 public class InternalTransferService {
@@ -44,14 +61,21 @@ public class InternalTransferService {
 
     private final AccountRepository accountRepository;
     private final TransactionRepository transactionRepository;
+    private final TransactionPartRepository partRepository;
     private final AccountService accountService;
 
     public InternalTransferService(AccountRepository accountRepository,
                                    TransactionRepository transactionRepository,
+                                   TransactionPartRepository partRepository,
                                    AccountService accountService) {
         this.accountRepository = accountRepository;
         this.transactionRepository = transactionRepository;
+        this.partRepository = partRepository;
         this.accountService = accountService;
+    }
+
+    /** Les dues potes d'un traspàs desades com a moviments normals. */
+    public record Pair(Transaction outgoing, Transaction incoming) {
     }
 
     /**
@@ -164,6 +188,139 @@ public class InternalTransferService {
             // Per dir des d'on: és el mateix traspàs vist des de l'altre compte.
             line.setCounterpartAccount(stored.get().getAccount());
         }
+    }
+
+    /**
+     * Els traspassos que no estan marcats: una despesa en un compte i un
+     * ingrés del mateix import en un altre, a menys de tres dies.
+     *
+     * És una proposta, no una certesa: 50 € pagats en una botiga i 50 € que
+     * un amic envia a Revolut l'endemà també hi encaixen. Per això només es
+     * llisten, i ajuntar-los ho decideix l'usuari.
+     *
+     * No n'hi entren els moviments dividits ni els vinculats a un deute: ja
+     * diuen d'una altra manera què són. Cada moviment va com a molt a un
+     * parell, el de la data més propera.
+     *
+     * @return els més recents primer
+     */
+    public List<Pair> unmarkedPairs() {
+        Set<Long> split = partRepository.findAll().stream()
+                .map(TransactionPart::getTransaction)
+                .filter(Objects::nonNull)
+                .map(Transaction::getId)
+                .collect(Collectors.toSet());
+        List<Transaction> legs = transactionRepository.findAll().stream()
+                .filter(transaction -> isPlainLeg(transaction, split))
+                .toList();
+
+        Map<BigDecimal, List<Transaction>> incomesByAmount = new HashMap<>();
+        for (Transaction leg : legs) {
+            if ("INCOME".equals(leg.getType())) {
+                incomesByAmount.computeIfAbsent(amountKey(leg), missingAmount -> new ArrayList<>()).add(leg);
+            }
+        }
+
+        Set<Long> used = new HashSet<>();
+        List<Pair> pairs = new ArrayList<>();
+        legs.stream()
+                .filter(leg -> "EXPENSE".equals(leg.getType()))
+                .sorted(Comparator.comparing(Transaction::getDate).thenComparing(Transaction::getId))
+                .forEach(outgoing -> incomesByAmount.getOrDefault(amountKey(outgoing), List.of()).stream()
+                        .filter(incoming -> !used.contains(incoming.getId()))
+                        .filter(incoming -> !incoming.getAccount().getId().equals(outgoing.getAccount().getId()))
+                        .filter(incoming -> daysBetween(outgoing, incoming) <= MATCHING_DAYS)
+                        .min(Comparator.comparingLong((Transaction incoming) -> daysBetween(outgoing, incoming))
+                                .thenComparing(Transaction::getId))
+                        .ifPresent(incoming -> {
+                            used.add(incoming.getId());
+                            pairs.add(new Pair(outgoing, incoming));
+                        }));
+
+        pairs.sort(Comparator.comparing((Pair pair) -> pair.outgoing().getDate()).reversed());
+        return pairs;
+    }
+
+    /**
+     * L'altra pota d'un traspàs, si s'havia desat com un moviment normal: al
+     * compte de l'altre costat, en sentit contrari, pel mateix import i a
+     * menys de tres dies. La de la data més propera.
+     *
+     * El traspàs ja mou el saldo d'aquell compte; si l'altra pota es quedés,
+     * el mouria una segona vegada i a l'anàlisi hi hauria un ingrés o una
+     * despesa que no han existit.
+     */
+    public Optional<Transaction> findUnmarkedOtherLeg(Transaction transfer) {
+        Account counterpart = transfer.getCounterpartAccount();
+        if (counterpart == null || counterpart.getId() == null || transfer.getAmount() == null
+                || transfer.getDate() == null || transfer.getType() == null) {
+            return Optional.empty();
+        }
+        String otherType = "EXPENSE".equals(transfer.getType()) ? "INCOME" : "EXPENSE";
+        List<Transaction> candidates = transactionRepository.findPossibleOtherLegs(counterpart.getId(),
+                        transfer.getAmount(), transfer.getDate().minusDays(MATCHING_DAYS),
+                        transfer.getDate().plusDays(MATCHING_DAYS)).stream()
+                .filter(candidate -> !Objects.equals(candidate.getId(), transfer.getId()))
+                .filter(candidate -> otherType.equals(candidate.getType()))
+                .toList();
+        if (candidates.isEmpty()) return Optional.empty();
+
+        Set<Long> split = partRepository.findByTransactions(candidates.stream().map(Transaction::getId).toList())
+                .stream()
+                .map(part -> part.getTransaction().getId())
+                .collect(Collectors.toSet());
+        return candidates.stream()
+                .filter(candidate -> !split.contains(candidate.getId()))
+                .min(Comparator.comparingLong((Transaction candidate) -> daysBetween(transfer, candidate))
+                        .thenComparing(Transaction::getId));
+    }
+
+    /**
+     * Comprova que dos moviments es poden ajuntar en un traspàs: una despesa
+     * i un ingrés del mateix import, en comptes diferents, que encara no són
+     * cap traspàs i no estan dividits ni vinculats a cap deute.
+     */
+    public void requireJoinable(Transaction outgoing, Transaction incoming) {
+        if (!"EXPENSE".equals(outgoing.getType()) || !"INCOME".equals(incoming.getType())) {
+            throw new IllegalArgumentException("Un traspàs surt d'un compte i entra a un altre: "
+                    + "cal una despesa i un ingrés.");
+        }
+        if (outgoing.getAccount() == null || incoming.getAccount() == null
+                || outgoing.getAccount().getId().equals(incoming.getAccount().getId())) {
+            throw new IllegalArgumentException("Els dos moviments han de ser de comptes diferents.");
+        }
+        if (outgoing.getAmount() == null || incoming.getAmount() == null
+                || outgoing.getAmount().compareTo(incoming.getAmount()) != 0) {
+            throw new IllegalArgumentException("Els dos moviments no són del mateix import.");
+        }
+        if (outgoing.isTransfer() || incoming.isTransfer()) {
+            throw new IllegalArgumentException("Un dels dos ja és un traspàs.");
+        }
+        if (outgoing.getDebt() != null || incoming.getDebt() != null) {
+            throw new IllegalArgumentException("Un dels dos està vinculat a un deute: desvincula'l abans.");
+        }
+        if (!partRepository.findByTransactions(List.of(outgoing.getId(), incoming.getId())).isEmpty()) {
+            throw new IllegalArgumentException("Un dels dos està dividit en parts: treu la divisió abans.");
+        }
+    }
+
+    private static boolean isPlainLeg(Transaction transaction, Set<Long> split) {
+        return transaction.getId() != null
+                && transaction.getAccount() != null && transaction.getAccount().getId() != null
+                && !transaction.isTransfer()
+                && transaction.getDebt() == null
+                && transaction.getDate() != null
+                && transaction.getAmount() != null && transaction.getAmount().signum() > 0
+                && ("INCOME".equals(transaction.getType()) || "EXPENSE".equals(transaction.getType()))
+                && !split.contains(transaction.getId());
+    }
+
+    private static BigDecimal amountKey(Transaction transaction) {
+        return transaction.getAmount().setScale(2, RoundingMode.HALF_UP);
+    }
+
+    private static long daysBetween(Transaction first, Transaction second) {
+        return Math.abs(ChronoUnit.DAYS.between(first.getDate(), second.getDate()));
     }
 
     private static boolean isOtherLeg(Transaction stored, Transaction line, Account importAccount) {

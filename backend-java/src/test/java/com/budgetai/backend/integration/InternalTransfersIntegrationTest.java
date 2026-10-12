@@ -297,4 +297,131 @@ class InternalTransfersIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.length()").value(1))
                 .andExpect(jsonPath("$[0].compte_contrapart_id").value(tradeRepublic.getId()));
     }
+
+    // ============ LES DUES POTES DESADES COM A MOVIMENTS NORMALS ============
+
+    /** Desa un moviment sense traspàs, un dia concret, i en torna l'id. */
+    private Long createPlain(String type, String amount, String category, Account account, String date) throws Exception {
+        Map<String, Object> form = form(type, amount, category, account, null);
+        form.put("data", date);
+        String response = mockMvc.perform(post("/gastos").cookie(session)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(form)))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString(StandardCharsets.UTF_8);
+        return objectMapper.readTree(response).get("id").asLong();
+    }
+
+    private JsonNode octoberSummary() throws Exception {
+        String response = mockMvc.perform(get("/analytics/monthly-summary")
+                        .param("year", "2026").param("month", "10").cookie(session))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString(StandardCharsets.UTF_8);
+        return objectMapper.readTree(response);
+    }
+
+    @Test
+    @DisplayName("Les dues potes importades com a despesa i ingrés surten com a traspàs sense marcar, i ajuntar-les el treu de l'anàlisi sense tocar els saldos")
+    void bothLegsAreDetectedAndJoined() throws Exception {
+        // Els dos extractes importats abans de marcar res: una despesa a
+        // Principal i un ingrés a Trade Republic, del mateix diner.
+        Long outgoing = createPlain("EXPENSE", "1276.00", "Estalvis", principal, "2026-10-06");
+        Long incoming = createPlain("INCOME", "1276.00", "Altres", tradeRepublic, "2026-10-07");
+        assertThat(octoberSummary().get("total_income").decimalValue()).isEqualByComparingTo("1276.00");
+        assertThat(octoberSummary().get("total_expense").decimalValue()).isEqualByComparingTo("1276.00");
+
+        mockMvc.perform(get("/traspassos/sense-marcar").cookie(session))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].sortida.id").value(outgoing))
+                .andExpect(jsonPath("$[0].sortida.compte").value("Compte Principal"))
+                .andExpect(jsonPath("$[0].entrada.id").value(incoming))
+                .andExpect(jsonPath("$[0].entrada.compte").value("Trade Republic"))
+                .andExpect(jsonPath("$[0].import").value(1276.00));
+
+        mockMvc.perform(post("/traspassos/ajuntar").cookie(session)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"sortida_id\":" + outgoing + ",\"entrada_id\":" + incoming + "}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.message", containsString("Els saldos no canvien")));
+
+        // Un sol moviment: la sortida, ara traspàs a Trade Republic.
+        assertThat(transactionRepository.findAll()).hasSize(1);
+        Transaction transfer = onlyTransfer();
+        assertThat(transfer.getId()).isEqualTo(outgoing);
+        assertThat(transfer.getCounterpartAccount().getId()).isEqualTo(tradeRepublic.getId());
+        // Els saldos, com abans d'ajuntar: 1000 − 1276 i 0 + 1276.
+        assertThat(balanceOf(principal)).isEqualByComparingTo("-276.00");
+        assertThat(balanceOf(tradeRepublic)).isEqualByComparingTo("1276.00");
+        // A l'anàlisi ja no hi és ni com a despesa ni com a ingrés.
+        assertThat(octoberSummary().get("total_income").decimalValue()).isEqualByComparingTo("0");
+        assertThat(octoberSummary().get("total_expense").decimalValue()).isEqualByComparingTo("0");
+        assertThat(octoberSummary().get("transaction_count").asInt()).isZero();
+        // Al pressupost, l'estalvi segueix comptant: cap a Trade Republic compta.
+        assertThat(realOf(savings)).isEqualByComparingTo("1276.00");
+
+        mockMvc.perform(get("/traspassos/sense-marcar").cookie(session))
+                .andExpect(jsonPath("$.length()").value(0));
+    }
+
+    @Test
+    @DisplayName("Marcar un traspàs editant-lo ajunta l'altra pota que ja hi era: el saldo no es mou dues vegades")
+    void markingATransferJoinsTheOtherLeg() throws Exception {
+        Long outgoing = createPlain("EXPENSE", "100.00", "Altres", principal, "2026-10-01");
+        createPlain("INCOME", "100.00", "Altres", revolut, "2026-10-02");
+
+        mockMvc.perform(put("/gastos/" + outgoing).cookie(session)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"compte_contrapart_id\":" + revolut.getId() + "}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.message", containsString("s'han ajuntat en un sol traspàs")));
+
+        assertThat(transactionRepository.findAll()).hasSize(1);
+        assertThat(onlyTransfer().isExcludedFromBudget()).isTrue();
+        assertThat(balanceOf(principal)).isEqualByComparingTo("900.00");
+        assertThat(balanceOf(revolut)).isEqualByComparingTo("100.00");
+    }
+
+    @Test
+    @DisplayName("Una regla que marca el traspàs en importar ajunta l'altra pota, si l'altre extracte s'havia importat abans")
+    void confirmingAMarkedTransferJoinsTheOtherLeg() throws Exception {
+        // L'extracte de Revolut, importat primer: l'entrada és un ingrés normal.
+        createPlain("INCOME", "100.00", "Altres", revolut, "2026-10-02");
+
+        Map<String, Object> line = new LinkedHashMap<>();
+        line.put("data", "2026-10-01");
+        line.put("type", "EXPENSE");
+        line.put("cost", new BigDecimal("100.00"));
+        line.put("categoria", "Altres");
+        line.put("empresa", "Revolut");
+        line.put("concepte_original", "TRASPASO A REVOLUT");
+        line.put("account", Map.of("id", principal.getId()));
+        line.put("compte_contrapart_id", revolut.getId());
+        mockMvc.perform(post("/confirm-upload").cookie(session)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(List.of(line))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.message", containsString("s'han ajuntat amb l'altra pota")));
+
+        assertThat(transactionRepository.findAll()).hasSize(1);
+        assertThat(balanceOf(principal)).isEqualByComparingTo("900.00");
+        assertThat(balanceOf(revolut)).isEqualByComparingTo("100.00");
+    }
+
+    @Test
+    @DisplayName("Dos moviments que no fan un traspàs no s'ajunten, i no es toca res")
+    void notATransferIsRejected() throws Exception {
+        Long first = createPlain("EXPENSE", "100.00", "Altres", principal, "2026-10-01");
+        Long second = createPlain("EXPENSE", "100.00", "Altres", revolut, "2026-10-01");
+
+        mockMvc.perform(post("/traspassos/ajuntar").cookie(session)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"sortida_id\":" + first + ",\"entrada_id\":" + second + "}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message", containsString("una despesa i un ingrés")));
+
+        assertThat(transactionRepository.findAll()).hasSize(2);
+        assertThat(balanceOf(principal)).isEqualByComparingTo("900.00");
+        assertThat(balanceOf(revolut)).isEqualByComparingTo("-100.00");
+    }
 }

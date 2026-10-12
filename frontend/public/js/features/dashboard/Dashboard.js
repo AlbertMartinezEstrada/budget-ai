@@ -1,4 +1,5 @@
 import { getTransactions, formatCurrency, escapeHtml } from '../../api.js';
+import { countedLines } from '../../transfers.js';
 
 export async function initDashboard(container) {
     container.innerHTML = `
@@ -74,25 +75,20 @@ export async function initDashboard(container) {
     }
 }
 
-// Un traspàs entre comptes teus no és ni ingrés ni despesa: sumat, 100 € passats
-// a Revolut sortien com a despesa, i el que s'hi pagués comptava dues vegades.
-const isTransfer = (transaction) => Boolean(transaction.compte_contrapart_id);
-
+// Només el que és ingrés o despesa de debò (countedLines): un traspàs entre
+// comptes teus o el que està marcat com a «no comptar» només mouen saldos.
+// Sumats, 100 € passats a Revolut sortien com a despesa, i el que s'hi pagués
+// comptava dues vegades.
 function updateStats(transactions) {
     let income = 0;
     let expense = 0;
 
-    transactions.filter(transaction => !isTransfer(transaction)).forEach(transaction => {
-        const amount = parseFloat(transaction.cost || 0);
-        // Check type. If not present, assume expense if amount is positive? 
-        // Usually banks give negative for expense. 
-        // But our backend seems to store absolute value in 'amount' and type in 'type'.
-        
-        if (transaction.type === 'INCOME') {
-            income += amount;
+    transactions.flatMap(countedLines).forEach(line => {
+        // Sense tipus, es pren per despesa, com sempre.
+        if (line.type === 'INCOME') {
+            income += line.amount;
         } else {
-            // EXPENSE or undefined (default to expense)
-            expense += amount;
+            expense += line.amount;
         }
     });
 
@@ -114,15 +110,11 @@ function updateStats(transactions) {
 }
 
 function renderTopCategories(transactions) {
-    // Filter only expenses for categories
-    const expenses = transactions.filter(transaction => transaction.type !== 'INCOME' && !isTransfer(transaction));
     const categories = {};
 
     // D'un moviment dividit, cada part va a la seva categoria: si no, la
     // transferència a Trade Republic sortiria sencera a "Trade Republic".
-    const lines = expenses.flatMap(transaction => (transaction.parts || []).length > 0
-        ? transaction.parts.map(part => ({ categoryName: part.category?.nom, amount: part.import }))
-        : [{ categoryName: transaction.categoria, amount: transaction.cost }]);
+    const lines = transactions.flatMap(countedLines).filter(line => line.type !== 'INCOME');
 
     lines.forEach(line => {
         const categoryName = line.categoryName || 'Altres';

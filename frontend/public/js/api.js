@@ -656,6 +656,24 @@ export async function addAmountToGoal(id, amount) {
     return handleResponse(response);
 }
 
+// ============ TRASPASSOS SENSE MARCAR ============
+// Una despesa en un compte i un ingrés del mateix import en un altre, a menys
+// de tres dies: el mateix diner desat dues vegades. Ajuntar-los en deixa un sol
+// traspàs, i els saldos no canvien.
+export async function getUnmarkedTransfers() {
+    const response = await apiFetch('/traspassos/sense-marcar');
+    return handleResponse(response);
+}
+
+export async function joinTransfer(outgoingId, incomingId) {
+    const response = await apiFetch('/traspassos/ajuntar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sortida_id: outgoingId, entrada_id: incomingId }),
+    });
+    return handleResponse(response);
+}
+
 // ============ DEUTES I PRÉSTECS ============
 // Cada deute arriba amb el que s'ha retornat, el que queda i el calendari amb
 // l'estat de cada pagament: el backend ho calcula a partir dels moviments

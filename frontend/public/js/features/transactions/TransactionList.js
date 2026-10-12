@@ -5,6 +5,7 @@ import {
 import { categoryOptions, leafCategories } from '../../categoryOptions.js';
 import { counterpartOptions, transferCounts, transferLabel } from '../../transfers.js';
 import { hasReceiptsToChoose, receiptOptions } from '../../debtReceipts.js';
+import { setUpUnmarkedTransfers } from './UnmarkedTransfers.js';
 import { setUpSplitEditor } from './SplitEditor.js';
 
 /**
@@ -50,6 +51,8 @@ let accountsById = new Map();
 let openEditor = () => {};
 // El mateix per al formulari de dividir.
 let openSplitter = () => {};
+// I per tornar a buscar els traspassos sense marcar després de desar.
+let refreshUnmarkedTransfers = async () => {};
 
 const isSplit = (transaction) => (transaction.parts || []).length > 0;
 
@@ -101,6 +104,8 @@ export async function initTransactions(container) {
                 </div>
             </div>
         </div>
+
+        <div id="unmarked-transfers" class="card mb-4 p-4 hidden border-l-4 border-amber-400"></div>
 
         <div class="card">
             <div class="card-header">
@@ -201,10 +206,11 @@ export async function initTransactions(container) {
                     <label class="flex items-start gap-2 text-sm" data-unsplit-only>
                         <input type="checkbox" id="new-excluded" class="mt-1">
                         <span>
-                            No comptar al pressupost
+                            No comptar
                             <span class="block text-xs text-gray-500 dark:text-slate-400">
-                                Per a diners que no són ni despesa ni ingrés teus. Un traspàs entre els
-                                teus comptes del dia a dia es marca sol.
+                                Ni al pressupost ni a l'anàlisi: per a diners que no són ni despesa ni ingrés
+                                teus. Només mou el saldo del compte. Un traspàs entre els teus comptes del dia a
+                                dia es marca sol.
                             </span>
                         </span>
                     </label>
@@ -291,6 +297,11 @@ export async function initTransactions(container) {
     // posat a cada botó no sobreviuria. I res d'onclick amb dades
     // interpolades, que es trenca amb un nom com O'Brien.
     document.getElementById('transactions-body').addEventListener('click', handleRowAction);
+
+    refreshUnmarkedTransfers = setUpUnmarkedTransfers(document.getElementById('unmarked-transfers'), {
+        onJoined: loadData
+    });
+    refreshUnmarkedTransfers();
 
     setUpManualEntry(categories, companies, debts);
     // Aquí les parts es desen de seguida, i la llista es torna a carregar
@@ -564,6 +575,8 @@ function setUpManualEntry(categories, companies, debts) {
             await loadData();
             // Els rebuts del desplegable han canviat d'estat amb aquest pagament.
             await refreshDebts();
+            // Marcar un traspàs pot haver resolt un parell, o desar-ne un de nou.
+            await refreshUnmarkedTransfers();
         } catch (failure) {
             error.textContent = failure.message || 'No s\'ha pogut afegir el moviment.';
             error.classList.remove('hidden');
@@ -718,7 +731,7 @@ function buildMonthRow(date) {
 function budgetBadges(excluded, debtId) {
     return `
         ${excluded
-            ? '<span class="badge badge-outline text-sm" title="Diners ja comptats en sortir del compte principal: no compten al pressupost">no compta</span>'
+            ? '<span class="badge badge-outline text-sm" title="No compta ni al pressupost ni a l\'anàlisi: només mou el saldo">no compta</span>'
             : ''}
         ${debtId
             ? `<span class="badge badge-outline text-sm" title="Vinculat a un deute: compta per saber quant queda per tornar">

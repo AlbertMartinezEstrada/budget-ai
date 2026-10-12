@@ -220,6 +220,34 @@ Un límite puesto directamente sobre un grupo manda sobre la suma de sus hijos.
 
 ---
 
+## ⇄ **Traspasos sin marcar** (`/traspassos`)
+
+Un traspaso entre cuentas propias es un movimiento con `compte_contrapart_id`:
+solo mueve los saldos y no cuenta en el análisis. Si las dos patas se guardaron
+como movimientos normales (un gasto en una cuenta y un ingreso en otra), cuentan
+dos veces hasta que se juntan.
+
+- `GET /traspassos/sense-marcar` - Pares que parecen traspasos: gasto e ingreso
+  del mismo importe en cuentas distintas, a ±3 días
+  ```json
+  [{"sortida": {"id": 2, "data": "2026-10-06", "compte": "Compte Principal", "compte_id": 1,
+                "descripcio": "TRANSFERENCIA A TRADE REPUBLIC", "categoria": "Estalvis"},
+    "entrada": {"id": 3, "data": "2026-10-06", "compte": "Trade Republic", "compte_id": 3,
+                "descripcio": "Incoming transfer from …", "categoria": "Altres"},
+    "import": 1276.00}]
+  ```
+- `POST /traspassos/ajuntar` - Los junta: la salida pasa a ser el traspaso y la
+  entrada se borra. Los saldos no cambian. 400 si no son un gasto y un ingreso
+  del mismo importe en cuentas distintas.
+  ```json
+  {"sortida_id": 2, "entrada_id": 3}
+  ```
+
+Al marcar un traspaso con `POST`/`PUT /gastos` o al confirmar una importación,
+la otra pata sin marcar se junta sola.
+
+---
+
 ## 🤝 **Deudas y préstamos** (`/debts`)
 
 Lo devuelto no se guarda: sale de los movimientos con `deute_id`. Cada deuda
