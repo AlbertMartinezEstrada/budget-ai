@@ -1,6 +1,7 @@
 package com.budgetai.backend.service;
 
 import com.budgetai.backend.model.Transaction;
+import org.apache.commons.csv.CSVException;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVParser;
 import org.apache.commons.csv.CSVRecord;
@@ -10,16 +11,48 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.StringReader;
+import java.io.UncheckedIOException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
+/**
+ * Converteix un extracte bancari en moviments.
+ *
+ * **Tot el que surti d'aquí cap a l'usuari ha de ser una
+ * IllegalArgumentException amb un text que s'entengui**: quin problema té el
+ * fitxer, a quina línia i què s'esperava. Qualsevol altra excepció acaba com
+ * un "Error intern" a la pantalla i una traça de commons-csv al log, que és
+ * el que passava amb l'extracte de Trade Republic: el lector no el reconeixia,
+ * el llegia amb punt i coma, i l'única pista era "Invalid character between
+ * encapsulated token and delimiter at line: 1, position: 11".
+ */
 @Service
 public class BankReaderService {
+
+    /** Els formats que se saben llegir, per dir-ho quan el fitxer no n'és cap. */
+    static final String KNOWN_FORMATS = "el clàssic (Fecha;Concepto;Importe), Revolut i Trade Republic";
+
+    /**
+     * La línia de l'error de commons-csv. La "position" que hi surt no es diu:
+     * compta caràcters des del principi del fitxer, no dins de la línia, i a
+     * l'usuari el despistaria. Es queda a la causa, que va al log.
+     */
+    private static final Pattern CSV_LINE = Pattern.compile("line: (\\d+)");
+
+    /** Com es llegeix cada fila: null vol dir que no és cap moviment i se salta. */
+    @FunctionalInterface
+    private interface RowReader {
+        Transaction read(CSVRecord csvRecord);
+    }
 
     private final TransactionHasher transactionHasher;
 
@@ -41,7 +74,31 @@ public class BankReaderService {
         if (content.startsWith("\uFEFF")) content = content.substring(1);
 
         String header = content.lines().findFirst().orElse("");
-        return isRevolut(header) ? readRevolut(content) : readClassic(content);
+        if (header.isBlank()) {
+            throw new IllegalArgumentException("El fitxer és buit, o la primera línia no és la capçalera de les columnes.");
+        }
+
+        if (isTradeRepublic(header)) {
+            return readRows(content, ',', "Trade Republic", this::readTradeRepublicRow,
+                    new String[] {"date", "datetime"}, new String[] {"amount"});
+        }
+        if (isRevolut(header)) {
+            return readRows(content, ',', "Revolut", this::readRevolutRow,
+                    new String[] {"Data de Conclusão", "Data de Conclusao", "Completed Date"},
+                    new String[] {"Montante", "Amount"});
+        }
+        return readRows(content, delimiterOf(header), "clàssic", this::readClassicRow,
+                new String[] {"Fecha"}, new String[] {"Concepto"}, new String[] {"Importe"});
+    }
+
+    /**
+     * Trade Republic: una columna per a cada cosa, en anglès i en minúscules,
+     * amb un identificador per moviment. Cap altre banc porta "transaction_id"
+     * i "account_type" alhora.
+     */
+    private boolean isTradeRepublic(String header) {
+        String lower = header.toLowerCase(Locale.ROOT);
+        return lower.contains("transaction_id") && lower.contains("account_type");
     }
 
     /**
@@ -49,7 +106,29 @@ public class BankReaderService {
      * Cap dels dos noms surt a l'altre format, així que n'hi ha prou de mirar-ho.
      */
     private boolean isRevolut(String header) {
-        return header.contains("Montante") || header.contains("Data de Conclus");
+        return header.contains("Montante") || header.contains("Data de Conclus") || header.contains("Completed Date");
+    }
+
+    /**
+     * El separador del format clàssic, mirant la capçalera: el que hi surt més
+     * vegades fora de cometes. Sol ser el punt i coma, però hi ha bancs que
+     * exporten les mateixes columnes amb comes o tabuladors, i llegir-los amb
+     * el que no toca trencava a la primera línia.
+     */
+    static char delimiterOf(String header) {
+        int semicolons = 0;
+        int commas = 0;
+        int tabs = 0;
+        boolean quoted = false;
+        for (char character : header.toCharArray()) {
+            if (character == '"') quoted = !quoted;
+            if (quoted) continue;
+            if (character == ';') semicolons++;
+            else if (character == ',') commas++;
+            else if (character == '\t') tabs++;
+        }
+        if (tabs > semicolons && tabs > commas) return '\t';
+        return commas > semicolons ? ',' : ';';
     }
 
     private CSVParser parse(String content, char delimiter) throws IOException {
@@ -66,23 +145,175 @@ public class BankReaderService {
                 .get();
     }
 
-    /** El format de sempre: Fecha;Concepto;Importe. */
-    private List<Transaction> readClassic(String content) throws IOException {
-        List<Transaction> transactions = new ArrayList<>();
+    /**
+     * Llegeix totes les files d'un format i en tradueix els errors.
+     *
+     * Un error de commons-csv (unes cometes mal tancades, un separador que no
+     * és el que s'esperava) es converteix en un missatge en català amb la
+     * línia, i un error d'una fila concreta (una data o un import il·legibles)
+     * diu de quina línia és. La causa original es conserva: és la que surt al
+     * log.
+     *
+     * @param formatName per al missatge: "Trade Republic", "clàssic"...
+     * @param required   per a cada columna imprescindible, els noms que pot
+     *                   tenir; n'ha d'haver-hi almenys un de cada grup
+     */
+    private List<Transaction> readRows(String content, char delimiter, String formatName, RowReader rowReader,
+                                       String[]... required) throws IOException {
+        try (CSVParser csvParser = parse(content, delimiter)) {
+            requireColumns(csvParser, formatName, required);
 
-        try (CSVParser csvParser = parse(content, ';')) {
+            List<Transaction> transactions = new ArrayList<>();
             for (CSVRecord csvRecord : csvParser) {
-                String rawBalance = csvRecord.isMapped("Saldo") ? csvRecord.get("Saldo") : null;
+                try {
+                    Transaction transaction = rowReader.read(csvRecord);
+                    if (transaction != null) transactions.add(transaction);
+                } catch (IllegalArgumentException exception) {
+                    throw new IllegalArgumentException("Línia " + csvParser.getCurrentLineNumber() + " de l'extracte ("
+                            + formatName + "): " + exception.getMessage(), exception);
+                }
+            }
+            return transactions;
+        } catch (CSVException exception) {
+            throw unreadable(exception, delimiter);
+        } catch (UncheckedIOException exception) {
+            // L'iterador de commons-csv embolcalla així els errors de les files.
+            if (exception.getCause() instanceof CSVException csvException) throw unreadable(csvException, delimiter);
+            throw exception;
+        }
+    }
 
-                BigDecimal amount = cleanNumber(csvRecord.get("Importe"));
-                BigDecimal balance = (rawBalance != null) ? cleanNumber(rawBalance) : null;
-
-                transactions.add(build(
-                        LocalDate.parse(csvRecord.get("Fecha"), DateTimeFormatter.ofPattern("dd/MM/yyyy")),
-                        csvRecord.get("Concepto"), amount, balance));
+    private static void requireColumns(CSVParser csvParser, String formatName, String[]... required) {
+        List<String> present = csvParser.getHeaderNames();
+        for (String[] alternatives : required) {
+            boolean found = false;
+            for (String name : alternatives) {
+                found |= present.stream().anyMatch(column -> column.equalsIgnoreCase(name));
+            }
+            if (!found) {
+                throw new IllegalArgumentException("No reconec aquest extracte: per llegir-lo com a " + formatName
+                        + " li falta la columna «" + String.join("» o «", alternatives) + "». "
+                        + "Sé llegir " + KNOWN_FORMATS + ". Les columnes del fitxer són: "
+                        + abbreviate(String.join(", ", present), 200) + ".");
             }
         }
-        return transactions;
+    }
+
+    /** Un error de lectura del CSV, explicat. */
+    private static IllegalArgumentException unreadable(CSVException exception, char delimiter) {
+        String detail = exception.getMessage() != null ? exception.getMessage() : "";
+        Matcher line = CSV_LINE.matcher(detail);
+        String where = line.find() ? "a la línia " + line.group(1) : "";
+
+        String what;
+        if (detail.contains("Invalid character between encapsulated token and delimiter")) {
+            what = "després d'un camp entre cometes hi ha un caràcter que no és el separador «"
+                    + describe(delimiter) + "». Sol voler dir que el fitxer separa les columnes amb un altre caràcter";
+        } else if (detail.contains("EOF reached before encapsulated token finished")) {
+            what = "unes cometes s'obren i no es tanquen fins al final del fitxer";
+        } else {
+            what = "el fitxer no té un format CSV vàlid";
+        }
+        return new IllegalArgumentException("No es pot llegir l'extracte" + (where.isEmpty() ? "" : " " + where)
+                + ": " + what + ". Sé llegir " + KNOWN_FORMATS + ".", exception);
+    }
+
+    private static String describe(char delimiter) {
+        return switch (delimiter) {
+            case ';' -> "punt i coma";
+            case ',' -> "coma";
+            case '\t' -> "tabulador";
+            default -> String.valueOf(delimiter);
+        };
+    }
+
+    private static String abbreviate(String text, int length) {
+        return text.length() <= length ? text : text.substring(0, length) + "…";
+    }
+
+    /** El format de sempre: Fecha;Concepto;Importe. */
+    private Transaction readClassicRow(CSVRecord csvRecord) {
+        String rawBalance = csvRecord.isMapped("Saldo") ? csvRecord.get("Saldo") : null;
+
+        BigDecimal amount = cleanNumber(csvRecord.get("Importe"));
+        BigDecimal balance = (rawBalance != null) ? cleanNumber(rawBalance) : null;
+
+        return build(parseDate(csvRecord.get("Fecha"), DateTimeFormatter.ofPattern("dd/MM/yyyy"), "DD/MM/AAAA"),
+                csvRecord.get("Concepto"), amount, balance);
+    }
+
+    /**
+     * Extracte de Trade Republic.
+     *
+     * Les compres i vendes de valors (categoria TRADING) no s'importen: els
+     * diners passen d'efectiu a una inversió dins del mateix compte, i al
+     * pressupost no són ni una despesa ni un ingrés. Sí que s'importen els
+     * dividends i els interessos, que són diners que entren, i tot el que és
+     * efectiu: transferències, pagaments amb targeta.
+     *
+     * L'import ve en format de màquina (punt decimal, sis decimals, sense
+     * milers): "500.000000" són 500 €, i el lector heurístic dels altres bancs
+     * el prendria per mig milió. Comissió i impostos van en columnes a part,
+     * com la comissió de Revolut, i es resten.
+     */
+    private Transaction readTradeRepublicRow(CSVRecord csvRecord) {
+        if (isTrade(column(csvRecord, "category"), column(csvRecord, "type"))) return null;
+
+        BigDecimal amount = plainNumber(column(csvRecord, "amount"), "amount");
+        BigDecimal charges = plainNumber(column(csvRecord, "fee"), "fee").abs()
+                .add(plainNumber(column(csvRecord, "tax"), "tax").abs());
+        BigDecimal net = amount.subtract(charges);
+        // Una fila sense moviment no és res que calgui desar.
+        if (net.signum() == 0) return null;
+
+        String rawDate = column(csvRecord, "date");
+        if (rawDate == null || rawDate.isBlank()) rawDate = column(csvRecord, "datetime");
+        if (rawDate == null || rawDate.isBlank()) throw new IllegalArgumentException("falta la data.");
+        // "2026-10-01" o "2026-10-01T03:24:22.922096Z": el dia és el principi.
+        LocalDate date = parseDate(rawDate.length() > 10 ? rawDate.substring(0, 10) : rawDate,
+                DateTimeFormatter.ISO_LOCAL_DATE, "AAAA-MM-DD");
+
+        String concept = firstNonBlank(column(csvRecord, "description"),
+                column(csvRecord, "counterparty_name"), column(csvRecord, "name"), column(csvRecord, "type"));
+        return build(date, concept, net, null);
+    }
+
+    /**
+     * Una compra o venda de valors. Els dividends i els interessos també poden
+     * anar a TRADING, però aquests sí que són diners que entren.
+     */
+    private boolean isTrade(String category, String type) {
+        if (category == null || !category.trim().equalsIgnoreCase("TRADING")) return false;
+        String normalised = type == null ? "" : type.toUpperCase(Locale.ROOT);
+        return !(normalised.contains("DIVIDEND") || normalised.contains("INTEREST")
+                || normalised.contains("DISTRIBUTION") || normalised.contains("COUPON"));
+    }
+
+    /** Un import en format de màquina ("-553.330000"); buit és zero. */
+    private BigDecimal plainNumber(String raw, String columnName) {
+        if (raw == null || raw.isBlank()) return BigDecimal.ZERO;
+        try {
+            return new BigDecimal(raw.trim()).setScale(2, RoundingMode.HALF_UP);
+        } catch (NumberFormatException exception) {
+            throw new IllegalArgumentException("Import il·legible a la columna «" + columnName + "»: \"" + raw + "\"",
+                    exception);
+        }
+    }
+
+    private static String firstNonBlank(String... values) {
+        for (String value : values) {
+            if (value != null && !value.isBlank()) return value.trim();
+        }
+        return "";
+    }
+
+    private LocalDate parseDate(String value, DateTimeFormatter formatter, String expected) {
+        try {
+            return LocalDate.parse(value.trim(), formatter);
+        } catch (DateTimeParseException exception) {
+            throw new IllegalArgumentException("Data il·legible al CSV: \"" + value + "\" (s'esperava " + expected + ")",
+                    exception);
+        }
     }
 
     /**
@@ -101,34 +332,26 @@ public class BankReaderService {
      * NO TOT ESTÀ FET. Revolut també exporta moviments pendents i revertits.
      * Importar-los mouria saldos de diners que no s'han mogut.
      */
-    private List<Transaction> readRevolut(String content) throws IOException {
-        List<Transaction> transactions = new ArrayList<>();
+    private Transaction readRevolutRow(CSVRecord csvRecord) {
+        if (!isCompleted(column(csvRecord, "Estado", "Estat", "State"))) return null;
 
-        try (CSVParser csvParser = parse(content, ',')) {
-            for (CSVRecord csvRecord : csvParser) {
-                if (!isCompleted(column(csvRecord, "Estado", "Estat", "State"))) continue;
+        BigDecimal amount = cleanNumber(column(csvRecord, "Montante", "Amount"));
+        BigDecimal fee = cleanNumber(column(csvRecord, "Comissão", "Comissao", "Fee"));
+        BigDecimal net = amount.subtract(fee);
 
-                BigDecimal amount = cleanNumber(column(csvRecord, "Montante", "Amount"));
-                BigDecimal fee = cleanNumber(column(csvRecord, "Comissão", "Comissao", "Fee"));
-                BigDecimal net = amount.subtract(fee);
+        // Una fila sense moviment no és res que calgui desar.
+        if (net.signum() == 0) return null;
 
-                // Una fila sense moviment no és res que calgui desar.
-                if (net.signum() == 0) continue;
+        LocalDate date = parseDateTime(column(csvRecord, "Data de Conclusão",
+                "Data de Conclusao", "Completed Date"));
+        if (date == null) return null;
 
-                LocalDate date = parseDateTime(column(csvRecord, "Data de Conclusão",
-                        "Data de Conclusao", "Completed Date"));
-                if (date == null) continue;
-
-                String concept = column(csvRecord, "Descrição", "Descricao", "Description");
-                if (concept == null || concept.isBlank()) {
-                    concept = column(csvRecord, "Tipo", "Type");
-                }
-
-                transactions.add(build(date, concept, net,
-                        cleanNumber(column(csvRecord, "Saldo", "Balance"))));
-            }
+        String concept = column(csvRecord, "Descrição", "Descricao", "Description");
+        if (concept == null || concept.isBlank()) {
+            concept = column(csvRecord, "Tipo", "Type");
         }
-        return transactions;
+
+        return build(date, concept, net, cleanNumber(column(csvRecord, "Saldo", "Balance")));
     }
 
     /** Els noms de columna canvien amb l'idioma de l'exportació. */
