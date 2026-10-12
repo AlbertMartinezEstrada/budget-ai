@@ -8,7 +8,12 @@ export async function initAnalytics(container) {
     container.innerHTML = `
         <div class="page-header mb-6">
             <div class="flex justify-between items-center">
-                <h2 class="text-2xl font-bold text-slate-800 dark:text-slate-100">Análisis</h2>
+                <div>
+                    <h2 class="text-2xl font-bold text-slate-800 dark:text-slate-100">Análisis</h2>
+                    <p class="text-sm text-slate-500 dark:text-slate-400">
+                        Solo ingresos y gastos de verdad: sin traspasos entre tus cuentas ni lo marcado como «no comptar».
+                    </p>
+                </div>
                 <div class="flex gap-2">
                     <select id="year-select" class="px-3 py-2 border rounded-lg"></select>
                     <select id="month-select" class="px-3 py-2 border rounded-lg">

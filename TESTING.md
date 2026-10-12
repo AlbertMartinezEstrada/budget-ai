@@ -81,7 +81,11 @@ comptin i cap a l'estalvi sí; que mouen el saldo de l'altre compte, i desfer-lo
 el retorna; que un traspàs al mateix compte es rebutgi; i que, en revisar un
 extracte, l'altra pota d'un traspàs ja desat es reconegui només si té el mateix
 import, el sentit contrari i dates a tres dies o menys, i que cada traspàs en
-reconegui una sola línia.
+reconegui una sola línia. També els traspassos sense marcar: que una despesa i
+un ingrés del mateix import en comptes diferents, a tres dies o menys, facin un
+parell (i no si són del mateix compte, d'una setmana després, dividits, d'un
+deute o ja marcats), que cada moviment vagi a un sol parell, el més proper, i
+que només s'ajunti una despesa i un ingrés del mateix import.
 
 ### `TransactionLinesTest` i `TransactionPartServiceTest`
 
@@ -132,7 +136,9 @@ no una revisió del codi.
 
 Les claus que retorna el servei són contracte amb el frontend, i tres d'elles
 estaven mal llegides. També comprova que la suma de `291.21 - 262.95` doni
-exactament `28.26` i no `28.25999999999999`.
+exactament `28.26` i no `28.25999999999999`, i que ni els traspassos ni el que
+està marcat com a «no comptar» (tampoc una part d'un moviment dividit) surtin al
+resum, al desglossament, a la tendència ni a l'any.
 
 ### `AiEngineServiceTest`
 
@@ -196,7 +202,9 @@ canviï sense voler.
 Els traspassos al navegador: que un traspàs entre comptes del dia a dia no
 compti i un cap a l'estalvi sí, amb el mateix criteri que el backend (si no, el
 formulari diria una cosa i en desar-lo en passaria una altra), que el
-desplegable no ofereixi el mateix compte i que els noms s'escapin.
+desplegable no ofereixi el mateix compte i que els noms s'escapin. I que el
+tauler compti com l'anàlisi (`countedLines`): ni traspassos ni «no comptar», i
+d'un moviment dividit, les parts que compten.
 
 ### `frontend/test/assets.test.js`
 
@@ -284,7 +292,12 @@ nova.
   esborrar-lo els desfaci; que canviar-ne l'altre compte mogui el diner; que un
   traspàs al mateix compte es rebutgi sense tocar res; que a l'extracte de
   Revolut l'entrada d'un traspàs ja desat surti reconeguda; que una regla el
-  marqui sola; i que filtrar per Trade Republic el trobi.
+  marqui sola; i que filtrar per Trade Republic el trobi. I les dues potes
+  desades com a moviments normals: que surtin com a traspàs sense marcar, que
+  ajuntar-les les tregui de l'anàlisi sense tocar cap saldo (i l'estalvi
+  segueixi comptant al pressupost), que marcar el traspàs editant-lo o amb una
+  regla en importar ajunti sola l'altra pota, i que dos moviments que no fan un
+  traspàs no s'ajuntin.
 - `MonthlySummaryIntegrationTest`: el resum del mes que pinta Pressupostos.
   Entre d'altres, que Estalvis sigui un variable més: el seu percentatge surt
   del que sobra dels fixos, com el dels altres, i no hi ha cap secció d'estalvi
