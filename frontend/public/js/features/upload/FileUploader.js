@@ -108,7 +108,7 @@ export async function initUpload(container) {
                             <th>Empresa (Editable)</th>
                             <th>Categoria (Seleccionar)</th>
                             <th class="text-right">Import</th>
-                            <th title="Diners que no compten al pressupost. Un traspàs entre comptes del dia a dia es marca sol.">No comptar</th>
+                            <th title="Diners que no compten ni al pressupost ni a l'anàlisi: només mouen el saldo. Un traspàs entre comptes del dia a dia es marca sol.">No comptar</th>
                             <th style="width: 3rem;"></th>
                         </tr>
                     </thead>
@@ -198,7 +198,7 @@ export async function initUpload(container) {
                             <code>${escapeHtml(rule.patro)}</code>
                             ${rule.compte_traspas_id
                                 ? `→ traspàs a ${escapeHtml(accountsById.get(rule.compte_traspas_id)?.nom || 'un altre compte')}`
-                                : rule.marca_exclos ? '→ no comptar al pressupost' : ''}
+                                : rule.marca_exclos ? '→ no comptar' : ''}
                             ${rule.categoria ? `→ ${escapeHtml(rule.categoria)}` : ''}
                         </span>
                         <button class="btn btn-sm btn-outline" data-action="delete-rule"

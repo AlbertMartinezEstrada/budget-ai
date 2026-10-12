@@ -264,8 +264,9 @@ class TransactionPartsIntegrationTest extends AbstractIntegrationTest {
             byCategory.put((String) item.get("category"), (BigDecimal) item.get("total"));
         }
 
-        // L'anàlisi ensenya tot el que s'ha mogut, exclòs inclòs, com fins ara.
-        assertThat(byCategory.get("Trade Republic")).isEqualByComparingTo("340.00");
+        // La part marcada com a «no comptar» (40 €) tampoc compta a
+        // l'anàlisi: no és ni despesa ni ingrés.
+        assertThat(byCategory.get("Trade Republic")).isEqualByComparingTo("300.00");
         assertThat(byCategory.get("Pagament de deutes")).isEqualByComparingTo("100.00");
         assertThat(byCategory.get("Assegurances")).isEqualByComparingTo("60.00");
     }

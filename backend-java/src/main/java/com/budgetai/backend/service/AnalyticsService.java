@@ -1,6 +1,5 @@
 package com.budgetai.backend.service;
 
-import com.budgetai.backend.model.Transaction;
 import com.budgetai.backend.repository.TransactionPartRepository;
 import com.budgetai.backend.repository.TransactionRepository;
 import com.budgetai.backend.service.TransactionLines.Line;
@@ -14,6 +13,18 @@ import java.time.YearMonth;
 import java.util.*;
 import java.util.stream.Collectors;
 
+/**
+ * Ingressos i despeses de debò, per a la pantalla d'anàlisi.
+ *
+ * **Només compta el que és un ingrés o una despesa teus** (counts): ni els
+ * traspassos entre comptes propis, que només mouen diners de lloc, ni el que
+ * està marcat com a «no comptar». Abans es comptava tot el que s'havia mogut:
+ * 1.276 € passats de Principal a Trade Republic sortien com a despesa i, si
+ * se n'havia importat l'altre extracte, també com a ingrés.
+ *
+ * Es compta per línies (TransactionLines): d'un moviment dividit, cada part
+ * va a la seva categoria i una part marcada com a «no comptar» no suma.
+ */
 @Service
 public class AnalyticsService {
 
@@ -23,25 +34,40 @@ public class AnalyticsService {
     @Autowired
     private TransactionPartRepository transactionPartRepository;
 
+    /** Si una línia és un ingrés o una despesa de debò. */
+    static boolean counts(Line line) {
+        return !line.transaction().isTransfer() && !line.excludedFromBudget();
+    }
+
+    private List<Line> countedLinesBetween(LocalDate startDate, LocalDate endDate) {
+        return TransactionLines.expand(transactionRepository.findAll(), transactionPartRepository.findAll())
+                .stream()
+                .filter(line -> line.isBetween(startDate, endDate))
+                .filter(AnalyticsService::counts)
+                .toList();
+    }
+
     public Map<String, Object> getMonthlySummary(int year, int month) {
         LocalDate startDate = LocalDate.of(year, month, 1);
         LocalDate endDate = startDate.withDayOfMonth(startDate.lengthOfMonth());
+        return summaryOf(countedLinesBetween(startDate, endDate), YearMonth.of(year, month));
+    }
 
-        List<Transaction> transactions = transactionRepository.findAll().stream()
-                .filter(transaction -> !transaction.getDate().isBefore(startDate) && !transaction.getDate().isAfter(endDate))
-                .toList();
+    private static Map<String, Object> summaryOf(List<Line> lines, YearMonth period) {
+        BigDecimal totalIncome = sumByType(lines, "INCOME");
+        BigDecimal totalExpense = sumByType(lines, "EXPENSE");
 
-        BigDecimal totalIncome = sumByType(transactions, "INCOME");
-        BigDecimal totalExpense = sumByType(transactions, "EXPENSE");
-        BigDecimal balance = totalIncome.subtract(totalExpense);
+        // Moviments, no línies: un moviment dividit en quatre parts és un.
+        // Per identitat, perquè un moviment encara sense desar no té id.
+        Set<Object> transactions = Collections.newSetFromMap(new IdentityHashMap<>());
+        lines.forEach(line -> transactions.add(line.transaction()));
 
         Map<String, Object> summary = new HashMap<>();
-        summary.put("period", YearMonth.of(year, month).toString());
+        summary.put("period", period.toString());
         summary.put("total_income", totalIncome);
         summary.put("total_expense", totalExpense);
-        summary.put("balance", balance);
+        summary.put("balance", totalIncome.subtract(totalExpense));
         summary.put("transaction_count", transactions.size());
-
         return summary;
     }
 
@@ -49,14 +75,8 @@ public class AnalyticsService {
         LocalDate startDate = LocalDate.of(year, month, 1);
         LocalDate endDate = startDate.withDayOfMonth(startDate.lengthOfMonth());
 
-        // Per línies: d'un moviment dividit, cada part va a la seva categoria.
-        // Els totals per tipus no en necessiten, perquè les parts sumen el
-        // moviment sencer.
-        List<Line> expenses = TransactionLines.expand(transactionRepository.findAll(), transactionPartRepository.findAll())
-                .stream()
+        List<Line> expenses = countedLinesBetween(startDate, endDate).stream()
                 .filter(line -> "EXPENSE".equals(line.type()))
-                .filter(line -> !line.transaction().isTransfer())
-                .filter(line -> line.isBetween(startDate, endDate))
                 .toList();
 
         Map<String, BigDecimal> categoryTotals = expenses.stream()
@@ -85,15 +105,10 @@ public class AnalyticsService {
     }
 
     public Map<String, Object> getYearlySummary(int year) {
-        LocalDate startDate = LocalDate.of(year, 1, 1);
-        LocalDate endDate = LocalDate.of(year, 12, 31);
+        List<Line> lines = countedLinesBetween(LocalDate.of(year, 1, 1), LocalDate.of(year, 12, 31));
 
-        List<Transaction> transactions = transactionRepository.findAll().stream()
-                .filter(transaction -> !transaction.getDate().isBefore(startDate) && !transaction.getDate().isAfter(endDate))
-                .toList();
-
-        BigDecimal totalIncome = sumByType(transactions, "INCOME");
-        BigDecimal totalExpense = sumByType(transactions, "EXPENSE");
+        BigDecimal totalIncome = sumByType(lines, "INCOME");
+        BigDecimal totalExpense = sumByType(lines, "EXPENSE");
         BigDecimal twelve = BigDecimal.valueOf(12);
 
         Map<String, Object> summary = new HashMap<>();
@@ -107,28 +122,24 @@ public class AnalyticsService {
         return summary;
     }
 
-    private static BigDecimal sumByType(List<Transaction> transactions, String type) {
-        return transactions.stream()
-                .filter(transaction -> type.equals(transaction.getType()))
-                // Un traspàs entre comptes propis no és ni ingrés ni despesa:
-                // sumat aquí, 100 € passats a Revolut sortien com a despesa.
-                .filter(transaction -> !transaction.isTransfer())
-                .map(AnalyticsService::amountOf)
+    private static BigDecimal sumByType(List<Line> lines, String type) {
+        return lines.stream()
+                .filter(line -> type.equals(line.type()))
+                .map(line -> line.amount() != null ? line.amount() : BigDecimal.ZERO)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
-    private static BigDecimal amountOf(Transaction transaction) {
-        return transaction.getAmount() != null ? transaction.getAmount() : BigDecimal.ZERO;
-    }
-
+    /** Els dotze mesos de l'any, llegint els moviments una sola vegada. */
     public List<Map<String, Object>> getMonthlyTrend(int year) {
+        List<Line> lines = countedLinesBetween(LocalDate.of(year, 1, 1), LocalDate.of(year, 12, 31));
+
         List<Map<String, Object>> trend = new ArrayList<>();
-
         for (int month = 1; month <= 12; month++) {
-            Map<String, Object> monthData = getMonthlySummary(year, month);
-            trend.add(monthData);
+            YearMonth period = YearMonth.of(year, month);
+            trend.add(summaryOf(lines.stream()
+                    .filter(line -> line.isBetween(period.atDay(1), period.atEndOfMonth()))
+                    .toList(), period));
         }
-
         return trend;
     }
 }

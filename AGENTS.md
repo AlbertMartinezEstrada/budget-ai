@@ -32,9 +32,9 @@ docker compose logs -f backend        # logs
 scripts\backup.bat                    # copia de la base de datos (backup.sh fuera de Windows)
 scripts/migrate.sh                    # aplica las migraciones pendientes (copia antes; --estat para ver cuáles)
 
-cd backend-java && ./gradlew test              # 193 unitarios, sin Docker
-cd backend-java && ./gradlew integrationTest   # 150, requieren Docker
-cd frontend && npm test                        # 52
+cd backend-java && ./gradlew test              # 202 unitarios, sin Docker
+cd backend-java && ./gradlew integrationTest   # 154, requieren Docker
+cd frontend && npm test                        # 54
 ```
 
 **Ejecuta los tests antes de dar nada por terminado.** El backend hay que
@@ -268,6 +268,18 @@ Se guarda **una fila por traspaso**, y mueve el saldo de **las dos cuentas**
 (`InternalTransferService`). La línea del otro extracto es el mismo dinero: al
 importarlo se reconoce (mismo importe, sentido contrario, ±3 días) y sale
 desmarcada. Importarla otra vez movería el saldo dos veces.
+
+Si las dos patas ya estaban guardadas como movimientos normales (un gasto en
+una cuenta y un ingreso en otra), **se juntan en un solo traspaso**: queda la
+salida y la entrada se borra, y los saldos no cambian. Transacciones lista los
+pares sin marcar (`GET /traspassos/sense-marcar`) y el usuario decide
+(`POST /traspassos/ajuntar`): es una propuesta, no una certeza. Al marcar un
+traspaso (alta, edición o una regla al confirmar), la otra pota sin marcar se
+junta sola, porque si no el saldo se movería dos veces.
+
+**Análisis y panel cuentan solo ingresos y gastos de verdad**
+(`AnalyticsService.counts`, `countedLines` en el frontend): ni traspasos ni lo
+marcado como «no comptar». Los dos criterios tienen que ser el mismo.
 
 Antes la regla era «una vez sale de la cuenta principal, ya está contado», y lo
 que se pagaba desde Revolut se marcaba como no contado. Servía para el ahorro,

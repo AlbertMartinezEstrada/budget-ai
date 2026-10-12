@@ -20,6 +20,7 @@ import com.budgetai.backend.service.InternalTransferService;
 import com.budgetai.backend.service.TransactionHasher;
 import com.budgetai.backend.service.TransactionPartService;
 import com.budgetai.backend.service.NotFoundException;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
@@ -39,6 +40,7 @@ import java.util.ArrayList;
 import java.time.LocalDate;
 import java.util.HashSet;
 import java.util.IdentityHashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -343,10 +345,11 @@ public class TransactionController {
         linkAndApplyToBalance(transaction, defaultAccount);
         Transaction saved = transactionRepository.save(transaction);
         if (!parts.isEmpty()) transactionPartService.store(saved, parts);
+        Transaction joined = absorbOtherLeg(saved);
 
         return ResponseEntity.ok(Map.of(
                 "status", "success",
-                "message", "Moviment afegit correctament",
+                "message", "Moviment afegit correctament" + joinedNote(joined),
                 "id", saved.getId()));
     }
 
@@ -438,6 +441,7 @@ public class TransactionController {
                     "message", exception.getMessage()));
         }
         boolean wasTransfer = existing.isTransfer();
+        Long counterpartBefore = existing.getCounterpartAccountId();
 
         revertFromBalance(existing);
 
@@ -475,9 +479,129 @@ public class TransactionController {
         linkAndApplyToBalance(existing, existing.getAccount());
         transactionRepository.save(existing);
 
+        // Només si ara és traspàs a un altre compte que abans: si ja ho era,
+        // l'altra pota ja es va ajuntar o reconèixer, i un moviment igual que
+        // hagi arribat després és un altre.
+        Transaction joined = Objects.equals(counterpartBefore, existing.getCounterpartAccountId())
+                ? null
+                : absorbOtherLeg(existing);
+
         return ResponseEntity.ok(Map.of(
                 "status", "success",
-                "message", "Moviment actualitzat"));
+                "message", "Moviment actualitzat" + joinedNote(joined)));
+    }
+
+    /**
+     * Si el traspàs té l'altra pota desada com un moviment normal, la treu.
+     *
+     * És el mateix diner: el traspàs ja mou el saldo de l'altre compte, i
+     * l'altra pota el mouria un segon cop i sortiria a l'anàlisi com un
+     * ingrés o una despesa que no han existit. Es desfà el seu saldo i
+     * s'esborra; tornar a importar aquell extracte la reconeixerà com l'altra
+     * pota i no la tornarà a desar.
+     *
+     * @return el moviment tret, o null si no n'hi havia cap
+     */
+    private Transaction absorbOtherLeg(Transaction transfer) {
+        if (!transfer.isTransfer()) return null;
+        return internalTransfers.findUnmarkedOtherLeg(transfer)
+                .map(otherLeg -> {
+                    revertFromBalance(otherLeg);
+                    transactionRepository.delete(otherLeg);
+                    return otherLeg;
+                })
+                .orElse(null);
+    }
+
+    private static String joinedNote(Transaction joined) {
+        if (joined == null) return "";
+        return ". Era el mateix diner que el moviment de " + joined.getAccount().getName() + " del "
+                + joined.getDate() + ": s'han ajuntat en un sol traspàs";
+    }
+
+    /**
+     * Els traspassos que no estan marcats: una despesa en un compte i un
+     * ingrés del mateix import en un altre, a menys de tres dies. Compten
+     * tots dos a l'anàlisi, com si fossin una despesa i un ingrés de debò.
+     */
+    @GetMapping("/traspassos/sense-marcar")
+    public List<Map<String, Object>> unmarkedTransfers() {
+        return internalTransfers.unmarkedPairs().stream()
+                .map(pair -> {
+                    Map<String, Object> item = new LinkedHashMap<>();
+                    item.put("sortida", describeLeg(pair.outgoing()));
+                    item.put("entrada", describeLeg(pair.incoming()));
+                    item.put("import", pair.outgoing().getAmount());
+                    return item;
+                })
+                .toList();
+    }
+
+    private static Map<String, Object> describeLeg(Transaction leg) {
+        Map<String, Object> item = new LinkedHashMap<>();
+        item.put("id", leg.getId());
+        item.put("data", leg.getDate() != null ? leg.getDate().toString() : null);
+        item.put("compte", leg.getAccount().getName());
+        item.put("compte_id", leg.getAccount().getId());
+        item.put("descripcio", firstNonBlank(leg.getShortDescription(), leg.getOriginalConcept(), leg.getEmpresa()));
+        item.put("categoria", leg.getCategory() != null ? leg.getCategory().getName() : null);
+        return item;
+    }
+
+    private static String firstNonBlank(String... values) {
+        for (String value : values) {
+            if (value != null && !value.isBlank()) return value;
+        }
+        return "";
+    }
+
+    public record TransferJoin(
+            @JsonProperty("sortida_id") Long outgoingId,
+            @JsonProperty("entrada_id") Long incomingId) {
+    }
+
+    /**
+     * Ajunta les dues potes d'un traspàs desades com a moviments normals.
+     *
+     * Es queda la sortida, que passa a ser el traspàs (com si s'hagués marcat
+     * en importar-la), i l'entrada s'esborra. Els saldos no canvien: l'entrada
+     * desfà el seu i el traspàs posa el mateix a l'altre compte.
+     *
+     * Compta al pressupost com qualsevol traspàs: entre comptes del dia a dia
+     * no, i cap a un compte d'estalvi sí, a la categoria de la sortida.
+     */
+    @PostMapping("/traspassos/ajuntar")
+    @Transactional
+    public ResponseEntity<?> joinTransfer(@RequestBody TransferJoin request) {
+        if (request.outgoingId() == null || request.incomingId() == null) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "status", "error",
+                    "message", "Falten els dos moviments del traspàs."));
+        }
+        Transaction outgoing = transactionRepository.findById(request.outgoingId())
+                .orElseThrow(() -> new NotFoundException("el moviment", request.outgoingId()));
+        Transaction incoming = transactionRepository.findById(request.incomingId())
+                .orElseThrow(() -> new NotFoundException("el moviment", request.incomingId()));
+        try {
+            internalTransfers.requireJoinable(outgoing, incoming);
+        } catch (IllegalArgumentException exception) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "status", "error",
+                    "message", exception.getMessage()));
+        }
+
+        revertFromBalance(incoming);
+        transactionRepository.delete(incoming);
+
+        internalTransfers.link(outgoing, outgoing.getAccount(), incoming.getAccount());
+        internalTransfers.applyToCounterpart(outgoing);
+        transactionRepository.save(outgoing);
+
+        return ResponseEntity.ok(Map.of(
+                "status", "success",
+                "message", "Traspàs de " + outgoing.getAccount().getName() + " a " + incoming.getAccount().getName()
+                        + ": ja no compta com a despesa ni com a ingrés. Els saldos no canvien.",
+                "id", outgoing.getId()));
     }
 
     /**
@@ -589,9 +713,19 @@ public class TransactionController {
             transactionRepository.saveAll(toPersist);
             partsByTransaction.forEach(transactionPartService::store);
 
-            String message = skipped > 0
+            // Una regla pot marcar com a traspàs una línia l'altra pota de la
+            // qual ja s'havia importat de l'altre extracte, com un moviment
+            // normal: es treu, perquè el traspàs ja mou aquell saldo.
+            long joined = toPersist.stream()
+                    .filter(Transaction::isTransfer)
+                    .map(this::absorbOtherLeg)
+                    .filter(Objects::nonNull)
+                    .count();
+
+            String message = (skipped > 0
                     ? toPersist.size() + " moviments guardats (" + skipped + " ja existien)"
-                    : toPersist.size() + " moviments guardats correctament";
+                    : toPersist.size() + " moviments guardats correctament")
+                    + (joined > 0 ? ". " + joined + " traspassos s'han ajuntat amb l'altra pota, que ja hi era" : "");
 
             return ResponseEntity.ok(Map.of(
                     "status", "success",

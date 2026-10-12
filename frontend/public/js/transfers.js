@@ -39,3 +39,34 @@ export function counterpartOptions(accounts, ownAccountId, selected = null, empt
             </option>`))
         .join('');
 }
+
+/**
+ * Les línies d'un moviment que són un ingrés o una despesa de debò.
+ *
+ * Ni un traspàs entre comptes propis, que només mou diners de lloc, ni el que
+ * està marcat com a «no comptar». D'un moviment dividit, les parts que
+ * compten, cadascuna amb la seva categoria. El mateix criteri que
+ * AnalyticsService.counts: si fossin diferents, el tauler i l'anàlisi
+ * donarien xifres diferents del mateix mes.
+ *
+ * @returns [{ type, categoryName, amount }], buida si no compta res
+ */
+export function countedLines(transaction) {
+    if (!transaction || transaction.compte_contrapart_id) return [];
+    const parts = transaction.parts || [];
+    if (parts.length > 0) {
+        return parts
+            .filter(part => !part.exclos_pressupost)
+            .map(part => ({
+                type: transaction.type,
+                categoryName: part.category?.nom,
+                amount: Number.parseFloat(part.import) || 0
+            }));
+    }
+    if (transaction.exclos_pressupost) return [];
+    return [{
+        type: transaction.type,
+        categoryName: transaction.categoria,
+        amount: Number.parseFloat(transaction.cost) || 0
+    }];
+}
