@@ -171,8 +171,12 @@ public class TransactionController {
             HttpStatus status = ClientErrors.isForTheUser(exception)
                     ? HttpStatus.BAD_REQUEST
                     : HttpStatus.INTERNAL_SERVER_ERROR;
+            // El nom del fitxer i el compte, perquè la línia del log digui
+            // quin extracte ha fallat sense haver de demanar-lo.
+            String context = "Pujar extracte «" + file.getOriginalFilename() + "» ("
+                    + (file.getSize() / 1024) + " KB, compte " + (accountId != null ? accountId : "per defecte") + ")";
             return ResponseEntity.status(status).body(Map.of("error",
-                    "Error processant el fitxer: " + ClientErrors.messageFor(exception, "Pujar extracte")));
+                    "Error processant el fitxer: " + ClientErrors.messageFor(exception, context)));
         }
     }
 
