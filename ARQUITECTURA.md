@@ -463,11 +463,28 @@ de Revolut. En una regla de traspaso, `marca_exclos` no se aplica: si cuenta o
 no lo deciden las dos cuentas.
 
 **Se guarda marcado, no se calcula al leer.** Un traspaso entre cuentas del día
-a día se guarda con `exclos_pressupost`, y así el presupuesto, las deudas, el
-análisis y el panel lo respetan sin saber nada de traspasos. El panel y el
-análisis tampoco suman traspasos en sus totales de ingresos y gastos. Si
-después cambias el tipo de una cuenta, los traspasos ya guardados no se
-recalculan.
+a día se guarda con `exclos_pressupost`, y así el presupuesto y las deudas lo
+respetan sin saber nada de traspasos. Si después cambias el tipo de una cuenta,
+los traspasos ya guardados no se recalculan.
+
+**El análisis y el panel solo cuentan ingresos y gastos de verdad**: ni
+traspasos —tampoco los de ahorro, que sí cuentan en el presupuesto— ni lo
+marcado como «no comptar», que solo mueve el saldo de la cuenta. El criterio es
+uno (`AnalyticsService.counts` y `countedLines` en el navegador) y va por
+líneas: de un movimiento dividido, la parte marcada no suma.
+
+**Las dos patas guardadas por separado se juntan.** Si se importaron los dos
+extractos antes de marcar el traspaso, el mismo dinero está dos veces: un gasto
+en Principal y un ingreso en Trade Republic, y el análisis contaba los dos.
+Transacciones avisa de los pares sin marcar (gasto e ingreso del mismo importe
+en cuentas distintas, a ±3 días; ni divididos ni de una deuda) y los junta en
+un traspaso: queda la salida y la entrada se borra. Los saldos no cambian: la
+entrada deshace el suyo y el traspaso pone lo mismo en la otra cuenta. Es una
+propuesta —50 € de una cena y un Bizum de 50 € al día siguiente también
+encajan—, así que decide el usuario, y lo que descarta se recuerda en su
+navegador. Al marcar un traspaso a mano, o con una regla al confirmar una
+importación, la otra pata sin marcar se junta sola: si no, el saldo de la otra
+cuenta se movería dos veces.
 
 **Antes la regla era la contraria**: «una vez el dinero sale de la cuenta
 principal, ya está contado», y lo que se pagaba desde Revolut se marcaba a mano

@@ -2,7 +2,10 @@ package com.budgetai.backend.service;
 
 import com.budgetai.backend.model.Account;
 import com.budgetai.backend.model.Transaction;
+import com.budgetai.backend.model.Debt;
+import com.budgetai.backend.model.TransactionPart;
 import com.budgetai.backend.repository.AccountRepository;
+import com.budgetai.backend.repository.TransactionPartRepository;
 import com.budgetai.backend.repository.TransactionRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -22,6 +25,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -30,6 +36,7 @@ class InternalTransferServiceTest {
 
     @Mock private AccountRepository accountRepository;
     @Mock private TransactionRepository transactionRepository;
+    @Mock private TransactionPartRepository partRepository;
     @Mock private AccountService accountService;
     @InjectMocks private InternalTransferService service;
 
@@ -160,5 +167,122 @@ class InternalTransferServiceTest {
 
         assertThat(payment.getCounterpartAccount()).isNull();
         assertThat(payment.isExcludedFromBudget()).isFalse();
+    }
+
+    // ============ LES DUES POTES SENSE MARCAR ============
+
+    private static Transaction stored(long id, Account account, String type, String amount, LocalDate date) {
+        Transaction transaction = movement(account, type, amount, date);
+        transaction.setId(id);
+        return transaction;
+    }
+
+    private static TransactionPart partOf(Transaction transaction) {
+        TransactionPart part = new TransactionPart();
+        part.setTransaction(transaction);
+        part.setAmount(transaction.getAmount());
+        return part;
+    }
+
+    @Test
+    @DisplayName("Una despesa i un ingrés del mateix import en comptes diferents, a menys de tres dies, fan un parell")
+    void unmarkedPairsAreFound() {
+        Transaction toTradeRepublic = stored(1L, principal, "EXPENSE", "1276.00", LocalDate.of(2026, 10, 6));
+        Transaction arrival = stored(2L, tradeRepublic, "INCOME", "1276.00", LocalDate.of(2026, 10, 7));
+        // El mateix compte no és cap traspàs, i una setmana després és un altre moviment.
+        Transaction sameAccount = stored(3L, principal, "INCOME", "50.00", LocalDate.of(2026, 10, 6));
+        Transaction purchase = stored(4L, principal, "EXPENSE", "50.00", LocalDate.of(2026, 10, 6));
+        Transaction tooLate = stored(5L, revolut, "INCOME", "80.00", LocalDate.of(2026, 10, 20));
+        Transaction early = stored(6L, principal, "EXPENSE", "80.00", LocalDate.of(2026, 10, 10));
+        when(transactionRepository.findAll())
+                .thenReturn(List.of(toTradeRepublic, arrival, sameAccount, purchase, tooLate, early));
+        when(partRepository.findAll()).thenReturn(List.of());
+
+        List<InternalTransferService.Pair> pairs = service.unmarkedPairs();
+
+        assertThat(pairs).hasSize(1);
+        assertThat(pairs.get(0).outgoing()).isSameAs(toTradeRepublic);
+        assertThat(pairs.get(0).incoming()).isSameAs(arrival);
+    }
+
+    @Test
+    @DisplayName("Cada moviment va com a molt a un parell, el de la data més propera")
+    void eachLegIsUsedOnceAndTheClosestWins() {
+        Transaction first = stored(1L, principal, "EXPENSE", "100.00", LocalDate.of(2026, 10, 1));
+        Transaction second = stored(2L, principal, "EXPENSE", "100.00", LocalDate.of(2026, 10, 3));
+        Transaction arrivesOnThe3rd = stored(3L, revolut, "INCOME", "100.00", LocalDate.of(2026, 10, 3));
+        Transaction arrivesOnThe1st = stored(4L, revolut, "INCOME", "100.00", LocalDate.of(2026, 10, 1));
+        when(transactionRepository.findAll()).thenReturn(List.of(first, second, arrivesOnThe3rd, arrivesOnThe1st));
+        when(partRepository.findAll()).thenReturn(List.of());
+
+        List<InternalTransferService.Pair> pairs = service.unmarkedPairs();
+
+        assertThat(pairs).extracting(pair -> pair.outgoing().getId() + "→" + pair.incoming().getId())
+                .containsExactlyInAnyOrder("1→4", "2→3");
+    }
+
+    @Test
+    @DisplayName("Ni els traspassos ja marcats, ni els dividits, ni els d'un deute no entren a cap parell")
+    void markedSplitAndDebtLegsAreLeftOut() {
+        Transaction marked = stored(1L, principal, "EXPENSE", "100.00", LocalDate.of(2026, 10, 1));
+        marked.setCounterpartAccount(revolut);
+        Transaction split = stored(2L, principal, "EXPENSE", "200.00", LocalDate.of(2026, 10, 1));
+        Transaction debtPayment = stored(3L, principal, "EXPENSE", "300.00", LocalDate.of(2026, 10, 1));
+        debtPayment.setDebt(new Debt());
+        when(transactionRepository.findAll()).thenReturn(List.of(marked, split, debtPayment,
+                stored(4L, revolut, "INCOME", "100.00", LocalDate.of(2026, 10, 1)),
+                stored(5L, revolut, "INCOME", "200.00", LocalDate.of(2026, 10, 1)),
+                stored(6L, revolut, "INCOME", "300.00", LocalDate.of(2026, 10, 1))));
+        when(partRepository.findAll()).thenReturn(List.of(partOf(split)));
+
+        assertThat(service.unmarkedPairs()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("L'altra pota d'un traspàs que es marca és la del compte de l'altre costat, en sentit contrari i la més propera")
+    void otherLegOfANewTransfer() {
+        Transaction transfer = stored(1L, principal, "EXPENSE", "100.00", LocalDate.of(2026, 10, 1));
+        transfer.setCounterpartAccount(revolut);
+        Transaction sameDirection = stored(2L, revolut, "EXPENSE", "100.00", LocalDate.of(2026, 10, 1));
+        Transaction farther = stored(3L, revolut, "INCOME", "100.00", LocalDate.of(2026, 10, 3));
+        Transaction closer = stored(4L, revolut, "INCOME", "100.00", LocalDate.of(2026, 10, 2));
+        when(transactionRepository.findPossibleOtherLegs(eq(revolut.getId()), any(), any(), any()))
+                .thenReturn(List.of(sameDirection, farther, closer));
+        when(partRepository.findByTransactions(anyList())).thenReturn(List.of());
+
+        assertThat(service.findUnmarkedOtherLeg(transfer)).containsSame(closer);
+    }
+
+    @Test
+    @DisplayName("Un moviment que no és traspàs no té altra pota")
+    void noCounterpartNoOtherLeg() {
+        assertThat(service.findUnmarkedOtherLeg(movement(principal, "EXPENSE", "100.00", LocalDate.of(2026, 10, 1))))
+                .isEmpty();
+        verifyNoInteractions(transactionRepository);
+    }
+
+    @Test
+    @DisplayName("Només s'ajunten una despesa i un ingrés del mateix import, de comptes diferents i sense marcar")
+    void joiningRequiresAPlainPair() {
+        when(partRepository.findByTransactions(anyList())).thenReturn(List.of());
+        Transaction outgoing = stored(1L, principal, "EXPENSE", "100.00", LocalDate.of(2026, 10, 1));
+
+        assertThatThrownBy(() -> service.requireJoinable(outgoing,
+                stored(2L, revolut, "EXPENSE", "100.00", LocalDate.of(2026, 10, 1))))
+                .hasMessageContaining("una despesa i un ingrés");
+        assertThatThrownBy(() -> service.requireJoinable(outgoing,
+                stored(3L, principal, "INCOME", "100.00", LocalDate.of(2026, 10, 1))))
+                .hasMessageContaining("comptes diferents");
+        assertThatThrownBy(() -> service.requireJoinable(outgoing,
+                stored(4L, revolut, "INCOME", "99.00", LocalDate.of(2026, 10, 1))))
+                .hasMessageContaining("mateix import");
+
+        Transaction alreadyMarked = stored(5L, revolut, "INCOME", "100.00", LocalDate.of(2026, 10, 1));
+        alreadyMarked.setCounterpartAccount(principal);
+        assertThatThrownBy(() -> service.requireJoinable(outgoing, alreadyMarked))
+                .hasMessageContaining("ja és un traspàs");
+
+        // I un parell bo passa.
+        service.requireJoinable(outgoing, stored(6L, revolut, "INCOME", "100.00", LocalDate.of(2026, 10, 2)));
     }
 }
