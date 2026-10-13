@@ -55,7 +55,8 @@ async function startApp() {
 
     const mainContentArea = document.getElementById('main-content');
 
-    function navigate(view) {
+    /** @param sub el que va després de la vista a l'adreça: #analytics/presupuesto */
+    function navigate(view, sub = '') {
         // Update Active Link in the sidebar
         const sidebarLinks = document.querySelectorAll('.sidebar .nav-link');
         sidebarLinks.forEach(link => {
@@ -106,7 +107,7 @@ async function startApp() {
                 initRecurring(mainContentArea);
                 break;
             case 'analytics':
-                initAnalytics(mainContentArea);
+                initAnalytics(mainContentArea, sub);
                 break;
             case 'settings':
                 initSettings(mainContentArea);
@@ -133,7 +134,9 @@ async function startApp() {
                 if (!VIEWS.includes(view)) return;
 
                 // Canviar el hash dispara hashchange, que és qui navega de debò.
-                if (currentView() === view) {
+                // Des d'una pestanya (#analytics/presupuesto), l'enllaç de la
+                // barra torna a la vista sense pestanya.
+                if (window.location.hash === `#${view}`) {
                     navigate(view);
                 } else {
                     window.location.hash = view;
@@ -150,11 +153,11 @@ async function startApp() {
         // Routing per hash: la URL passa a reflectir la vista, de manera que
         // recarregar manté la pantalla, el botó d'enrere funciona i els
         // enllaços es poden compartir.
-        window.addEventListener('hashchange', () => navigate(currentView()));
+        window.addEventListener('hashchange', () => navigate(currentView(), currentSubview()));
     }
 
     // Initial Load
-    navigate(currentView());
+    navigate(currentView(), currentSubview());
 }
 
 let listenersAttached = false;
@@ -170,7 +173,17 @@ async function handleLogout() {
     }
 }
 
+// L'adreça és #vista o #vista/pestanya.
+function hashParts() {
+    return window.location.hash.replace(/^#/, '').split('/');
+}
+
 function currentView() {
-    const view = window.location.hash.replace(/^#/, '');
+    const [view] = hashParts();
     return VIEWS.includes(view) ? view : 'dashboard';
+}
+
+function currentSubview() {
+    const [view, ...rest] = hashParts();
+    return VIEWS.includes(view) ? rest.join('/') : '';
 }
