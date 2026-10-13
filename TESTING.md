@@ -180,6 +180,17 @@ percentatge es proposi en percentatge; que els mesos sense moviments no
 comptin. I la previsió: el gastat més la mitjana dels dies que queden, o el pla
 o el ritme si no hi ha historial, amb el que es pot gastar cada dia.
 
+### `GeneralAnalysisServiceTest`
+
+La pestanya General, amb moviments fets a mà. El rang (el mes actual per
+defecte, sense mesos futurs, rebutjat al revés o de més de 36 mesos); el període
+anterior del mateix llarg i l'habitual (la mitjana dels mesos amb moviments pel
+llarg del període); l'estructura de cada mes (fixos, variables, estalvi i el que
+es paga del fons, que no resta del que queda sense destinar); les categories per
+blocs, de més a menys, amb el que no està classificat; els comerços per import i
+per visites (un moviment dividit és una visita); la despesa formiga (fins a 10 €
+i fora dels fixos); i els moviments d'un bloc, amb l'import de cada part.
+
 ### `AiEngineServiceTest`
 
 Que la resposta de la IA no pugui corrompre les dades del banc. La IA només pot
@@ -258,12 +269,21 @@ més s'ha desviat primer. I les propostes: el perquè de cadascuna, l'efecte net
 de les marcades i que en aplicar-les un pla per percentatge s'enviï com a
 percentatge.
 
+### `frontend/test/generalAnalysis.test.js`
+
+La pestanya General de l'anàlisi: els períodes (mes, trimestre, any, els últims
+12 mesos) i les seves opcions, el nom d'un rang, que el canvi respecte d'una
+referència digui si és bo o dolent segons la xifra (més despesa és dolent, més
+estalvi és bo) i no doni cap % sobre zero, l'estructura en % dels ingressos (amb
+el que s'ha gastat de més a part), que els mesos buits del principi no surtin
+al gràfic, que l'eix arribi al 100 % i els colors fixos de cada sèrie.
+
 ### `frontend/test/assets.test.js`
 
-Tailwind i les fonts es generen amb `npm run build:assets` i es desen a
-`public/`. Aquest test torna a compilar Tailwind i compara el resultat amb
-`public/css/tailwind.css`, i comprova que les fonts de `public/vendor/` siguin
-les dels paquets instal·lats. Una classe nova sense regenerar el CSS no dona
+Tailwind, les fonts i Chart.js es generen amb `npm run build:assets` i es desen
+a `public/`. Aquest test torna a compilar Tailwind i compara el resultat amb
+`public/css/tailwind.css`, i comprova que les fonts i Chart.js de
+`public/vendor/` siguin els dels paquets instal·lats. Una classe nova sense regenerar el CSS no dona
 cap error: simplement no té estil. Necessita `npm ci` abans.
 
 ## Tests d'integració
@@ -365,6 +385,10 @@ nova.
   del mes que ve (amb la resta copiada, el percentatge com a percentatge i el
   pressupost trimestral sense tocar), i que un canvi mal fet no apliqui res, ni
   tan sols la còpia.
+- `GeneralAnalysisIntegrationTest`: la pestanya General per HTTP. El període
+  amb les categories, els comerços i la despesa formiga; els moviments d'un
+  bloc amb la data com la llegeix el navegador; i els errors (400 per un mes mal
+  escrit, 404 per una categoria que no existeix).
 - `MonthlySummaryIntegrationTest`: el resum del mes que pinta Pressupostos.
   Entre d'altres, que Estalvi i inversió sigui una secció pròpia però que el
   seu percentatge surti del mateix bot que els variables (el que sobra dels

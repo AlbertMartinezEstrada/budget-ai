@@ -325,6 +325,47 @@ primero sin pagar.
   `period`, de todos los movimientos, y `top_categories`: las cinco categorías
   con más gasto, como en el desglose.
 
+### La pestaña General
+- `GET /analytics/general` - Un periodo con contexto
+  - Query params: `from`, `to` (`AAAA-MM`, opcionales). Sin `to`, el mes actual;
+    sin `from`, solo `to`. Como mucho 36 meses, y nunca más allá del mes actual.
+  ```json
+  {
+    "des_de": "2026-07", "fins_a": "2026-09", "mesos": 3,
+    "resum": { "total_income": 6000.00, "total_expense": 4326.59, "total_savings": 750.00,
+               "spent_from_savings": 0, "savings_rate": 12.50, "balance": 1673.41,
+               "unassigned": 923.41, "transaction_count": 61 },
+    "anterior": { "des_de": "2026-04", "fins_a": "2026-06", "...": "las mismas claves" },
+    "habitual": { "mesos_base": 2, "total_income": 6000.00, "total_expense": 3347.49,
+                  "total_savings": 900.00, "unassigned": 1752.51 },
+    "estructura": [{ "periode": "2026-07", "ingressos": 2000.00, "fixos": 1153.33,
+                     "variables": 625.00, "estalvi": 200.00, "gastat_del_fons": 0,
+                     "sense_destinar": 21.67 }],
+    "evolucio": [{ "period": "2025-10", "...": "las claves del resumen" }],
+    "categories": [{ "categoria_id": 4, "nom": "Gast mensual", "seccio": "VARIABLE",
+                     "total": 2066.60, "percentatge": 47.8, "moviments": 30,
+                     "subcategories": [] }],
+    "sense_classificar": { "total": 45.00, "moviments": 1, "percentatge": 1.0 },
+    "comercos": { "per_import": [{ "nom": "Lloguer", "total": 1659.99, "moviments": 3 }],
+                  "per_visites": [{ "nom": "Cafeteria Sol", "total": 19.20, "moviments": 8 }] },
+    "despesa_formiga": { "llindar": 10.00, "total": 39.60, "moviments": 14, "percentatge": 0.9,
+                         "comercos": [{ "nom": "Cafeteria Sol", "total": 19.20, "moviments": 8 }] }
+  }
+  ```
+  `habitual` es la media mensual de los seis meses de antes con movimientos, por
+  el largo del periodo (`null` si no hay ninguno). `evolucio`, los 12 meses hasta
+  `fins_a`. En `categories`, lo que no tiene categoría va en un bloque sin id
+  («Sin categoría»). `sense_classificar` suma lo que no tiene categoría y lo que
+  está en «Altres».
+- `GET /analytics/category-movements` - Las líneas de gasto de una categoría (y
+  de todo lo que cuelga de ella) en un periodo, de la más nueva a la más vieja
+  - Query params: `categoryId` (sin él, las que no tienen categoría), `from`, `to`
+  ```json
+  [{ "transaccio_id": 12, "data": "2026-09-12", "empresa": "Cafeteria Sol",
+     "descripcio": "CAFETERIA SOL", "categoria": "Bars i restaurants",
+     "import": 2.40, "es_part": false }]
+  ```
+
 ### Plan frente a real
 - `GET /analytics/budget-vs-actual` - El plan del presupuesto frente a lo que
   ha pasado de verdad, mes a mes

@@ -33,8 +33,8 @@ test/                 tests con el ejecutor integrado de Node
 
 ```bash
 npm ci                 # instalar exactamente las versiones del lockfile
-npm test               # 52 tests (hace falta npm ci antes: compilan Tailwind)
-npm run build:assets   # regenerar tailwind.css y las fuentes de public/vendor
+npm test               # 75 tests (hace falta npm ci antes: compilan Tailwind)
+npm run build:assets   # regenerar tailwind.css, las fuentes y Chart.js de public/vendor
 ```
 
 `npm test` es `node --test` sin argumentos, a propósito: pasarle una ruta
@@ -66,8 +66,8 @@ devuelve a esa pantalla automáticamente.
 `main.css` para los componentes propios, y las variantes `dark:` de Tailwind en
 las vistas. Si tocas una, mira la otra.
 
-**Nada viene de un CDN.** Tailwind, la fuente Inter y los iconos (Material
-Symbols) se sirven desde `public/`: un script de terceros tiene acceso a toda la
+**Nada viene de un CDN.** Tailwind, la fuente Inter, los iconos (Material
+Symbols) y Chart.js se sirven desde `public/`: un script de terceros tiene acceso a toda la
 página, y sin internet la app se quedaba sin estilos. Un test de
 `contract.test.js` falla si `index.html` o los CSS cargan algo de otro dominio.
 
@@ -81,8 +81,23 @@ sin paso de construcción. La configuración está en `tailwind.config.js`.
   falla si el CSS guardado no coincide con el que se generaría.
 - Tailwind solo genera las clases que encuentra escritas enteras en
   `index.html` y `js/`. `bg-${color}-500` no sale en el CSS: enumera las clases.
-- Las fuentes de `public/vendor/` se copian de `node_modules` con el mismo
-  comando; el mismo test comprueba que coinciden con las versiones instaladas.
+- Las fuentes y Chart.js de `public/vendor/` se copian de `node_modules` con el
+  mismo comando; el mismo test comprueba que coinciden con las versiones
+  instaladas. Chart.js va en su versión UMD (`chart.umd.js`, un solo fichero
+  sin imports) y deja `Chart` en `window`; `index.html` lo carga con `defer`
+  antes de `app.js`.
+
+**Los gráficos (Chart.js) siguen unas reglas fijas**, las de la pestaña General
+de Análisis:
+- Cada serie tiene siempre el mismo color, de `chartTheme()` en
+  `js/generalAnalysis.js`: las cuatro primeras posiciones de una paleta
+  validada para daltonismo contra el blanco y contra la superficie oscura. Si
+  añades una serie o cambias un color, vuelve a validarla.
+- Un solo eje: nunca dos escalas en el mismo gráfico.
+- Leyenda siempre que hay dos series o más, tooltip y una tabla con los mismos
+  datos («Ver como tabla»). Ninguna cifra depende solo del gráfico.
+- En tema oscuro, sus propios colores (`chartTheme(true)`), no una inversión.
+- Destruye los gráficos (`chart.destroy()`) antes de volver a pintar.
 
 **Los desplegables de categoría se montan con `categoryOptions()`**
 (`js/categoryOptions.js`), nunca a mano. Agrupa por sección y bloque igual que

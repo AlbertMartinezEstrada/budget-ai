@@ -1,4 +1,4 @@
-// El CSS de Tailwind i les fonts es generen amb "npm run build:assets" i es
+// El CSS de Tailwind, les fonts i Chart.js es generen amb "npm run build:assets" i es
 // desen al repositori, perquè el frontend se serveix des del disc tal qual.
 // Aquests tests comproven que el que hi ha desat és el que es generaria ara:
 // una classe nova sense regenerar el CSS no donaria cap error, simplement no
@@ -23,7 +23,7 @@ test('public/css/tailwind.css està al dia', () => {
         'tailwind.css no coincideix amb les classes que es fan servir: executa "npm run build:assets"');
 });
 
-test('les fonts de public/vendor són les del paquet instal·lat', () => {
+test('les fonts i Chart.js de public/vendor són els del paquet instal·lat', () => {
     const stale = vendorFiles()
         .filter(([source, target]) => {
             const copied = path.join(root, 'public', 'vendor', target);
@@ -31,5 +31,5 @@ test('les fonts de public/vendor són les del paquet instal·lat', () => {
                 || !fs.readFileSync(copied).equals(fs.readFileSync(path.join(root, 'node_modules', source)));
         })
         .map(([, target]) => target);
-    assert.deepEqual(stale, [], `fonts desactualitzades: ${stale.join(', ')}. Executa "npm run build:assets"`);
+    assert.deepEqual(stale, [], `fitxers desactualitzats: ${stale.join(', ')}. Executa "npm run build:assets"`);
 });

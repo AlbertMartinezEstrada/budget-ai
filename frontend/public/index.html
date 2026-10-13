@@ -116,6 +116,9 @@
     </div>
 
     <!-- JS Modules -->
+    <!-- Chart.js deixa Chart a window. Amb defer s'executa abans que app.js,
+         que com a mòdul també espera que s'hagi llegit la pàgina. -->
+    <script defer src="vendor/chart.js/chart.umd.js"></script>
     <script type="module" src="js/app.js"></script>
 </body>
 </html>
