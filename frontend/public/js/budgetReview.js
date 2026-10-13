@@ -174,3 +174,67 @@ export function sortHistory(blocks) {
         || (second.mesos_avis || 0) - (first.mesos_avis || 0)
         || String(first.nom).localeCompare(String(second.nom), 'es'));
 }
+
+// ============ LA PREVISIÓ I LES PROPOSTES (GET /analytics/budget-advice) ============
+
+/** D'on surt la previsió, per al title de la xifra. */
+export function forecastBasis(basis) {
+    switch (basis) {
+        case 'HISTORIC': return 'Lo gastado hasta hoy más lo que sueles gastar en los días que quedan (media de los últimos meses).';
+        case 'PLA': return 'Lo gastado hasta hoy más el plan de los días que quedan: no hay meses anteriores con los que comparar.';
+        case 'RITME': return 'Al ritmo de este mes: no hay plan ni meses anteriores.';
+        default: return '';
+    }
+}
+
+/** El perquè d'una proposta, en una frase. */
+export function adviceReason(recommendation) {
+    const months = (recommendation.mesos || []).length;
+    if (recommendation.tipus === 'PUJAR') {
+        return `Te has pasado ${recommendation.mesos_passats} de ${months} meses; de media gastas `
+            + `${formatCurrency(recommendation.mitjana_real)}. El plan no es realista.`;
+    }
+    if ((Number.parseFloat(recommendation.maxim_real) || 0) === 0) {
+        return `No lo has usado en ${months} meses.`;
+    }
+    return `Te sobra todos los meses: como mucho gastaste ${formatCurrency(recommendation.maxim_real)}.`;
+}
+
+/** «10 % (100.00 €)» si el pla va per percentatge; si no, l'import. */
+export function planLabel(amount, percentage) {
+    if (percentage === null || percentage === undefined) return formatCurrency(amount);
+    return `${Number(percentage).toLocaleString('es-ES')} % (${formatCurrency(amount)})`;
+}
+
+/** La suma de les diferències de les propostes marcades. */
+export function netEffect(recommendations, selectedIds) {
+    const selected = new Set((selectedIds || []).map(String));
+    return (recommendations || [])
+        .filter(recommendation => selected.has(String(recommendation.categoria_id)))
+        .reduce((total, recommendation) => total + (Number.parseFloat(recommendation.diferencia) || 0), 0);
+}
+
+/** Què vol dir l'efecte net per al mes que ve. */
+export function netEffectText(total) {
+    const rounded = Math.round(total * 100) / 100;
+    if (rounded < 0) {
+        return `Si aplicas las marcadas, liberas ${formatCurrency(-rounded)} al mes: puedes pasarlos a ahorro.`;
+    }
+    if (rounded > 0) {
+        return `Si aplicas las marcadas, necesitas ${formatCurrency(rounded)} más al mes: saldrán de lo que queda sin repartir o del ahorro.`;
+    }
+    return 'Las marcadas no cambian el total del mes.';
+}
+
+/**
+ * El que s'envia per aplicar les propostes marcades: un pla per percentatge
+ * es queda per percentatge.
+ */
+export function changesFor(recommendations, selectedIds) {
+    const selected = new Set((selectedIds || []).map(String));
+    return (recommendations || [])
+        .filter(recommendation => selected.has(String(recommendation.categoria_id)))
+        .map(recommendation => recommendation.percentatge_proposat != null
+            ? { categoria_id: recommendation.categoria_id, percentatge: Number(recommendation.percentatge_proposat) }
+            : { categoria_id: recommendation.categoria_id, import: Number(recommendation.proposta) });
+}

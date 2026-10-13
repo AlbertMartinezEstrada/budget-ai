@@ -362,6 +362,46 @@ primero sin pagar.
   lo malo es pasarse; en ahorro e ingresos, quedarse corto. El resumen de cada
   bloque solo cuenta los meses cerrados con plan.
 
+### Previsión y propuestas
+- `GET /analytics/budget-advice` - Cómo acabará el mes en curso (gastos
+  variables) y qué cambiar del plan el mes que viene
+  ```json
+  {
+    "periode": "2026-10", "dia": 13, "dies_mes": 31,
+    "previsio": [{ "categoria_id": 4, "nom": "Gast mensual", "es_grup": true,
+                   "pla": 600.00, "real": 290.00, "previsio": 673.61,
+                   "base_previsio": "HISTORIC", "estat_previst": "DESVIAT",
+                   "disponible_per_dia": 16.32, "subcategories": [] }],
+    "mes_desti": "2026-11",
+    "mesos_mostra": ["2026-09", "2026-08", "2026-07"],
+    "recomanacions": [{ "categoria_id": 7, "nom": "Bars i restaurants", "es_grup": false,
+                        "tipus": "PUJAR", "pla_actual": 100.00, "proposta": 135.00,
+                        "diferencia": 35.00, "mitjana_real": 135.00, "maxim_real": 160.00,
+                        "mesos_passats": 3,
+                        "mesos": [{ "periode": "2026-09", "real": 140.00 }],
+                        "percentatge_actual": null, "percentatge_proposat": null }],
+    "efecte_net": 70.00
+  }
+  ```
+  `previsio` es lo gastado hasta hoy más lo que se suele gastar en los días que
+  quedan (`base_previsio`: `HISTORIC`, la media de los últimos meses; `PLA`,
+  sin meses anteriores; `RITME`, sin plan tampoco). `disponible_per_dia`, lo que
+  queda del plan entre los días que faltan, hoy incluido. `tipus`: `PUJAR` o
+  `BAIXAR`. Un plan por porcentaje trae también `percentatge_proposat`, sobre la
+  base de este mes.
+
+### Aplicar cambios de plan
+- `POST /budgets/apply-changes` - Copia el plan del mes anterior al mes
+  indicado (sin tocar lo que ya tenga) y pone los cambios encima, todo o nada
+  ```json
+  { "periode": "2026-11",
+    "canvis": [{ "categoria_id": 7, "import": 135.00 },
+               { "categoria_id": 8, "percentatge": 12.5 }] }
+  ```
+  Respuesta: `{ "periode", "copiats", "aplicats", "omesos" }`. Cada cambio lleva
+  un importe o un porcentaje, nunca los dos (400). Una categoría que no existe
+  da 404. Una con un presupuesto de más de un mes no se toca y sale en `omesos`.
+
 ### Desglose por Categorías
 - `GET /analytics/category-breakdown` - Gastos por categoría del mes
   - Query params: `year`, `month` (opcionales)

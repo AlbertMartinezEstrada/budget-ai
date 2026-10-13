@@ -753,6 +753,30 @@ export async function getBudgetVsActual(from, to) {
     return handleResponse(response);
 }
 
+/**
+ * Com acabarà el mes en curs (blocs variables) i les propostes de canvi del
+ * pla per al mes que ve.
+ */
+export async function getBudgetAdvice() {
+    const response = await apiFetch('/analytics/budget-advice');
+    return handleResponse(response);
+}
+
+/**
+ * Aplica canvis de pla a un mes: copia el del mes anterior i hi posa els
+ * canvis, tot o res.
+ *
+ * @param changes [{ categoria_id, import }] o [{ categoria_id, percentatge }]
+ */
+export async function applyBudgetChanges(period, changes) {
+    const response = await apiFetch('/budgets/apply-changes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ periode: period, canvis: changes })
+    });
+    return handleResponse(response);
+}
+
 export async function getMonthlySummary(year, month) {
     const params = new URLSearchParams({ year, month });
     const response = await apiFetch(`/analytics/monthly-summary?${params.toString()}`);
