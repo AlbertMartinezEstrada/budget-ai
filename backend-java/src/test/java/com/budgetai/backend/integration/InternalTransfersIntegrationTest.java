@@ -321,14 +321,17 @@ class InternalTransfersIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("Les dues potes importades com a despesa i ingrés surten com a traspàs sense marcar, i ajuntar-les el treu de l'anàlisi sense tocar els saldos")
+    @DisplayName("Les dues potes importades com a despesa i ingrés surten com a traspàs sense marcar, i ajuntar-les treu de l'anàlisi l'ingrés que no ho era sense tocar els saldos")
     void bothLegsAreDetectedAndJoined() throws Exception {
         // Els dos extractes importats abans de marcar res: una despesa a
         // Principal i un ingrés a Trade Republic, del mateix diner.
         Long outgoing = createPlain("EXPENSE", "1276.00", "Estalvis", principal, "2026-10-06");
         Long incoming = createPlain("INCOME", "1276.00", "Altres", tradeRepublic, "2026-10-07");
+        // La sortida ja és estalvi, per la categoria; l'entrada, sense
+        // ajuntar, sembla un ingrés.
         assertThat(octoberSummary().get("total_income").decimalValue()).isEqualByComparingTo("1276.00");
-        assertThat(octoberSummary().get("total_expense").decimalValue()).isEqualByComparingTo("1276.00");
+        assertThat(octoberSummary().get("total_expense").decimalValue()).isEqualByComparingTo("0");
+        assertThat(octoberSummary().get("total_savings").decimalValue()).isEqualByComparingTo("1276.00");
 
         mockMvc.perform(get("/traspassos/sense-marcar").cookie(session))
                 .andExpect(status().isOk())
@@ -353,10 +356,11 @@ class InternalTransfersIntegrationTest extends AbstractIntegrationTest {
         // Els saldos, com abans d'ajuntar: 1000 − 1276 i 0 + 1276.
         assertThat(balanceOf(principal)).isEqualByComparingTo("-276.00");
         assertThat(balanceOf(tradeRepublic)).isEqualByComparingTo("1276.00");
-        // A l'anàlisi ja no hi és ni com a despesa ni com a ingrés.
+        // A l'anàlisi ja no hi ha l'ingrés que no ho era: només l'estalvi.
         assertThat(octoberSummary().get("total_income").decimalValue()).isEqualByComparingTo("0");
         assertThat(octoberSummary().get("total_expense").decimalValue()).isEqualByComparingTo("0");
-        assertThat(octoberSummary().get("transaction_count").asInt()).isZero();
+        assertThat(octoberSummary().get("total_savings").decimalValue()).isEqualByComparingTo("1276.00");
+        assertThat(octoberSummary().get("transaction_count").asInt()).isEqualTo(1);
         // Al pressupost, l'estalvi segueix comptant: cap a Trade Republic compta.
         assertThat(realOf(savings)).isEqualByComparingTo("1276.00");
 
@@ -428,30 +432,47 @@ class InternalTransfersIntegrationTest extends AbstractIntegrationTest {
     // ============ ESTALVI I INVERSIÓ ============
 
     @Test
-    @DisplayName("A Estalvi i inversió, el que passa a Trade Republic és estalviat; un regal pagat després, gastat del fons")
+    @DisplayName("A Estalvi i inversió, el que passa a Trade Republic és estalviat; un regal pagat després amb Trade Republic, gastat del fons")
     void savingsAndSpendingFromTheFund() throws Exception {
         Category gifts = saveCategory("Regals i altres", null, Category.SAVINGS);
         saveCategory("Nòmina", saveCategory("Ingressos", null, "INCOME").getId(), null);
 
         create(form("INCOME", "2000.00", "Nòmina", principal, null));
-        // S'aparten 50 € per a regals a Trade Republic, i se'n paga un de 120.
+        // S'aparten 50 € per a regals a Trade Republic, i se'n paga un de 120
+        // amb la targeta de Trade Republic.
         create(form("EXPENSE", "50.00", "Regals i altres", principal, tradeRepublic));
-        create(form("EXPENSE", "120.00", "Regals i altres", principal, null));
+        create(form("EXPENSE", "120.00", "Regals i altres", tradeRepublic, null));
         create(form("EXPENSE", "300.00", "Estalvis", principal, tradeRepublic));
+        // Mana la categoria: a Estalvis, és estalvi encara que no s'hagi
+        // marcat com a traspàs.
+        create(form("EXPENSE", "100.00", "Estalvis", principal, null));
 
         Map<String, Object> node = nodeOf(gifts);
         assertThat((BigDecimal) node.get("estalviat")).isEqualByComparingTo("50.00");
         assertThat((BigDecimal) node.get("gastat_del_fons")).isEqualByComparingTo("120.00");
         // El que es compara amb el pla és l'estalviat, no el que s'ha pagat.
         assertThat((BigDecimal) node.get("cost_vida_real")).isEqualByComparingTo("50.00");
+        assertThat(realOf(savings)).isEqualByComparingTo("400.00");
 
-        // A l'anàlisi: l'estalvi no és despesa, i el regal sí.
+        // A l'anàlisi, les mateixes xifres que al pressupost: l'estalvi no és
+        // despesa, i el regal sí, però del fons.
         mockMvc.perform(get("/analytics/monthly-summary").param("year", "2026").param("month", "10").cookie(session))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.total_income").value(2000.00))
                 .andExpect(jsonPath("$.total_expense").value(120.00))
-                .andExpect(jsonPath("$.total_savings").value(350.00))
-                .andExpect(jsonPath("$.savings_rate").value(17.50));
+                .andExpect(jsonPath("$.spent_from_savings").value(120.00))
+                .andExpect(jsonPath("$.total_savings").value(450.00))
+                .andExpect(jsonPath("$.savings_rate").value(22.50))
+                .andExpect(jsonPath("$.unassigned").value(1550.00));
+
+        // I al tauler, que ja no compta pel seu compte.
+        mockMvc.perform(get("/analytics/overall").cookie(session))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.total_expense").value(120.00))
+                .andExpect(jsonPath("$.total_savings").value(450.00))
+                .andExpect(jsonPath("$.unassigned").value(1550.00))
+                .andExpect(jsonPath("$.top_categories.length()").value(1))
+                .andExpect(jsonPath("$.top_categories[0].category").value("Regals i altres"));
     }
 
     @Test

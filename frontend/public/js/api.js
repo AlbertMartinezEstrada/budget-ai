@@ -733,6 +733,16 @@ export async function restoreDebtReceipt(id, date) {
 }
 
 // ============ ANALYTICS ============
+/**
+ * El resum de tot, sense dates, per al tauler: ingressos, despeses, estalvi,
+ * el que no s'ha destinat a res i les categories on més s'ha gastat. El
+ * calcula el backend amb el mateix criteri que l'anàlisi i el pressupost.
+ */
+export async function getOverallSummary() {
+    const response = await apiFetch('/analytics/overall');
+    return handleResponse(response);
+}
+
 export async function getMonthlySummary(year, month) {
     const params = new URLSearchParams({ year, month });
     const response = await apiFetch(`/analytics/monthly-summary?${params.toString()}`);

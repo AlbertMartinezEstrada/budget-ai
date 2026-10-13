@@ -25,6 +25,12 @@ public class AnalyticsController {
         return analyticsService.getMonthlySummary(targetYear, targetMonth);
     }
 
+    /** Tot el que hi ha, sense dates: el que ensenya el tauler. */
+    @GetMapping("/overall")
+    public Map<String, Object> getOverallSummary() {
+        return analyticsService.getOverallSummary();
+    }
+
     @GetMapping("/category-breakdown")
     public List<Map<String, Object>> getCategoryBreakdown(
             @RequestParam(required = false) Integer year,

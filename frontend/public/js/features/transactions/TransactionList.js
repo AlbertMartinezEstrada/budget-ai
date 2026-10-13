@@ -3,7 +3,7 @@ import {
     createTransaction, updateTransaction, deleteTransaction, saveTransactionParts, formatCurrency, escapeHtml
 } from '../../api.js';
 import { categoryOptions, leafCategories, sectionOfCategory } from '../../categoryOptions.js';
-import { counterpartOptions, transferCounts, transferLabel } from '../../transfers.js';
+import { counterpartOptions, savingsCategoryHint, transferCounts, transferLabel } from '../../transfers.js';
 import { hasReceiptsToChoose, receiptOptions } from '../../debtReceipts.js';
 import { setUpUnmarkedTransfers } from './UnmarkedTransfers.js';
 import { setUpSplitEditor } from './SplitEditor.js';
@@ -167,11 +167,7 @@ export async function initTransactions(container) {
                     <div data-unsplit-only>
                         <label class="block text-sm font-medium mb-1" for="new-category">Categoria</label>
                         <select id="new-category" class="form-control" required></select>
-                        <p id="new-category-hint" class="text-xs text-teal-700 dark:text-teal-300 mt-1 hidden">
-                            És una categoria d'estalvi: compta com a estalviat si són diners que passes a un compte
-                            d'estalvi o d'inversió (tria'l a «Traspàs amb un altre compte teu»). Si no, és una despesa
-                            pagada del fons.
-                        </p>
+                        <p id="new-category-hint" class="text-xs text-teal-700 dark:text-teal-300 mt-1 hidden"></p>
                     </div>
                     <div>
                         <label class="block text-sm font-medium mb-1" for="new-company">Empresa</label>
@@ -416,18 +412,25 @@ function setUpManualEntry(categories, companies, debts) {
     counterpartSelect.addEventListener('change', refreshCounterpart);
 
     /**
-     * A Estalvi i inversió, només és estalvi el que passa a un compte
-     * d'estalvi o d'inversió. Un pagament amb aquesta categoria que no és cap
-     * traspàs compta com a despesa del fons, i val més dir-ho abans de desar.
+     * A Estalvi i inversió mana la categoria: el que hi va des del dia a dia
+     * és estalvi, estigui marcat com a traspàs o no, i el que es paga des d'un
+     * compte d'estalvi és gastat del fons. Un regal pagat des de Principal amb
+     * aquesta categoria comptaria com a estalvi, i val més dir-ho abans de desar.
      */
     const refreshCategoryHint = () => {
         const category = categories.find(candidate => candidate.nom === document.getElementById('new-category').value);
         const isSavings = category && sectionOfCategory(categories, category.id) === 'SAVINGS';
-        const isPayment = document.getElementById('new-type').value === 'EXPENSE' && !counterpartSelect.value;
-        document.getElementById('new-category-hint').classList.toggle('hidden', !(isSavings && isPayment));
+        const hint = isSavings
+            ? savingsCategoryHint(document.getElementById('new-type').value,
+                accountsById.get(Number.parseInt(ownSelect.value, 10)), counterpartSelect.value)
+            : '';
+        const hintElement = document.getElementById('new-category-hint');
+        hintElement.textContent = hint;
+        hintElement.classList.toggle('hidden', !hint);
     };
     document.getElementById('new-category').addEventListener('change', refreshCategoryHint);
     document.getElementById('new-type').addEventListener('change', refreshCategoryHint);
+    ownSelect.addEventListener('change', refreshCategoryHint);
     counterpartSelect.addEventListener('change', refreshCategoryHint);
 
     getAccounts().then(accounts => {

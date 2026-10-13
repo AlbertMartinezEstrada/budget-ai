@@ -2,6 +2,7 @@ package com.budgetai.backend.service;
 
 import com.budgetai.backend.repository.TransactionPartRepository;
 import com.budgetai.backend.repository.TransactionRepository;
+import com.budgetai.backend.service.MoneyFlows.Kind;
 import com.budgetai.backend.service.TransactionLines.Line;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -11,29 +12,26 @@ import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.*;
-import java.util.stream.Collectors;
 
 /**
- * Ingressos i despeses de debò, per a la pantalla d'anàlisi.
+ * Ingressos, despeses i estalvi, per a l'anàlisi i el tauler.
  *
- * **Només compta el que és un ingrés o una despesa teus** (counts): ni els
- * traspassos entre comptes propis, que només mouen diners de lloc, ni el que
- * està marcat com a «no comptar». Abans es comptava tot el que s'havia mogut:
- * 1.276 € passats de Principal a Trade Republic sortien com a despesa i, si
- * se n'havia importat l'altre extracte, també com a ingrés.
+ * **Què és cada línia ho decideix MoneyFlows**, el mateix que fa servir el
+ * pressupost: el que va a Estalvi i inversió és estalvi i no despesa, estigui
+ * marcat com a traspàs o no; els traspassos entre comptes del dia a dia i el
+ * que està marcat com a «no comptar» no són res. Abans l'anàlisi tenia el seu
+ * criteri (comptava l'estalvi per comptes) i el tauler un altre, i els 300 €
+ * apartats a Estalvis sortien com a despesa en un lloc i com a estalvi en
+ * l'altre.
  *
  * Es compta per línies (TransactionLines): d'un moviment dividit, cada part
  * va a la seva categoria i una part marcada com a «no comptar» no suma.
- *
- * **L'estalvi va a part** (total_savings): el que ha passat a un compte
- * d'estalvi o d'inversió, menys el que n'ha tornat. No és despesa —els diners
- * segueixen sent teus— i no surt a total_expense. Es compta per comptes i no
- * per categories: tot el que entra a Trade Republic s'ha apartat, sigui per a
- * Estalvis, per a un regal o per a l'assegurança. El que es paga després amb
- * aquests diners sí que és despesa.
  */
 @Service
 public class AnalyticsService {
+
+    /** Les categories amb més despesa que ensenya el tauler. */
+    static final int TOP_CATEGORIES = 5;
 
     @Autowired
     private TransactionRepository transactionRepository;
@@ -41,63 +39,66 @@ public class AnalyticsService {
     @Autowired
     private TransactionPartRepository transactionPartRepository;
 
-    /** Si una línia és un ingrés o una despesa de debò. */
-    static boolean counts(Line line) {
-        return !line.transaction().isTransfer() && !line.excludedFromBudget();
+    @Autowired
+    private CategoryHierarchyService hierarchyService;
+
+    private List<Line> allLines() {
+        return TransactionLines.expand(transactionRepository.findAll(), transactionPartRepository.findAll());
     }
 
-    /** Totes les línies d'un període, comptin o no: l'estalvi surt dels traspassos. */
-    private List<Line> linesBetween(LocalDate startDate, LocalDate endDate) {
-        return TransactionLines.expand(transactionRepository.findAll(), transactionPartRepository.findAll())
-                .stream()
-                .filter(line -> line.isBetween(startDate, endDate))
-                .toList();
-    }
-
-    private List<Line> countedLinesBetween(LocalDate startDate, LocalDate endDate) {
-        return linesBetween(startDate, endDate).stream()
-                .filter(AnalyticsService::counts)
-                .toList();
-    }
-
-    /**
-     * El que s'ha apartat: el que ha entrat als comptes d'estalvi i d'inversió
-     * des dels del dia a dia, menys el que n'ha tornat. Sense el que està
-     * marcat com a «no comptar».
-     */
-    static BigDecimal savedIn(List<Line> lines) {
-        return lines.stream()
-                .filter(line -> !line.excludedFromBudget())
-                .map(line -> line.amount().multiply(
-                        BigDecimal.valueOf(InternalTransferService.savingsDirection(line.transaction()))))
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
+    private MoneyFlows flows() {
+        return new MoneyFlows(hierarchyService.loadTree());
     }
 
     public Map<String, Object> getMonthlySummary(int year, int month) {
-        LocalDate startDate = LocalDate.of(year, month, 1);
-        LocalDate endDate = startDate.withDayOfMonth(startDate.lengthOfMonth());
-        return summaryOf(linesBetween(startDate, endDate), YearMonth.of(year, month));
+        YearMonth period = YearMonth.of(year, month);
+        Map<String, Object> summary = summaryOf(flows(), allLines(), period.atDay(1), period.atEndOfMonth());
+        summary.put("period", period.toString());
+        return summary;
     }
 
-    /** @param allLines les del període, comptin o no */
-    private static Map<String, Object> summaryOf(List<Line> allLines, YearMonth period) {
-        List<Line> lines = allLines.stream().filter(AnalyticsService::counts).toList();
-        BigDecimal totalIncome = sumByType(lines, "INCOME");
-        BigDecimal totalExpense = sumByType(lines, "EXPENSE");
-        BigDecimal totalSavings = savedIn(allLines);
+    /**
+     * El resum de tot el que hi ha, per al tauler, amb les categories on més
+     * s'ha gastat. Les mateixes xifres que l'anàlisi d'un mes, però sense dates.
+     */
+    public Map<String, Object> getOverallSummary() {
+        MoneyFlows flows = flows();
+        List<Line> lines = allLines();
+        Map<String, Object> summary = summaryOf(flows, lines, LocalDate.MIN, LocalDate.MAX);
+        summary.put("top_categories", breakdownOf(flows, lines, LocalDate.MIN, LocalDate.MAX).stream()
+                .limit(TOP_CATEGORIES)
+                .toList());
+        return summary;
+    }
+
+    /**
+     * total_income, total_expense, total_savings (el que s'ha apartat, menys el
+     * que n'ha tornat), spent_from_savings (la part de la despesa pagada des
+     * d'un compte d'estalvi), savings_rate, balance (ingressos menys despeses)
+     * i unassigned (el que no s'ha destinat a res).
+     */
+    private static Map<String, Object> summaryOf(MoneyFlows flows, List<Line> allLines,
+                                                 LocalDate from, LocalDate to) {
+        List<Line> lines = allLines.stream().filter(line -> line.isBetween(from, to)).toList();
+        BigDecimal totalIncome = flows.sum(lines, Kind.INCOME, from, to);
+        BigDecimal totalExpense = flows.sum(lines, Kind.EXPENSE, from, to);
+        BigDecimal totalSavings = flows.sum(lines, Kind.SAVING, from, to);
 
         // Moviments, no línies: un moviment dividit en quatre parts és un.
         // Per identitat, perquè un moviment encara sense desar no té id.
         Set<Object> transactions = Collections.newSetFromMap(new IdentityHashMap<>());
-        lines.forEach(line -> transactions.add(line.transaction()));
+        lines.stream()
+                .filter(line -> flows.of(line).kind() != Kind.NONE)
+                .forEach(line -> transactions.add(line.transaction()));
 
         Map<String, Object> summary = new HashMap<>();
-        summary.put("period", period.toString());
         summary.put("total_income", totalIncome);
         summary.put("total_expense", totalExpense);
         summary.put("total_savings", totalSavings);
+        summary.put("spent_from_savings", flows.spentFromFunds(lines, from, to));
         summary.put("savings_rate", rateOf(totalSavings, totalIncome));
         summary.put("balance", totalIncome.subtract(totalExpense));
+        summary.put("unassigned", flows.unassigned(lines, from, to));
         summary.put("transaction_count", transactions.size());
         return summary;
     }
@@ -109,18 +110,25 @@ public class AnalyticsService {
     }
 
     public List<Map<String, Object>> getCategoryBreakdown(int year, int month) {
-        LocalDate startDate = LocalDate.of(year, month, 1);
-        LocalDate endDate = startDate.withDayOfMonth(startDate.lengthOfMonth());
+        YearMonth period = YearMonth.of(year, month);
+        return breakdownOf(flows(), allLines(), period.atDay(1), period.atEndOfMonth());
+    }
 
-        List<Line> expenses = countedLinesBetween(startDate, endDate).stream()
-                .filter(line -> "EXPENSE".equals(line.type()))
-                .toList();
-
-        Map<String, BigDecimal> categoryTotals = expenses.stream()
-                .collect(Collectors.groupingBy(
-                        line -> line.category() != null ? line.category().getName() : "Sin categoría",
-                        Collectors.reducing(BigDecimal.ZERO, Line::amount, BigDecimal::add)
-                ));
+    /**
+     * La despesa per categories, de més a menys. Una categoria on ha tornat
+     * més del que s'hi ha gastat no hi surt: no és despesa.
+     */
+    private static List<Map<String, Object>> breakdownOf(MoneyFlows flows, List<Line> lines,
+                                                         LocalDate from, LocalDate to) {
+        Map<String, BigDecimal> categoryTotals = new HashMap<>();
+        for (Line line : lines) {
+            if (!line.isBetween(from, to)) continue;
+            MoneyFlows.Flow flow = flows.of(line);
+            if (flow.kind() != Kind.EXPENSE) continue;
+            String name = line.category() != null ? line.category().getName() : "Sin categoría";
+            categoryTotals.merge(name, flow.amount(), BigDecimal::add);
+        }
+        categoryTotals.values().removeIf(total -> total.signum() <= 0);
 
         BigDecimal totalExpense = categoryTotals.values().stream()
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
@@ -142,44 +150,30 @@ public class AnalyticsService {
     }
 
     public Map<String, Object> getYearlySummary(int year) {
-        List<Line> allLines = linesBetween(LocalDate.of(year, 1, 1), LocalDate.of(year, 12, 31));
-        List<Line> lines = allLines.stream().filter(AnalyticsService::counts).toList();
-
-        BigDecimal totalIncome = sumByType(lines, "INCOME");
-        BigDecimal totalExpense = sumByType(lines, "EXPENSE");
-        BigDecimal totalSavings = savedIn(allLines);
+        Map<String, Object> summary = summaryOf(flows(), allLines(),
+                LocalDate.of(year, 1, 1), LocalDate.of(year, 12, 31));
         BigDecimal twelve = BigDecimal.valueOf(12);
 
-        Map<String, Object> summary = new HashMap<>();
         summary.put("year", year);
-        summary.put("total_income", totalIncome);
-        summary.put("total_expense", totalExpense);
-        summary.put("total_savings", totalSavings);
-        summary.put("savings_rate", rateOf(totalSavings, totalIncome));
-        summary.put("balance", totalIncome.subtract(totalExpense));
-        summary.put("average_monthly_expense", totalExpense.divide(twelve, 2, RoundingMode.HALF_UP));
-        summary.put("average_monthly_income", totalIncome.divide(twelve, 2, RoundingMode.HALF_UP));
-
+        summary.remove("transaction_count");
+        summary.put("average_monthly_expense", ((BigDecimal) summary.get("total_expense")).divide(twelve, 2, RoundingMode.HALF_UP));
+        summary.put("average_monthly_income", ((BigDecimal) summary.get("total_income")).divide(twelve, 2, RoundingMode.HALF_UP));
         return summary;
-    }
-
-    private static BigDecimal sumByType(List<Line> lines, String type) {
-        return lines.stream()
-                .filter(line -> type.equals(line.type()))
-                .map(line -> line.amount() != null ? line.amount() : BigDecimal.ZERO)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
     /** Els dotze mesos de l'any, llegint els moviments una sola vegada. */
     public List<Map<String, Object>> getMonthlyTrend(int year) {
-        List<Line> lines = linesBetween(LocalDate.of(year, 1, 1), LocalDate.of(year, 12, 31));
+        MoneyFlows flows = flows();
+        List<Line> lines = allLines().stream()
+                .filter(line -> line.isBetween(LocalDate.of(year, 1, 1), LocalDate.of(year, 12, 31)))
+                .toList();
 
         List<Map<String, Object>> trend = new ArrayList<>();
         for (int month = 1; month <= 12; month++) {
             YearMonth period = YearMonth.of(year, month);
-            trend.add(summaryOf(lines.stream()
-                    .filter(line -> line.isBetween(period.atDay(1), period.atEndOfMonth()))
-                    .toList(), period));
+            Map<String, Object> summary = summaryOf(flows, lines, period.atDay(1), period.atEndOfMonth());
+            summary.put("period", period.toString());
+            trend.add(summary);
         }
         return trend;
     }

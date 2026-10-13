@@ -1,5 +1,13 @@
-import { getTransactions, formatCurrency, escapeHtml } from '../../api.js';
-import { countedLines } from '../../transfers.js';
+import { getTransactions, getOverallSummary, formatCurrency, escapeHtml } from '../../api.js';
+
+/**
+ * El tauler: el resum de tot el que hi ha i els últims moviments.
+ *
+ * Les xifres les calcula el backend (GET /analytics/overall) amb el mateix
+ * criteri que l'anàlisi i el pressupost. Abans es calculaven aquí, amb un
+ * criteri propi que no sabia què era l'estalvi: els 300 € passats a Estalvis
+ * sortien com a despesa al tauler i com a estalvi al pressupost.
+ */
 
 export async function initDashboard(container) {
     container.innerHTML = `
@@ -22,11 +30,19 @@ export async function initDashboard(container) {
             </div>
             <div class="card">
                 <div class="card-header">
-                    <h3 class="card-title">Balanç Net</h3>
+                    <h3 class="card-title">Estalviat</h3>
+                    <span class="material-symbols-outlined" style="font-size: 1.5rem; color: #0d9488;">savings</span>
+                </div>
+                <div class="stat-value text-teal-600" id="total-estalviat">${formatCurrency(0)}</div>
+                <div class="stat-label" id="taxa-estalvi">A Estalvi i inversió</div>
+            </div>
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">Sense destinar</h3>
                     <span class="material-symbols-outlined" style="font-size: 1.5rem; color: var(--primary-color);">balance</span>
                 </div>
-                <div class="stat-value" id="balanc-net">${formatCurrency(0)}</div>
-                <div class="stat-label">Ingressos - Despeses</div>
+                <div class="stat-value" id="sense-destinar">${formatCurrency(0)}</div>
+                <div class="stat-label">Ingressos menys despeses i estalvi</div>
             </div>
         </div>
         
@@ -65,65 +81,44 @@ export async function initDashboard(container) {
     `;
 
     try {
-        const transactions = await getTransactions();
-        updateStats(transactions);
+        const [summary, transactions] = await Promise.all([getOverallSummary(), getTransactions()]);
+        updateStats(summary);
         renderRecentTransactions(transactions);
-        renderTopCategories(transactions);
+        renderTopCategories(summary.top_categories || []);
     } catch (error) {
         console.error('Error loading dashboard:', error);
         container.innerHTML += `<div class="alert alert-error mt-4">Error carregant dades: ${error.message}</div>`;
     }
 }
 
-// Només el que és ingrés o despesa de debò (countedLines): un traspàs entre
-// comptes teus o el que està marcat com a «no comptar» només mouen saldos.
-// Sumats, 100 € passats a Revolut sortien com a despesa, i el que s'hi pagués
-// comptava dues vegades.
-function updateStats(transactions) {
-    let income = 0;
-    let expense = 0;
-
-    transactions.flatMap(countedLines).forEach(line => {
-        // Sense tipus, es pren per despesa, com sempre.
-        if (line.type === 'INCOME') {
-            income += line.amount;
-        } else {
-            expense += line.amount;
-        }
-    });
-
-    const balance = income - expense;
+/**
+ * Despeses inclou el que s'ha pagat des d'un compte d'estalvi (un regal amb
+ * la targeta de Trade Republic), però «Sense destinar» no ho resta: surt del
+ * que ja s'havia apartat.
+ */
+function updateStats(summary) {
+    const income = Number(summary.total_income) || 0;
+    const expense = Number(summary.total_expense) || 0;
+    const saved = Number(summary.total_savings) || 0;
+    const unassigned = Number(summary.unassigned) || 0;
 
     document.getElementById('total-ingressos').textContent = formatCurrency(income);
     document.getElementById('total-despeses').textContent = formatCurrency(expense);
-    
-    const balanceElement = document.getElementById('balanc-net');
-    balanceElement.textContent = formatCurrency(balance);
-    
-    if (balance >= 0) {
-        balanceElement.classList.add('text-success');
-        balanceElement.classList.remove('text-error');
-    } else {
-        balanceElement.classList.add('text-error');
-        balanceElement.classList.remove('text-success');
+    document.getElementById('total-estalviat').textContent = formatCurrency(saved);
+    if (summary.savings_rate != null) {
+        document.getElementById('taxa-estalvi').textContent =
+            `${Number(summary.savings_rate).toFixed(1)}% dels ingressos`;
     }
+
+    const unassignedElement = document.getElementById('sense-destinar');
+    unassignedElement.textContent = formatCurrency(unassigned);
+    unassignedElement.classList.toggle('text-success', unassigned >= 0);
+    unassignedElement.classList.toggle('text-error', unassigned < 0);
 }
 
-function renderTopCategories(transactions) {
-    const categories = {};
-
-    // D'un moviment dividit, cada part va a la seva categoria: si no, la
-    // transferència a Trade Republic sortiria sencera a "Trade Republic".
-    const lines = transactions.flatMap(countedLines).filter(line => line.type !== 'INCOME');
-
-    lines.forEach(line => {
-        const categoryName = line.categoryName || 'Altres';
-        categories[categoryName] = (categories[categoryName] || 0) + parseFloat(line.amount || 0);
-    });
-
-    const sortedCategories = Object.entries(categories)
-        .sort((firstEntry, secondEntry) => secondEntry[1] - firstEntry[1])
-        .slice(0, 5);
+/** Les que dona el backend, ja ordenades: d'un moviment dividit, cada part a la seva. */
+function renderTopCategories(topCategories) {
+    const sortedCategories = topCategories.map(item => [item.category, Number(item.total) || 0]);
 
     const container = document.getElementById('top-categories-list');
     
