@@ -743,6 +743,16 @@ export async function getOverallSummary() {
     return handleResponse(response);
 }
 
+/**
+ * El pla del pressupost contra el real, mes a mes, de from a to («AAAA-MM»,
+ * inclosos): seccions i blocs de cada mes, i l'historial de cada bloc.
+ */
+export async function getBudgetVsActual(from, to) {
+    const params = new URLSearchParams({ from, to });
+    const response = await apiFetch(`/analytics/budget-vs-actual?${params.toString()}`);
+    return handleResponse(response);
+}
+
 export async function getMonthlySummary(year, month) {
     const params = new URLSearchParams({ year, month });
     const response = await apiFetch(`/analytics/monthly-summary?${params.toString()}`);
