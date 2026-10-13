@@ -5,6 +5,7 @@ import com.budgetai.backend.model.MonthlyIncome;
 import com.budgetai.backend.service.BudgetService;
 import com.budgetai.backend.service.IncomeBaseService;
 import com.budgetai.backend.service.NotFoundException;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
@@ -76,6 +77,24 @@ public class BudgetController {
         return budgetService.copyFromPreviousMonth(
                 year != null ? year : now.getYear(),
                 month != null ? month : now.getMonthValue());
+    }
+
+    /** El que envia el botó d'aplicar les propostes de l'anàlisi. */
+    public record ChangesRequest(@JsonProperty("periode") String period,
+                                 @JsonProperty("canvis") List<BudgetService.BudgetChange> changes) {}
+
+    /**
+     * Aplica uns canvis de pla a un mes (les propostes de l'anàlisi): copia
+     * el pla del mes anterior i hi posa els canvis, tot o res.
+     *
+     * Va abans de /{id} pel mateix motiu que monthly-summary.
+     */
+    @PostMapping("/apply-changes")
+    public Map<String, Object> applyChanges(@RequestBody ChangesRequest request) {
+        if (request.period() == null || !isValidPeriod(request.period())) {
+            throw new IllegalArgumentException("El mes ha de ser AAAA-MM, com 2026-11.");
+        }
+        return budgetService.applyChanges(YearMonth.parse(request.period()), request.changes());
     }
 
     /**

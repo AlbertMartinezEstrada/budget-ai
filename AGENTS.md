@@ -238,7 +238,8 @@ o ahorro: pasa por `MoneyFlows`.
 
 **La pestaña Presupuesto de Análisis no tiene fórmula propia**:
 `BudgetReviewService` compara el resumen mensual del presupuesto con lo que ha
-pasado de verdad (`caixa_real`). Si cambias cómo se calcula el presupuesto,
+pasado de verdad (`caixa_real`), y `BudgetAdviceService` saca de él la
+previsión del mes y las propuestas. Si cambias cómo se calcula el presupuesto,
 cambia ahí, no en la comparación.
 
 **Manda la categoría.** Lo que va a Estalvi i inversió es ahorro, esté marcado
