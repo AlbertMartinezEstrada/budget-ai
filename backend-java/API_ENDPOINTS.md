@@ -325,6 +325,43 @@ primero sin pagar.
   `period`, de todos los movimientos, y `top_categories`: las cinco categorías
   con más gasto, como en el desglose.
 
+### Plan frente a real
+- `GET /analytics/budget-vs-actual` - El plan del presupuesto frente a lo que
+  ha pasado de verdad, mes a mes
+  - Query params: `from`, `to` (`AAAA-MM`, opcionales). Sin `to`, hasta el mes
+    actual; sin `from`, los seis meses hasta `to`. Como mucho 24 meses, y nunca
+    más allá del mes actual. Un mes mal escrito o un rango al revés dan 400.
+  ```json
+  {
+    "des_de": "2026-05",
+    "fins_a": "2026-10",
+    "mesos": [{
+      "periode": "2026-10", "mes_en_curs": true, "te_pla": true,
+      "seccions": [{
+        "tipus": "VARIABLE", "pla": 540.00, "real": 675.00, "desviacio": 135.00,
+        "desviacio_percent": 25.0, "estat": "DESVIAT",
+        "blocs": [{ "categoria_id": 4, "nom": "Gast mensual", "es_grup": true,
+                    "pla": 540.00, "real": 675.00, "desviacio": 135.00,
+                    "desviacio_percent": 25.0, "estat": "DESVIAT",
+                    "carrec_irregular": false, "subcategories": [] }]
+      }]
+    }],
+    "blocs": [{
+      "categoria_id": 4, "nom": "Gast mensual", "seccio": "VARIABLE",
+      "mesos": [{ "periode": "2026-05", "pla": 540.00, "real": 500.00, "desviacio": -40.00, "estat": "BE" }],
+      "mesos_tancats_amb_pla": 5, "mesos_be": 1, "mesos_avis": 1, "mesos_desviats": 3,
+      "mesos_puntuals": 0, "pla_total": 2700.00, "real_total": 3010.00,
+      "desviacio_mitjana": 62.00, "estat_acumulat": "DESVIAT"
+    }]
+  }
+  ```
+  `real` es lo que ha pasado de verdad (lo gastado, lo apartado o lo cobrado) y
+  `desviacio`, real menos plan. `estat`: `BE`, `AVIS` (fuera por poco, hasta el
+  10 % o 5 €), `DESVIAT`, `SENSE_PLA`, `CARREC_PUNTUAL` (recurrente trimestral o
+  anual) o `EN_CURS` (ahorro o ingreso que aún puede llegar este mes). En gastos
+  lo malo es pasarse; en ahorro e ingresos, quedarse corto. El resumen de cada
+  bloque solo cuenta los meses cerrados con plan.
+
 ### Desglose por Categorías
 - `GET /analytics/category-breakdown` - Gastos por categoría del mes
   - Query params: `year`, `month` (opcionales)
