@@ -12,7 +12,7 @@ export async function initAnalytics(container) {
                     <h2 class="text-2xl font-bold text-slate-800 dark:text-slate-100">Análisis</h2>
                     <p class="text-sm text-slate-500 dark:text-slate-400">
                         Solo ingresos y gastos de verdad: sin traspasos entre tus cuentas ni lo marcado como «no comptar».
-                        Lo que pasas a tus cuentas de ahorro e inversión sale como ahorrado, no como gasto.
+                        Lo que va a una categoría de Estalvi i inversió sale como ahorrado, no como gasto, como en el presupuesto.
                     </p>
                 </div>
                 <div class="flex gap-2">
@@ -52,7 +52,7 @@ export async function initAnalytics(container) {
             </div>
             <div class="bg-white dark:bg-slate-800 rounded-xl p-4 shadow-sm border border-slate-200 dark:border-slate-700">
                 <div class="text-sm text-gray-500 dark:text-slate-400 mb-1"
-                     title="Ingresos menos gastos y ahorro: lo que se queda en tus cuentas del día a día.">Sin destinar</div>
+                     title="Ingresos menos gastos y ahorro. Lo pagado desde una cuenta de ahorro no resta: sale de lo que ya habías apartado.">Sin destinar</div>
                 <div class="text-2xl font-bold" id="total-balance">${formatCurrency(0)}</div>
             </div>
         </div>
@@ -110,12 +110,13 @@ function renderSummary(summary) {
     // AnalyticsService retorna "total_expense" en singular.
     const income = summary?.total_income || 0;
     const expenses = summary?.total_expense || 0;
-    // Lo que ha pasado a las cuentas de ahorro e inversión, menos lo que ha
-    // vuelto. Antes la «tasa de ahorro» era ingresos menos gastos: no decía
-    // cuánto se había apartado de verdad.
+    // Lo que ha ido a Estalvi i inversió, menos lo que ha vuelto. Lo calcula
+    // el backend con el mismo criterio que el presupuesto (MoneyFlows), y
+    // también lo que queda sin destinar: lo pagado desde una cuenta de ahorro
+    // es gasto, pero no resta de ahí.
     const savings = summary?.total_savings || 0;
     const rate = summary?.savings_rate;
-    const unassigned = income - expenses - savings;
+    const unassigned = summary?.unassigned ?? (income - expenses - savings);
 
     document.getElementById('total-income').textContent = formatCurrency(income);
     document.getElementById('total-expenses').textContent = formatCurrency(expenses);

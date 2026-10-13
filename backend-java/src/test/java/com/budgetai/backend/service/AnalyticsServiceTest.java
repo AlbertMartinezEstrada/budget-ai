@@ -6,6 +6,7 @@ import com.budgetai.backend.model.Transaction;
 import com.budgetai.backend.model.TransactionPart;
 import com.budgetai.backend.repository.TransactionPartRepository;
 import com.budgetai.backend.repository.TransactionRepository;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -15,6 +16,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -33,19 +35,34 @@ class AnalyticsServiceTest {
     @Mock private TransactionRepository transactionRepository;
     // Sense parts: cap moviment està dividit i tots compten sencers.
     @Mock private TransactionPartRepository transactionPartRepository;
+    @Mock private CategoryHierarchyService hierarchyService;
     @InjectMocks private AnalyticsService service;
 
-    private Transaction transaction(String type, String amount, LocalDate date, String categoryName) {
+    private final Category transport = category(1L, "Transport", null);
+    private final Category rent = category(2L, "Lloguer", Category.FIXED);
+    private final Category savings = category(3L, "Estalvis", Category.SAVINGS);
+    private final List<Category> categories = new ArrayList<>(List.of(transport, rent, savings));
+
+    private static Category category(long id, String name, String costType) {
+        Category category = new Category(name);
+        category.setId(id);
+        category.setCostType(costType);
+        return category;
+    }
+
+    @BeforeEach
+    void givenCategories() {
+        // Què és cada línia ho decideix MoneyFlows amb l'arbre de categories,
+        // el mateix que fa servir el pressupost.
+        when(hierarchyService.loadTree()).thenAnswer(invocation -> CategoryHierarchyService.treeOf(categories));
+    }
+
+    private Transaction transaction(String type, String amount, LocalDate date, Category category) {
         Transaction transaction = new Transaction();
         transaction.setType(type);
         transaction.setAmount(new BigDecimal(amount));
         transaction.setDate(date);
-        if (categoryName != null) {
-            Category category = new Category();
-            category.setId(1L);
-            category.setName(categoryName);
-            transaction.setCategory(category);
-        }
+        transaction.setCategory(category);
         return transaction;
     }
 
@@ -87,8 +104,8 @@ class AnalyticsServiceTest {
     @DisplayName("El desglossament retorna la categoria com a text, no com a objecte")
     void categoryBreakdownReturnsPlainName() {
         when(transactionRepository.findAll()).thenReturn(List.of(
-                transaction("EXPENSE", "75.00", LocalDate.of(2026, 2, 10), "Transport"),
-                transaction("EXPENSE", "25.00", LocalDate.of(2026, 2, 11), "Transport")
+                transaction("EXPENSE", "75.00", LocalDate.of(2026, 2, 10), transport),
+                transaction("EXPENSE", "25.00", LocalDate.of(2026, 2, 11), transport)
         ));
 
         List<Map<String, Object>> breakdown = service.getCategoryBreakdown(2026, 2);
@@ -145,18 +162,29 @@ class AnalyticsServiceTest {
     }
 
     @Test
-    @DisplayName("Un traspàs entre comptes propis no surt a l'anàlisi: ni al resum, ni al desglossament, ni a la tendència")
+    @DisplayName("Un traspàs entre comptes propis no és despesa: ni al resum, ni al desglossament, ni a la tendència")
     void transfersDoNotCount() {
-        Transaction transfer = transaction("EXPENSE", "1276.00", LocalDate.of(2026, 10, 6), "Estalvis");
-        transfer.setAccount(account(1L, "Compte Principal"));
-        transfer.setCounterpartAccount(account(2L, "Trade Republic"));
+        // Entre comptes del dia a dia: es desa marcat com a «no comptar».
+        Transaction toRevolut = transaction("EXPENSE", "100.00", LocalDate.of(2026, 10, 2), null);
+        toRevolut.setAccount(account(1L, "Compte Principal"));
+        toRevolut.setCounterpartAccount(account(2L, "Revolut"));
+        toRevolut.setExcludedFromBudget(true);
+        // Cap a l'estalvi: és estalvi, no despesa.
+        Account tradeRepublic = account(3L, "Trade Republic");
+        tradeRepublic.setType("INVERSIONES");
+        Transaction toSavings = transaction("EXPENSE", "1276.00", LocalDate.of(2026, 10, 6), savings);
+        toSavings.setAccount(account(1L, "Compte Principal"));
+        toSavings.setCounterpartAccount(tradeRepublic);
         when(transactionRepository.findAll()).thenReturn(List.of(
-                transfer,
-                transaction("EXPENSE", "553.33", LocalDate.of(2026, 10, 1), "Lloguer")));
+                toRevolut,
+                toSavings,
+                transaction("EXPENSE", "553.33", LocalDate.of(2026, 10, 1), rent)));
 
         Map<String, Object> summary = service.getMonthlySummary(2026, 10);
         assertThat((BigDecimal) summary.get("total_expense")).isEqualByComparingTo("553.33");
-        assertThat(summary.get("transaction_count")).isEqualTo(1);
+        assertThat((BigDecimal) summary.get("total_savings")).isEqualByComparingTo("1276.00");
+        // El lloguer i l'estalvi; el traspàs a Revolut no és res.
+        assertThat(summary.get("transaction_count")).isEqualTo(2);
 
         assertThat(service.getCategoryBreakdown(2026, 10)).extracting(item -> item.get("category"))
                 .containsExactly("Lloguer");
@@ -214,10 +242,10 @@ class AnalyticsServiceTest {
         tradeRepublic.setType("INVERSIONES");
 
         Transaction salary = transaction("INCOME", "2000.00", LocalDate.of(2026, 10, 1), null);
-        Transaction toSavings = transaction("EXPENSE", "500.00", LocalDate.of(2026, 10, 6), "Estalvis");
+        Transaction toSavings = transaction("EXPENSE", "500.00", LocalDate.of(2026, 10, 6), savings);
         toSavings.setAccount(principal);
         toSavings.setCounterpartAccount(tradeRepublic);
-        Transaction back = transaction("INCOME", "100.00", LocalDate.of(2026, 10, 20), "Estalvis");
+        Transaction back = transaction("INCOME", "100.00", LocalDate.of(2026, 10, 20), savings);
         back.setAccount(principal);
         back.setCounterpartAccount(tradeRepublic);
         Transaction toRevolut = transaction("EXPENSE", "80.00", LocalDate.of(2026, 10, 7), null);
@@ -236,5 +264,68 @@ class AnalyticsServiceTest {
         assertThat((BigDecimal) service.getMonthlyTrend(2026).get(9).get("total_savings")).isEqualByComparingTo("400.00");
         // Sense ingressos no hi ha taxa: no és 0 %, és que no se sap.
         assertThat(service.getMonthlySummary(2026, 11).get("savings_rate")).isNull();
+    }
+
+    @Test
+    @DisplayName("300 € a Estalvis són estalvi encara que no estiguin marcats com a traspàs, com al pressupost")
+    void savingsCategoryIsSavingEvenWithoutTransfer() {
+        Account principal = account(1L, "Compte Principal");
+        Transaction toSavings = transaction("EXPENSE", "300.00", LocalDate.of(2026, 10, 6), savings);
+        toSavings.setAccount(principal);
+        when(transactionRepository.findAll()).thenReturn(List.of(
+                transaction("INCOME", "2000.00", LocalDate.of(2026, 10, 1), null),
+                toSavings,
+                transaction("EXPENSE", "553.33", LocalDate.of(2026, 10, 1), rent)));
+
+        Map<String, Object> summary = service.getMonthlySummary(2026, 10);
+
+        assertThat((BigDecimal) summary.get("total_savings")).isEqualByComparingTo("300.00");
+        assertThat((BigDecimal) summary.get("total_expense")).isEqualByComparingTo("553.33");
+        assertThat((BigDecimal) summary.get("unassigned")).isEqualByComparingTo("1146.67");
+        assertThat(service.getCategoryBreakdown(2026, 10)).extracting(item -> item.get("category"))
+                .containsExactly("Lloguer");
+    }
+
+    @Test
+    @DisplayName("El que es paga des d'un compte d'estalvi és despesa, però no resta del que no s'ha destinat")
+    void spendingFromTheFund() {
+        Account tradeRepublic = account(3L, "Trade Republic");
+        tradeRepublic.setType("INVERSIONES");
+        Transaction gift = transaction("EXPENSE", "60.00", LocalDate.of(2026, 10, 12), savings);
+        gift.setAccount(tradeRepublic);
+        when(transactionRepository.findAll()).thenReturn(List.of(
+                transaction("INCOME", "2000.00", LocalDate.of(2026, 10, 1), null),
+                gift));
+
+        Map<String, Object> summary = service.getMonthlySummary(2026, 10);
+
+        assertThat((BigDecimal) summary.get("total_expense")).isEqualByComparingTo("60.00");
+        assertThat((BigDecimal) summary.get("spent_from_savings")).isEqualByComparingTo("60.00");
+        assertThat((BigDecimal) summary.get("total_savings")).isEqualByComparingTo("0");
+        assertThat((BigDecimal) summary.get("unassigned")).isEqualByComparingTo("2000.00");
+    }
+
+    @Test
+    @DisplayName("El resum del tauler és de tot, sense dates, amb les cinc categories on més s'ha gastat")
+    void overallSummaryForTheDashboard() {
+        List<Transaction> transactions = new ArrayList<>(List.of(
+                transaction("INCOME", "2000.00", LocalDate.of(2025, 3, 1), null),
+                transaction("EXPENSE", "300.00", LocalDate.of(2026, 10, 6), savings)));
+        for (int index = 0; index < 6; index++) {
+            Category category = category(10L + index, "Categoria " + index, null);
+            categories.add(category);
+            transactions.add(transaction("EXPENSE", String.valueOf(10 * (index + 1)), LocalDate.of(2024 + index, 1, 1), category));
+        }
+        when(transactionRepository.findAll()).thenReturn(transactions);
+
+        Map<String, Object> summary = service.getOverallSummary();
+
+        assertThat((BigDecimal) summary.get("total_income")).isEqualByComparingTo("2000.00");
+        assertThat((BigDecimal) summary.get("total_expense")).isEqualByComparingTo("210");
+        assertThat((BigDecimal) summary.get("total_savings")).isEqualByComparingTo("300.00");
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> top = (List<Map<String, Object>>) summary.get("top_categories");
+        assertThat(top).extracting(item -> item.get("category"))
+                .containsExactly("Categoria 5", "Categoria 4", "Categoria 3", "Categoria 2", "Categoria 1");
     }
 }

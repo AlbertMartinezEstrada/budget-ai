@@ -205,7 +205,7 @@ public class BudgetService {
     private Optional<Category> payrollLeaf() {
         CategoryHierarchyService.Tree tree = hierarchyService.loadTree();
         for (Category root : tree.roots()) {
-            if (!SECTION_INCOME.equals(sectionOf(root, tree))) continue;
+            if (!SECTION_INCOME.equals(tree.sectionOfRoot(root))) continue;
             for (Category leaf : tree.leavesOf(root.getId())) {
                 if (PAYROLL_NAMES.contains(normalize(leaf.getName()))) return Optional.of(leaf);
             }
@@ -271,28 +271,13 @@ public class BudgetService {
     private BigDecimal calculateCurrentSpent(Budget budget) {
         if (budget.getCategory() == null) return BigDecimal.ZERO;
 
-        Set<Long> leafIds = hierarchyService.loadTree().leafIdsOf(budget.getCategory().getId());
-        return spentIn(transactionLines.all(), leafIds, budget.getPeriodStart(), budget.getPeriodEnd());
-    }
-
-    /**
-     * Suma de la despesa d'unes categories dins d'un rang de dates.
-     *
-     * Per línies i no per moviments: d'un moviment dividit, cada part compta a
-     * la seva categoria i només pel seu import.
-     */
-    private BigDecimal spentIn(List<Line> lines, Set<Long> categoryIds, LocalDate from, LocalDate to) {
-        if (categoryIds.isEmpty()) return BigDecimal.ZERO;
-
-        return lines.stream()
-                .filter(line -> "EXPENSE".equals(line.type()))
-                // Els diners que ja es van comptar en sortir del compte
-                // principal no tornen a comptar en gastar-se al compte destí.
-                .filter(line -> !line.excludedFromBudget())
-                .filter(line -> line.category() != null && categoryIds.contains(line.category().getId()))
-                .filter(line -> line.isBetween(from, to))
-                .map(Line::amount)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        CategoryHierarchyService.Tree tree = hierarchyService.loadTree();
+        Set<Long> leafIds = tree.leafIdsOf(budget.getCategory().getId());
+        // Per línies i no per moviments, i amb el mateix criteri que la resta
+        // de l'aplicació (MoneyFlows): d'un moviment dividit, cada part compta
+        // a la seva categoria i només pel seu import.
+        return new MoneyFlows(tree).sum(transactionLines.all(), leafIds, MoneyFlows.Kind.EXPENSE,
+                budget.getPeriodStart(), budget.getPeriodEnd());
     }
 
     // ============ RESUM MENSUAL: COST DE VIDA I CAIXA ============
@@ -381,13 +366,16 @@ public class BudgetService {
         // Un sol cop per a tot el resum: cada fulla en filtra les seves.
         List<Line> lines = transactionLines.all();
 
-        Context context = new Context(tree, amountsByCategory, percentagesByCategory,
+        // Què és cada línia (ingrés, despesa, estalvi o res) ho decideix
+        // MoneyFlows, el mateix que fan servir l'anàlisi i el tauler.
+        MoneyFlows flows = new MoneyFlows(tree);
+        Context context = new Context(tree, flows, amountsByCategory, percentagesByCategory,
                 recurringByCategory, debtInstallmentsByCategory, lines, from, to, salary);
 
-        BigDecimal realIncome = realIncomeIn(lines, from, to);
+        BigDecimal realIncome = flows.sum(lines, MoneyFlows.Kind.INCOME, from, to);
         // El que hi ha per repartir surt de la secció d'ingressos: la nòmina hi
         // és un bloc més, al costat dels regals i de qualsevol altra entrada.
-        Income income = incomeAvailable(tree, amountsByCategory, recurringByCategory, lines, from, to);
+        Income income = incomeAvailable(tree, flows, amountsByCategory, recurringByCategory, lines, from, to);
         // Amb la secció d'ingressos buida no hi hauria res a repartir i la
         // pantalla es quedaria morta, així que s'hi aplica el sou de referència.
         boolean fromIncomeSection = income.total().signum() > 0;
@@ -405,7 +393,7 @@ public class BudgetService {
         List<Category> variableRoots = new ArrayList<>();
         List<Category> savingsRoots = new ArrayList<>();
         for (Category root : tree.roots()) {
-            switch (sectionOf(root, tree)) {
+            switch (tree.sectionOfRoot(root)) {
                 case SECTION_FIXED -> fixedNodes.add(context.buildNode(root, available, SECTION_FIXED));
                 // Els ingressos no es reparteixen: no tenen bot del qual penjar.
                 case SECTION_INCOME -> incomeNodes.add(context.buildNode(root, null, SECTION_INCOME));
@@ -464,35 +452,6 @@ public class BudgetService {
         return summary;
     }
 
-    /**
-     * A quina secció cau un bloc de primer nivell.
-     *
-     * Són dues preguntes diferents i per això es responen en dos llocs:
-     *
-     *   ON VIU EL BLOC    el declara el bloc amb el seu tipus_cost
-     *   COM ES MESURA     el declara cada fulla amb el seu
-     *
-     * "Llar" és una despesa fixa —el sostre no es negocia cada mes— però la
-     * llum i l'aigua de dins es mesuren pel consum real. Sense separar-ho, dues
-     * fulles variables se n'enduien el bloc sencer, lloguer inclòs, a la secció
-     * de variables.
-     *
-     * Un bloc que no declara res es dedueix de les fulles: és fix quan tot el
-     * que hi penja ho és. Un bloc que barreja compta com a variable, perquè
-     * partir-lo pel mig deixaria el mateix bloc a les dues seccions i no es
-     * podria repartir ni en un lloc ni en l'altre.
-     */
-    private String sectionOf(Category root, CategoryHierarchyService.Tree tree) {
-        if (SECTION_FIXED.equals(root.getCostType())) return SECTION_FIXED;
-        if (SECTION_VARIABLE.equals(root.getCostType())) return SECTION_VARIABLE;
-        if (SECTION_INCOME.equals(root.getCostType())) return SECTION_INCOME;
-        if (SECTION_SAVINGS.equals(root.getCostType())) return SECTION_SAVINGS;
-
-        List<Category> leaves = tree.leavesOf(root.getId());
-        if (leaves.isEmpty()) return SECTION_VARIABLE;
-        return leaves.stream().allMatch(Category::isFixed) ? SECTION_FIXED : SECTION_VARIABLE;
-    }
-
     private Map<String, Object> section(String type, BigDecimal pot, BigDecimal assigned,
                                         BigDecimal available, List<Map<String, Object>> nodes) {
         return section(type, pot, assigned, available, nodes, pot == null ? null : pot.subtract(assigned));
@@ -546,11 +505,6 @@ public class BudgetService {
                 .divide(base, 2, RoundingMode.HALF_UP);
     }
 
-    /** Ingressos realment importats del mes, per veure la desviació del sou previst. */
-    private BigDecimal realIncomeIn(List<Line> lines, LocalDate from, LocalDate to) {
-        return incomeIn(lines, null, from, to);
-    }
-
     /** @param total el que hi ha per repartir; forecast, la part que era previsible. */
     private record Income(BigDecimal total, BigDecimal forecast) {}
 
@@ -580,6 +534,7 @@ public class BudgetService {
      * ingressos recurrents: és el mateix criteri que a buildNode.
      */
     private Income incomeAvailable(CategoryHierarchyService.Tree tree,
+                                   MoneyFlows flows,
                                    Map<Long, BigDecimal> forecasts,
                                    Map<Long, List<RecurringTransaction>> recurring,
                                    List<Line> lines,
@@ -588,10 +543,10 @@ public class BudgetService {
         BigDecimal forecastTotal = BigDecimal.ZERO;
 
         for (Category root : tree.roots()) {
-            if (!SECTION_INCOME.equals(sectionOf(root, tree))) continue;
+            if (!SECTION_INCOME.equals(tree.sectionOfRoot(root))) continue;
 
             for (Category leaf : tree.leavesOf(root.getId())) {
-                BigDecimal received = receivedIn(lines, leaf.getId(), from, to);
+                BigDecimal received = flows.sum(lines, Set.of(leaf.getId()), MoneyFlows.Kind.INCOME, from, to);
                 BigDecimal assigned = forecasts.get(leaf.getId());
                 BigDecimal forecast = assigned != null ? assigned : proratedFor(leaf, recurring, INCOME);
                 total = total.add(received.max(forecast));
@@ -599,44 +554,6 @@ public class BudgetService {
             }
         }
         return new Income(total, forecastTotal);
-    }
-
-    /** El mateix, però d'una sola categoria. */
-    private BigDecimal receivedIn(List<Line> lines, Long categoryId, LocalDate from, LocalDate to) {
-        return incomeIn(lines, categoryId, from, to);
-    }
-
-    /** @param categoryId null per sumar-los tots, sigui quina sigui la categoria. */
-    private BigDecimal incomeIn(List<Line> lines, Long categoryId, LocalDate from, LocalDate to) {
-        return lines.stream()
-                .filter(line -> "INCOME".equals(line.type()))
-                // Una entrada per traspàs no són diners nous: eixamplaria el
-                // bot a repartir amb els mateixos euros que ja hi eren.
-                .filter(line -> !line.excludedFromBudget())
-                // Tampoc la que torna d'un compte d'estalvi, que compta: resta
-                // estalvi, però no és cap ingrés.
-                .filter(line -> !line.transaction().isTransfer())
-                .filter(line -> categoryId == null
-                        || (line.category() != null && categoryId.equals(line.category().getId())))
-                .filter(line -> line.isBetween(from, to))
-                .map(Line::amount)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-    }
-
-    /**
-     * El que ha tornat d'un compte d'estalvi a una categoria: els traspassos
-     * d'entrada que hi compten. Només traspassos: un reemborsament d'una
-     * botiga no es resta, com no s'ha restat mai.
-     */
-    private BigDecimal withdrawnFrom(List<Line> lines, Long categoryId, LocalDate from, LocalDate to) {
-        return lines.stream()
-                .filter(line -> "INCOME".equals(line.type()))
-                .filter(line -> line.transaction().isTransfer())
-                .filter(line -> !line.excludedFromBudget())
-                .filter(line -> line.category() != null && categoryId.equals(line.category().getId()))
-                .filter(line -> line.isBetween(from, to))
-                .map(Line::amount)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
     /** Percentatges vigents durant el mes, indexats per categoria. */
@@ -657,6 +574,7 @@ public class BudgetService {
      */
     private final class Context {
         private final CategoryHierarchyService.Tree tree;
+        private final MoneyFlows flows;
         private final Map<Long, BigDecimal> amounts;
         private final Map<Long, BigDecimal> percentages;
         private final Map<Long, List<RecurringTransaction>> recurring;
@@ -667,6 +585,7 @@ public class BudgetService {
         private final BigDecimal salary;
 
         private Context(CategoryHierarchyService.Tree tree,
+                        MoneyFlows flows,
                         Map<Long, BigDecimal> amounts,
                         Map<Long, BigDecimal> percentages,
                         Map<Long, List<RecurringTransaction>> recurring,
@@ -674,6 +593,7 @@ public class BudgetService {
                         List<Line> lines,
                         LocalDate from, LocalDate to, BigDecimal salary) {
             this.tree = tree;
+            this.flows = flows;
             this.amounts = amounts;
             this.percentages = percentages;
             this.recurring = recurring;
@@ -747,7 +667,7 @@ public class BudgetService {
             // el que hi ha entrat. Sense això, la nòmina sortia sempre a zero
             // perquè només es miraven els moviments de despesa.
             if (SECTION_INCOME.equals(section)) {
-                BigDecimal received = receivedIn(lines, category.getId(), from, to);
+                BigDecimal received = flows.sum(lines, Set.of(category.getId()), MoneyFlows.Kind.INCOME, from, to);
                 node.put("caixa_real", received);
                 node.put("prorrateig_mensual", null);
                 node.put("cost_vida_real", received);
@@ -768,11 +688,9 @@ public class BudgetService {
                 return fillSavingsLeaf(node, category, assigned);
             }
 
-            // El que torna d'un compte d'estalvi resta del que s'hi va apartar:
-            // treure'n 200 € de Trade Republic el mateix mes que se n'aparten
-            // 300 a Estalvis vol dir que se n'han estalviat 100.
-            BigDecimal real = spentIn(lines, Set.of(category.getId()), from, to)
-                    .subtract(withdrawnFrom(lines, category.getId(), from, to));
+            // El que s'hi ha gastat, amb el criteri de MoneyFlows: el que torna
+            // d'un compte d'estalvi a aquesta categoria en resta.
+            BigDecimal real = flows.sum(lines, Set.of(category.getId()), MoneyFlows.Kind.EXPENSE, from, to);
             BigDecimal prorated = proratedFor(category, recurring, EXPENSE);
             // Les quotes pactades dels deutes que dec: diners que aquest mes ja
             // estan compromesos. Van a part del prorrateig perquè no són cap
@@ -805,27 +723,20 @@ public class BudgetService {
         /**
          * Fulla d'estalvi: el real és el que s'ha apartat, no el que s'ha gastat.
          *
-         * ESTALVIAT       els traspassos d'aquesta categoria que passen diners a
-         *                 un compte d'estalvi o d'inversió, menys els que en
-         *                 tornen. És el que es compara amb el pla.
-         * GASTAT DEL FONS  el que s'ha pagat amb aquesta categoria i no és cap
-         *                 traspàs: el regal comprat amb el que s'havia apartat.
-         *                 És despesa, però no del mes: no es resta de l'estalviat.
+         * Amb el criteri de MoneyFlows, el mateix de l'anàlisi i el tauler:
+         *
+         * ESTALVIAT        el que hi ha anat, estigui marcat com a traspàs o
+         *                  no, menys el que n'ha tornat. És el que es compara
+         *                  amb el pla.
+         * GASTAT DEL FONS  el que s'ha pagat amb aquesta categoria des d'un
+         *                  compte d'estalvi: el regal comprat amb la targeta de
+         *                  Trade Republic. És despesa, però del fons i no del
+         *                  mes: no es resta de l'estalviat.
          */
         private BigDecimal fillSavingsLeaf(Map<String, Object> node, Category category, BigDecimal assigned) {
-            Long id = category.getId();
-            BigDecimal saved = BigDecimal.ZERO;
-            BigDecimal spentFromFund = BigDecimal.ZERO;
-            for (Line line : lines) {
-                if (line.excludedFromBudget() || !line.isBetween(from, to)) continue;
-                if (line.category() == null || !id.equals(line.category().getId())) continue;
-                int direction = InternalTransferService.savingsDirection(line.transaction());
-                if (direction != 0) {
-                    saved = saved.add(line.amount().multiply(BigDecimal.valueOf(direction)));
-                } else if ("EXPENSE".equals(line.type()) && !line.transaction().isTransfer()) {
-                    spentFromFund = spentFromFund.add(line.amount());
-                }
-            }
+            Set<Long> ids = Set.of(category.getId());
+            BigDecimal saved = flows.sum(lines, ids, MoneyFlows.Kind.SAVING, from, to);
+            BigDecimal spentFromFund = flows.sum(lines, ids, MoneyFlows.Kind.EXPENSE, from, to);
             BigDecimal prorated = proratedFor(category, recurring, EXPENSE);
 
             node.put("caixa_real", saved);
