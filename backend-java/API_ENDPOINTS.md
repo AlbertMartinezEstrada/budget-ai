@@ -144,6 +144,12 @@ marca, ver 645 € de caja cuando el coste de vida dice 95 € parece un error.
 
 Un límite puesto directamente sobre un grupo manda sobre la suma de sus hijos.
 
+En la sección `SAVINGS` («Estalvi i inversió») cada nodo trae además
+`estalviat` (lo que ha pasado a una cuenta de ahorro o inversión, neto de lo que
+ha vuelto; es también su `cost_vida_real`) y `gastat_del_fons` (lo pagado con esa
+categoría que no es un traspaso). La sección comparte `base` y `restant` con la
+de variables: se reparten el mismo bote.
+
 ---
 
 ## 🎯 **Gestión de Metas Financieras** (`/goals`)
@@ -298,10 +304,15 @@ primero sin pagar.
     "period": "2026-02",
     "total_income": 2500.00,
     "total_expense": 1800.00,
+    "total_savings": 500.00,
+    "savings_rate": 20.00,
     "balance": 700.00,
     "transaction_count": 45
   }
   ```
+  Ni los traspasos ni lo marcado como «no comptar» son ingreso o gasto.
+  `total_savings` es lo que ha pasado a las cuentas de ahorro e inversión menos
+  lo que ha vuelto; `savings_rate`, su % de los ingresos (`null` sin ingresos).
 
 ### Desglose por Categorías
 - `GET /analytics/category-breakdown` - Gastos por categoría del mes
@@ -324,6 +335,8 @@ primero sin pagar.
     "year": 2026,
     "total_income": 30000.00,
     "total_expense": 21600.00,
+    "total_savings": 6000.00,
+    "savings_rate": 20.00,
     "balance": 8400.00,
     "average_monthly_expense": 1800.00,
     "average_monthly_income": 2500.00

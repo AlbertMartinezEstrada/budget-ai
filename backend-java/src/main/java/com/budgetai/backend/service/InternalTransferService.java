@@ -108,6 +108,36 @@ public class InternalTransferService {
     }
 
     /**
+     * En quin sentit mou estalvi un moviment.
+     *
+     * +1 si els diners passen d'un compte del dia a dia a un d'estalvi o
+     * d'inversió: s'han apartat. −1 si en tornen. 0 si no és cap traspàs, o
+     * si els dos comptes són del mateix tipus.
+     *
+     * Es mira on entren i d'on surten els diners, no el tipus del moviment:
+     * el traspàs es desa al compte del primer extracte que s'importa, i
+     * 1.276 € cap a Trade Republic poden ser una despesa a Principal o un
+     * ingrés a Trade Republic. Tots dos són estalvi.
+     */
+    public static int savingsDirection(Transaction transaction) {
+        if (!transaction.isTransfer() || transaction.getAccount() == null) return 0;
+        Account from;
+        Account to;
+        if ("EXPENSE".equals(transaction.getType())) {
+            from = transaction.getAccount();
+            to = transaction.getCounterpartAccount();
+        } else if ("INCOME".equals(transaction.getType())) {
+            from = transaction.getCounterpartAccount();
+            to = transaction.getAccount();
+        } else {
+            return 0;
+        }
+        if (to.isSavings() && !from.isSavings()) return 1;
+        if (from.isSavings() && !to.isSavings()) return -1;
+        return 0;
+    }
+
+    /**
      * Fixa el compte de l'altre costat i, si el traspàs no compta, el marca
      * com a exclòs. Es desa marcat, i no es calcula en llegir, perquè així el
      * pressupost, les deudes, l'anàlisi i el tauler el respecten sense saber

@@ -317,7 +317,7 @@ public class BudgetService {
     //
     //   sou  ──> FIXOS      import exacte de cada bloc
     //        └─> VARIABLES  el que queda: sou − fixos
-    //                       └─> blocs        % del bot de variables
+    //            I ESTALVI  └─> blocs        % d'aquest bot, el mateix per als dos
     //                                        └─> subseccions  % del bloc
     //
     // Per això un percentatge **no** és sempre del sou: és del bot del nivell
@@ -339,6 +339,20 @@ public class BudgetService {
      * mesuraven no tenia res a veure amb el que mesuraven els seus veïns.
      */
     private static final String SECTION_INCOME = "INCOME";
+    /**
+     * Estalvi i inversió: el que s'aparta, no el que es gasta.
+     *
+     * Es reparteix del mateix bot que els variables, a posta: del que sobra dels
+     * fixos l'usuari en reparteix percentatges, i l'estalvi n'és un. Una
+     * secció que es repartís abans dels variables (la de la migració 014)
+     * deixava el seu percentatge fora d'aquest bot, i es va treure.
+     *
+     * El que la fa una secció és com es mesura: el real no és el que s'ha
+     * gastat sinó el que ha passat a un compte d'estalvi o d'inversió
+     * (estalviat). El que es paga després amb aquests diners —un regal amb el
+     * que s'havia apartat— és despesa, i surt a part com a "gastat del fons".
+     */
+    private static final String SECTION_SAVINGS = "SAVINGS";
 
     /** El sentit d'un recurrent, al seu camp tipus. */
     private static final String EXPENSE = "EXPENSE";
@@ -383,18 +397,19 @@ public class BudgetService {
         // justament el que en queda. Es mesuren contra tot el disponible: són
         // la primera mossegada, no hi ha cap bot per sobre seu.
         //
-        // L'estalvi és un variable més, a posta: del que sobra dels fixos es
-        // reparteixen percentatges, i l'estalvi n'és un. Es va provar de fer-ne
-        // una secció entre fixos i variables, i el repartiment deixava de ser
-        // el que l'usuari fa de debò.
+        // L'estalvi es reparteix del mateix bot que els variables (vegeu
+        // SECTION_SAVINGS): del que sobra dels fixos es reparteixen
+        // percentatges, i l'estalvi n'és un.
         List<Map<String, Object>> fixedNodes = new ArrayList<>();
         List<Map<String, Object>> incomeNodes = new ArrayList<>();
         List<Category> variableRoots = new ArrayList<>();
+        List<Category> savingsRoots = new ArrayList<>();
         for (Category root : tree.roots()) {
             switch (sectionOf(root, tree)) {
                 case SECTION_FIXED -> fixedNodes.add(context.buildNode(root, available, SECTION_FIXED));
                 // Els ingressos no es reparteixen: no tenen bot del qual penjar.
                 case SECTION_INCOME -> incomeNodes.add(context.buildNode(root, null, SECTION_INCOME));
+                case SECTION_SAVINGS -> savingsRoots.add(root);
                 default -> variableRoots.add(root);
             }
         }
@@ -409,8 +424,16 @@ public class BudgetService {
         for (Category root : variableRoots) {
             variableNodes.add(context.buildNode(root, variablePot, SECTION_VARIABLE));
         }
+        List<Map<String, Object>> savingsNodes = new ArrayList<>();
+        for (Category root : savingsRoots) {
+            savingsNodes.add(context.buildNode(root, variablePot, SECTION_SAVINGS));
+        }
         BigDecimal variableTotal = sumPlans(variableNodes);
-        BigDecimal assignedTotal = fixedTotal.add(variableTotal);
+        BigDecimal savingsTotal = sumPlans(savingsNodes);
+        BigDecimal assignedTotal = fixedTotal.add(variableTotal).add(savingsTotal);
+        // El que queda per repartir del bot compartit: el mateix per a les dues
+        // seccions, perquè un euro que va a estalvi ja no pot anar a variables.
+        BigDecimal sharedLeft = variablePot == null ? null : variablePot.subtract(variableTotal).subtract(savingsTotal);
 
         Map<String, Object> summary = new LinkedHashMap<>();
         summary.put("periode", period.toString());
@@ -429,11 +452,13 @@ public class BudgetService {
                 // No reparteixen res, així que no tenen bot ni percentatge.
                 section(SECTION_INCOME, null, sumPlans(incomeNodes), null, incomeNodes),
                 section(SECTION_FIXED, available, fixedTotal, available, fixedNodes),
-                section(SECTION_VARIABLE, variablePot, variableTotal, available, variableNodes)));
+                section(SECTION_VARIABLE, variablePot, variableTotal, available, variableNodes, sharedLeft),
+                section(SECTION_SAVINGS, variablePot, savingsTotal, available, savingsNodes, sharedLeft)));
         // L'arbre pla de primer nivell es manté: hi ha consultes que només
         // volen els grups i no els importa a quina secció cauen.
         List<Map<String, Object>> allRoots = new ArrayList<>(fixedNodes);
         allRoots.addAll(variableNodes);
+        allRoots.addAll(savingsNodes);
         allRoots.addAll(incomeNodes);
         summary.put("grups", allRoots);
         return summary;
@@ -461,6 +486,7 @@ public class BudgetService {
         if (SECTION_FIXED.equals(root.getCostType())) return SECTION_FIXED;
         if (SECTION_VARIABLE.equals(root.getCostType())) return SECTION_VARIABLE;
         if (SECTION_INCOME.equals(root.getCostType())) return SECTION_INCOME;
+        if (SECTION_SAVINGS.equals(root.getCostType())) return SECTION_SAVINGS;
 
         List<Category> leaves = tree.leavesOf(root.getId());
         if (leaves.isEmpty()) return SECTION_VARIABLE;
@@ -469,6 +495,15 @@ public class BudgetService {
 
     private Map<String, Object> section(String type, BigDecimal pot, BigDecimal assigned,
                                         BigDecimal available, List<Map<String, Object>> nodes) {
+        return section(type, pot, assigned, available, nodes, pot == null ? null : pot.subtract(assigned));
+    }
+
+    /**
+     * @param left el que queda per repartir del bot. Als variables i a
+     *             l'estalvi és el mateix, perquè comparteixen el bot.
+     */
+    private Map<String, Object> section(String type, BigDecimal pot, BigDecimal assigned,
+                                        BigDecimal available, List<Map<String, Object>> nodes, BigDecimal left) {
         Map<String, Object> section = new LinkedHashMap<>();
         section.put("tipus", type);
         // El bot dels fixos és tot el disponible; el dels variables, el que en
@@ -482,7 +517,13 @@ public class BudgetService {
                 .map(node -> (BigDecimal) node.get("cost_vida_real"))
                 .reduce(BigDecimal.ZERO, BigDecimal::add));
         section.put("percentatge_del_sou", shareOf(assigned, available));
-        section.put("restant", pot == null ? null : pot.subtract(assigned));
+        section.put("restant", left);
+        if (SECTION_SAVINGS.equals(type)) {
+            section.put("gastat_del_fons", nodes.stream()
+                    .map(node -> (BigDecimal) node.get("gastat_del_fons"))
+                    .filter(Objects::nonNull)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add));
+        }
         section.put("grups", nodes);
         return section;
     }
@@ -723,6 +764,10 @@ public class BudgetService {
                 return expected;
             }
 
+            if (SECTION_SAVINGS.equals(section)) {
+                return fillSavingsLeaf(node, category, assigned);
+            }
+
             // El que torna d'un compte d'estalvi resta del que s'hi va apartar:
             // treure'n 200 € de Trade Republic el mateix mes que se n'aparten
             // 300 a Estalvis vol dir que se n'han estalviat 100.
@@ -757,6 +802,46 @@ public class BudgetService {
             return plan;
         }
 
+        /**
+         * Fulla d'estalvi: el real és el que s'ha apartat, no el que s'ha gastat.
+         *
+         * ESTALVIAT       els traspassos d'aquesta categoria que passen diners a
+         *                 un compte d'estalvi o d'inversió, menys els que en
+         *                 tornen. És el que es compara amb el pla.
+         * GASTAT DEL FONS  el que s'ha pagat amb aquesta categoria i no és cap
+         *                 traspàs: el regal comprat amb el que s'havia apartat.
+         *                 És despesa, però no del mes: no es resta de l'estalviat.
+         */
+        private BigDecimal fillSavingsLeaf(Map<String, Object> node, Category category, BigDecimal assigned) {
+            Long id = category.getId();
+            BigDecimal saved = BigDecimal.ZERO;
+            BigDecimal spentFromFund = BigDecimal.ZERO;
+            for (Line line : lines) {
+                if (line.excludedFromBudget() || !line.isBetween(from, to)) continue;
+                if (line.category() == null || !id.equals(line.category().getId())) continue;
+                int direction = InternalTransferService.savingsDirection(line.transaction());
+                if (direction != 0) {
+                    saved = saved.add(line.amount().multiply(BigDecimal.valueOf(direction)));
+                } else if ("EXPENSE".equals(line.type()) && !line.transaction().isTransfer()) {
+                    spentFromFund = spentFromFund.add(line.amount());
+                }
+            }
+            BigDecimal prorated = proratedFor(category, recurring, EXPENSE);
+
+            node.put("caixa_real", saved);
+            node.put("estalviat", saved);
+            node.put("gastat_del_fons", spentFromFund);
+            node.put("prorrateig_mensual", prorated);
+            node.put("cost_vida_real", saved);
+            node.put("carrec_puntual_aquest_mes", false);
+
+            // Com a qualsevol fulla: mana el que s'hagi assignat, i si no, el
+            // recurrent (un traspàs mensual a Trade Republic).
+            BigDecimal plan = assigned != null ? assigned : prorated;
+            node.put("cost_vida_pla", plan);
+            return plan;
+        }
+
         /** Grup: agrega els fills. No mesura res pel seu compte. Retorna el pla. */
         private BigDecimal fillGroup(Map<String, Object> node, List<Map<String, Object>> subNodes,
                                      BigDecimal assigned) {
@@ -774,12 +859,25 @@ public class BudgetService {
             node.put("cost_vida_real", costReal);
             node.put("prorrateig_mensual", null);
             node.put("carrec_puntual_aquest_mes", anyOneOff);
+            // Un grup d'estalvi (Inversió) també suma el que s'ha apartat i el
+            // que s'ha gastat del fons.
+            if (subNodes.stream().anyMatch(sub -> sub.containsKey("estalviat"))) {
+                node.put("estalviat", sumOf(subNodes, "estalviat"));
+                node.put("gastat_del_fons", sumOf(subNodes, "gastat_del_fons"));
+            }
 
             // Una assignació posada directament al grup mana sobre la suma dels
             // fills: és el sostre que ha decidit l'usuari per al conjunt.
             BigDecimal plan = assigned != null ? assigned : sumPlans(subNodes);
             node.put("cost_vida_pla", plan);
             return plan;
+        }
+
+        private BigDecimal sumOf(List<Map<String, Object>> nodes, String key) {
+            return nodes.stream()
+                    .map(node -> (BigDecimal) node.get(key))
+                    .filter(Objects::nonNull)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
         }
 
         private BigDecimal applyPercent(BigDecimal base, BigDecimal percent) {

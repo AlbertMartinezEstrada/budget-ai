@@ -8,7 +8,8 @@ import { escapeHtml } from './api.js';
  * alguna oferia blocs on només hi poden anar fulles. No es trobava res, i no
  * es veia a quina part del pressupost anava a parar cada categoria.
  *
- * Ara tots surten igual: per seccions (fixos, variables, ingressos) i, dins,
+ * Ara tots surten igual: per seccions (fixos, variables, estalvi i
+ * inversió, ingressos) i, dins,
  * un grup per bloc —"Gastos fijos · Llar"— amb les seves fulles per ordre
  * alfabètic. Un <select> no pot niar grups, així que la secció va al nom del
  * grup: així el desplegable continua sent el natiu, que al mòbil és el que
@@ -18,12 +19,15 @@ import { escapeHtml } from './api.js';
 const SECTION_LABELS = {
     FIXED: 'Gastos fijos',
     VARIABLE: 'Gastos variables',
+    SAVINGS: 'Estalvi i inversió',
     INCOME: 'Ingresos'
 };
 
 // Les despeses primer: són la gran majoria dels moviments que es classifiquen.
-export const ALL_SECTIONS = ['FIXED', 'VARIABLE', 'INCOME'];
-export const EXPENSE_SECTIONS = ['FIXED', 'VARIABLE'];
+// L'estalvi va amb elles perquè els diners també surten del compte: el que
+// passa a Trade Republic és una sortida de Principal.
+export const ALL_SECTIONS = ['FIXED', 'VARIABLE', 'SAVINGS', 'INCOME'];
+export const EXPENSE_SECTIONS = ['FIXED', 'VARIABLE', 'SAVINGS'];
 export const INCOME_SECTIONS = ['INCOME'];
 
 const DECLARED_SECTIONS = new Set(ALL_SECTIONS);
@@ -77,7 +81,7 @@ function sectionOf(root, childrenOf) {
 /**
  * La secció del pressupost on cau una categoria: la del bloc d'on penja.
  *
- * @returns FIXED, VARIABLE o INCOME; null si la categoria no hi és.
+ * @returns FIXED, VARIABLE, SAVINGS o INCOME; null si la categoria no hi és.
  */
 export function sectionOfCategory(categories, categoryId) {
     const byId = new Map((categories || []).map(category => [category.id, category]));

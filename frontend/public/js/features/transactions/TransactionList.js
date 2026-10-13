@@ -2,7 +2,7 @@ import {
     getTransactions, getCategories, getCompanies, getAccounts, getDebts,
     createTransaction, updateTransaction, deleteTransaction, saveTransactionParts, formatCurrency, escapeHtml
 } from '../../api.js';
-import { categoryOptions, leafCategories } from '../../categoryOptions.js';
+import { categoryOptions, leafCategories, sectionOfCategory } from '../../categoryOptions.js';
 import { counterpartOptions, transferCounts, transferLabel } from '../../transfers.js';
 import { hasReceiptsToChoose, receiptOptions } from '../../debtReceipts.js';
 import { setUpUnmarkedTransfers } from './UnmarkedTransfers.js';
@@ -167,6 +167,11 @@ export async function initTransactions(container) {
                     <div data-unsplit-only>
                         <label class="block text-sm font-medium mb-1" for="new-category">Categoria</label>
                         <select id="new-category" class="form-control" required></select>
+                        <p id="new-category-hint" class="text-xs text-teal-700 dark:text-teal-300 mt-1 hidden">
+                            És una categoria d'estalvi: compta com a estalviat si són diners que passes a un compte
+                            d'estalvi o d'inversió (tria'l a «Traspàs amb un altre compte teu»). Si no, és una despesa
+                            pagada del fons.
+                        </p>
                     </div>
                     <div>
                         <label class="block text-sm font-medium mb-1" for="new-company">Empresa</label>
@@ -410,6 +415,21 @@ function setUpManualEntry(categories, companies, debts) {
     ownSelect.addEventListener('change', refreshCounterpart);
     counterpartSelect.addEventListener('change', refreshCounterpart);
 
+    /**
+     * A Estalvi i inversió, només és estalvi el que passa a un compte
+     * d'estalvi o d'inversió. Un pagament amb aquesta categoria que no és cap
+     * traspàs compta com a despesa del fons, i val més dir-ho abans de desar.
+     */
+    const refreshCategoryHint = () => {
+        const category = categories.find(candidate => candidate.nom === document.getElementById('new-category').value);
+        const isSavings = category && sectionOfCategory(categories, category.id) === 'SAVINGS';
+        const isPayment = document.getElementById('new-type').value === 'EXPENSE' && !counterpartSelect.value;
+        document.getElementById('new-category-hint').classList.toggle('hidden', !(isSavings && isPayment));
+    };
+    document.getElementById('new-category').addEventListener('change', refreshCategoryHint);
+    document.getElementById('new-type').addEventListener('change', refreshCategoryHint);
+    counterpartSelect.addEventListener('change', refreshCategoryHint);
+
     getAccounts().then(accounts => {
         ownSelect.innerHTML = accounts
             .map(account => `<option value="${account.id}">${escapeHtml(account.nom)}</option>`)
@@ -482,6 +502,7 @@ function setUpManualEntry(categories, companies, debts) {
         refreshCounterpart();
         showSplitFields(false);
         refreshReceipts();
+        refreshCategoryHint();
         open();
     });
 
@@ -521,6 +542,7 @@ function setUpManualEntry(categories, companies, debts) {
         refreshCounterpart();
         showSplitFields(isSplit(transaction));
         refreshReceipts(transaction.deute_rebut || null);
+        refreshCategoryHint();
 
         open();
     };
