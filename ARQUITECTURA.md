@@ -665,6 +665,35 @@ pero no lo impide.
 `grups` mantiene la lista plana de bloques de primer nivel, para quien no
 necesite saber en qué sección cae cada uno.
 
+## La pestaña General de Análisis
+
+Un periodo de meses (un mes, un trimestre, un año o los últimos 12) con
+contexto, en una sola llamada (`GET /analytics/general?from=AAAA-MM&to=AAAA-MM`,
+`GeneralAnalysisService`). Qué es cada línea lo decide `MoneyFlows`, y el
+resumen del periodo es el mismo `AnalyticsService.summaryOf` del resto.
+
+- **Anterior y habitual.** Cada cifra se compara con el periodo del mismo largo
+  justo antes y con lo habitual: la media mensual de los seis meses de antes,
+  contando solo los que tienen movimientos (los de antes de usar la aplicación
+  dirían que no se gasta nada), por el largo del periodo. El navegador decide
+  si el cambio es bueno o malo según la cifra: más gasto es malo, más ahorro es
+  bueno.
+- **Estructura.** De cada mes, qué parte de los ingresos va a fijos, a
+  variables y a ahorro (por la sección del bloque), y lo que queda sin destinar.
+  Lo pagado desde una cuenta de ahorro va aparte: sale de lo ya apartado.
+- **Categorías desplegables** hasta los movimientos, que se piden al abrir una
+  subcategoría (`GET /analytics/category-movements`): las mismas líneas que
+  suman, con el importe de cada parte.
+- **Comercios** por importe y por visitas (un movimiento dividido es una
+  visita), y **gasto hormiga**: hasta 10 € y fuera de los fijos (una
+  suscripción de 1 € no lo es).
+- **Sin clasificar**: lo que no tiene categoría o cae en «Altres». A partir del
+  15 % del gasto, un aviso: con tanto sin clasificar, el resto vale poco.
+
+Los gráficos son de Chart.js, guardado en `public/vendor/` como las fuentes
+(ver `frontend/AGENTS.md`), con una paleta validada para daltonismo, un solo eje
+y una tabla con los mismos datos.
+
 ## Plan frente a real (Análisis → Presupuesto)
 
 La pestaña Presupuesto de Análisis compara lo planeado con lo que ha pasado,

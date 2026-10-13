@@ -3,6 +3,7 @@ package com.budgetai.backend.controller;
 import com.budgetai.backend.service.AnalyticsService;
 import com.budgetai.backend.service.BudgetAdviceService;
 import com.budgetai.backend.service.BudgetReviewService;
+import com.budgetai.backend.service.GeneralAnalysisService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
@@ -23,6 +24,9 @@ public class AnalyticsController {
 
     @Autowired
     private BudgetAdviceService budgetAdviceService;
+
+    @Autowired
+    private GeneralAnalysisService generalAnalysisService;
 
     @GetMapping("/monthly-summary")
     public Map<String, Object> getMonthlySummary(
@@ -53,6 +57,26 @@ public class AnalyticsController {
     @GetMapping("/budget-advice")
     public Map<String, Object> getBudgetAdvice() {
         return budgetAdviceService.advice();
+    }
+
+    /**
+     * La pestanya General: un període de from a to (AAAA-MM, inclosos; sense
+     * from, només to; sense to, el mes actual) amb el període anterior, el
+     * que és habitual, l'estructura, l'evolució, les categories, els
+     * comerços i la despesa formiga.
+     */
+    @GetMapping("/general")
+    public Map<String, Object> getGeneral(@RequestParam(required = false) String from,
+                                          @RequestParam(required = false) String to) {
+        return generalAnalysisService.general(monthOf(from), monthOf(to));
+    }
+
+    /** Les línies de despesa d'una categoria en un període. Sense categoryId, les que no en tenen. */
+    @GetMapping("/category-movements")
+    public List<Map<String, Object>> getCategoryMovements(@RequestParam(required = false) Long categoryId,
+                                                          @RequestParam(required = false) String from,
+                                                          @RequestParam(required = false) String to) {
+        return generalAnalysisService.movements(categoryId, monthOf(from), monthOf(to));
     }
 
     private static YearMonth monthOf(String value) {

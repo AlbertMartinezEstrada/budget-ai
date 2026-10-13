@@ -3,6 +3,7 @@
 //   public/css/tailwind.css      Tailwind compilat (abans cdn.tailwindcss.com)
 //   public/vendor/inter/         la font Inter        (abans Google Fonts)
 //   public/vendor/material-symbols/  les icones        (abans Google Fonts)
+//   public/vendor/chart.js/      els gràfics de l'anàlisi (Chart.js, UMD)
 //
 // Es desa al repositori perquè el frontend se serveix des del disc tal qual:
 // sense pas de construcció, n'hi ha prou de recarregar. Un test comprova que
@@ -32,7 +33,7 @@ export function buildTailwind(outputFile) {
 }
 
 /**
- * Fitxers de font a copiar: [origen dins de node_modules, destí dins de vendor].
+ * Fitxers a copiar: [origen dins de node_modules, destí dins de vendor].
  *
  * D'Inter només el pes variable normal (sense cursiva ni opsz), que és l'únic
  * que fa servir la interfície: el paquet sencer són uns 2 MB i en calen 200 KB.
@@ -46,6 +47,8 @@ export function vendorFiles() {
         ...interFonts.map(file => [`@fontsource-variable/inter/files/${file}`, `inter/files/${file}`]),
         ['material-symbols/outlined.css', 'material-symbols/outlined.css'],
         ['material-symbols/material-symbols-outlined.woff2', 'material-symbols/material-symbols-outlined.woff2'],
+        // La versió UMD: un sol fitxer, sense imports, que deixa Chart a window.
+        ['chart.js/dist/chart.umd.js', 'chart.js/chart.umd.js'],
     ];
 }
 
@@ -62,5 +65,5 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     buildTailwind(output);
     copyVendor();
     const size = readFileSync(output).length;
-    console.log(`tailwind.css: ${(size / 1024).toFixed(0)} KB · fonts copiades a public/vendor`);
+    console.log(`tailwind.css: ${(size / 1024).toFixed(0)} KB · fonts i Chart.js copiats a public/vendor`);
 }

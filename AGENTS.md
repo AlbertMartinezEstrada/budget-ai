@@ -170,7 +170,8 @@ Tampoco construyas clases de Tailwind en tiempo de ejecución: `bg-${color}-500`
 no existe, hay que enumerarlas. Y si usas una clase nueva, ejecuta
 `npm run build:assets`: Tailwind está compilado en `public/css/tailwind.css`, y
 sin regenerarlo la clase no tiene estilo (lo vigila `test/assets.test.js`).
-Nada se carga desde un CDN.
+Nada se carga desde un CDN: tampoco Chart.js, que se copia a `public/vendor/`
+con el mismo comando.
 
 `frontend/test/contract.test.js` vigila estas cuatro reglas y falla si vuelven.
 
