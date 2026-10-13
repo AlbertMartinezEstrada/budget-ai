@@ -25,11 +25,24 @@ const SECTIONS = {
     },
     VARIABLE: {
         titol: 'Gastos variables',
-        descripcio: 'Se reparten sobre lo que queda después de los fijos.',
+        descripcio: 'Se reparten sobre lo que queda después de los fijos, junto con el ahorro.',
         accent: 'border-l-4 border-violet-500',
         pastilla: 'bg-violet-100 text-violet-700 dark:bg-violet-500/20 dark:text-violet-300',
         barra: 'bg-violet-500',
         buit: 'Todavía no hay bloques variables.'
+    },
+    // El ahorro se reparte del mismo bote que los variables (con su porcentaje,
+    // como siempre), pero no es gasto: lo que cuenta es lo que pasa a una cuenta
+    // de ahorro o inversión. Lo que se paga después con ese dinero es «gastado
+    // del fondo» y sale aparte.
+    SAVINGS: {
+        titol: 'Estalvi i inversió',
+        descripcio: 'Del mismo bote que los variables, pero no es gasto: cuenta lo que pasas a tus cuentas de ahorro e inversión.',
+        accent: 'border-l-4 border-teal-500',
+        pastilla: 'bg-teal-100 text-teal-700 dark:bg-teal-500/20 dark:text-teal-300',
+        barra: 'bg-teal-500',
+        buit: 'Ningún bloque en ahorro. En Categorías, elige «Estalvi i inversió» como sección de un bloque.',
+        esEstalvi: true
     },
     // Los ingresos no se reparten: son de donde sale todo lo demás, así que su
     // total es justo lo que las otras dos secciones tienen para repartir. Por
@@ -315,7 +328,8 @@ function indexPots(summary) {
             : section.tipus === 'INCOME'
                 // Los ingresos no cuelgan de ningún bote: no se reparten.
                 ? 'lo previsto'
-                : 'lo que queda para variables';
+                // Variables y ahorro se reparten el mismo bote.
+                : 'lo que queda después de los fijos';
 
         for (const node of section.grups || []) {
             walkPots(node, label, section.base);
@@ -487,6 +501,12 @@ function renderSection(section, budgetByCategory, available) {
                                 ? `previsto ${formatCurrency(assigned)} · recibido ${formatCurrency(real)}`
                                 : share != null ? `${share.toFixed(1)}% de los ingresos` : 'sin ingresos definidos'}
                         </div>
+                        ${style.esEstalvi ? `
+                            <div class="text-xs text-teal-700 dark:text-teal-300">
+                                ahorrado ${formatCurrency(real)}${toNumber(section.gastat_del_fons) > 0
+                                    ? ` · gastado del fondo ${formatCurrency(toNumber(section.gastat_del_fons))}`
+                                    : ''}
+                            </div>` : ''}
                     </div>
                 </div>
 
@@ -506,8 +526,10 @@ function renderSection(section, budgetByCategory, available) {
                                     : section.tipus === 'FIXED'
                                         // Lo que no se llevan los fijos no queda libre: es exactamente
                                         // el bote con el que empiezan los variables.
-                                        ? `${formatCurrency(left)} pasan a variables`
-                                        : `quedan ${formatCurrency(left)} por repartir`}
+                                        ? `${formatCurrency(left)} pasan a variables y ahorro`
+                                        // El bote es el mismo para variables y ahorro: lo que queda
+                                        // es de los dos, y sale igual en las dos secciones.
+                                        : `quedan ${formatCurrency(left)} por repartir entre variables y ahorro`}
                             </span>
                         </div>
                     </div>` : ''}
@@ -543,6 +565,9 @@ function renderBlock(node, budgetByCategory, style) {
 
     const percent = plan > 0 ? Math.min((real / plan) * 100, 100) : 0;
     const level = plan > 0 && real > plan ? 'high' : percent > 80 ? 'medium' : 'low';
+    // Ahorrar más de lo previsto no es pasarse: la barra del ahorro no se pone roja.
+    const barClass = style.esEstalvi ? style.barra : BAR_CLASSES[level];
+    const textClass = style.esEstalvi ? 'text-teal-700 dark:text-teal-300' : TEXT_CLASSES[level];
 
     return `
         <div class="rounded-lg border border-slate-200 dark:border-slate-700 p-4">
@@ -587,11 +612,12 @@ function renderBlock(node, budgetByCategory, style) {
 
             ${!style.esIngres && plan > 0 ? `
                 <div class="h-2 bg-gray-200 dark:bg-slate-700 rounded-full overflow-hidden">
-                    <div class="h-full ${BAR_CLASSES[level]} transition-all" style="width: ${percent}%"></div>
+                    <div class="h-full ${barClass} transition-all" style="width: ${percent}%"></div>
                 </div>
                 <div class="flex flex-wrap justify-between gap-2 text-xs mt-1.5">
-                    <span class="${TEXT_CLASSES[level]} font-medium">
-                        Gastado ${formatCurrency(real)} de ${formatCurrency(plan)}
+                    <span class="${textClass} font-medium">
+                        ${style.esEstalvi ? 'Ahorrado' : 'Gastado'} ${formatCurrency(real)} de ${formatCurrency(plan)}
+                        ${fundSpent(node)}
                     </span>
                     ${left != null
                         ? `<span class="${left < 0 ? 'text-red-600' : 'text-gray-500 dark:text-slate-400'}">
@@ -627,6 +653,9 @@ function renderLeaf(node, budgetByCategory, style) {
 
     const percent = plan > 0 ? Math.min((real / plan) * 100, 100) : 0;
     const level = plan > 0 && real > plan ? 'high' : percent > 80 ? 'medium' : 'low';
+    const barClass = style.esEstalvi ? style.barra : BAR_CLASSES[level];
+    const textClass = style.esEstalvi ? 'text-teal-700 dark:text-teal-300' : TEXT_CLASSES[level];
+    const verb = style.esEstalvi ? 'ahorrado' : 'gastado';
 
     // Una subsecció buida s'apaga en comptes d'ocupar el mateix que una amb
     // diners: hi ha catorze i només compten les que tenen alguna cosa.
@@ -654,8 +683,9 @@ function renderLeaf(node, budgetByCategory, style) {
                 </div>
                 ${!style.esIngres && plan > 0 ? `
                     <div class="h-1.5 bg-gray-200 dark:bg-slate-700 rounded-full overflow-hidden mt-1.5 max-w-xs">
-                        <div class="h-full ${BAR_CLASSES[level]}" style="width: ${percent}%"></div>
+                        <div class="h-full ${barClass}" style="width: ${percent}%"></div>
                     </div>` : ''}
+                ${fundSpent(node) ? `<div class="text-xs mt-1">${fundSpent(node, { inline: false })}</div>` : ''}
             </div>
             <div class="flex items-center gap-2 shrink-0">
                 <div class="text-right text-sm">
@@ -666,16 +696,30 @@ function renderLeaf(node, budgetByCategory, style) {
                            </div>`
                         : plan > 0
                             ? `<div class="font-medium">${formatCurrency(plan)}</div>
-                               <div class="text-xs ${TEXT_CLASSES[level]}">gastado ${formatCurrency(real)}</div>`
+                               <div class="text-xs ${textClass}">${verb} ${formatCurrency(real)}</div>`
                             : real > 0
-                                ? `<div class="font-medium text-orange-600">${formatCurrency(real)}</div>
-                                   <div class="text-xs text-gray-500 dark:text-slate-400">gastado sin asignar</div>`
+                                ? `<div class="font-medium ${style.esEstalvi ? 'text-teal-700 dark:text-teal-300' : 'text-orange-600'}">${formatCurrency(real)}</div>
+                                   <div class="text-xs text-gray-500 dark:text-slate-400">${verb} sin asignar</div>`
                                 : '<div class="text-xs text-gray-500 dark:text-slate-400">sin asignar</div>'}
                 </div>
                 ${actionButtons(node, budgetByCategory)}
             </div>
         </div>
     `;
+}
+
+/**
+ * Lo que se ha pagado con el dinero apartado: un regalo con lo de «Regals i
+ * altres». Es gasto, pero del fondo y no del mes, así que no resta de lo
+ * ahorrado: sale al lado.
+ */
+function fundSpent(node, { inline = true } = {}) {
+    const spent = toNumber(node.gastat_del_fons) || 0;
+    if (spent <= 0) return '';
+    return `<span class="text-gray-500 dark:text-slate-400 font-normal"
+                  title="Pagado con el dinero apartado: cuenta como gasto en Análisis, pero no resta de lo ahorrado.">
+                ${inline ? '· ' : ''}gastado del fondo ${formatCurrency(spent)}
+            </span>`;
 }
 
 /**

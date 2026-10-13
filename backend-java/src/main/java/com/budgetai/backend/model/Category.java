@@ -49,9 +49,10 @@ public class Category {
      *   A UNA FULLA  com es mesura: un fix compta pel prorrateig del seu
      *                recurrent, un variable pel gasto real del mes.
      *   A UN GRUP    a quina secció del repartiment va el bloc sencer: FIXED,
-     *                VARIABLE o INCOME. A null, es dedueix: fix si totes les
-     *                seves fulles ho són. Els ingressos no es dedueixen mai:
-     *                s'han de declarar.
+     *                VARIABLE, SAVINGS (estalvi i inversió) o INCOME. A null,
+     *                es dedueix: fix si totes les seves fulles ho són. Els
+     *                ingressos i l'estalvi no es dedueixen mai: s'han de
+     *                declarar.
      *
      * Un grup pot ser fix i tenir fulles variables a dins —"Llar" és una
      * despesa fixa, però la llum es mesura pel consum—, i per això la secció
@@ -71,6 +72,8 @@ public class Category {
 
     public static final String FIXED = "FIXED";
     public static final String VARIABLE = "VARIABLE";
+    /** Secció d'estalvi i inversió. Només a un bloc de primer nivell. */
+    public static final String SAVINGS = "SAVINGS";
     /**
      * Valor sentinella d'entrada, mai desat: en una actualització parcial vol
      * dir "buida'm la naturalesa". Sense ell no es podria distingir de "no he

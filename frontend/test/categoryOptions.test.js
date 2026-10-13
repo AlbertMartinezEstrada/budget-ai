@@ -175,3 +175,30 @@ test('sense categories no peta', () => {
     assert.equal(module.categoryOptions([]), '');
     assert.equal(module.categoryOptions(undefined), '');
 });
+
+test('Estalvi i inversió és una secció pròpia, entre els variables i els ingressos', () => {
+    const variable = category('Gast mensual', 'VARIABLE');
+    const savings = category('Estalvis', 'SAVINGS');
+    const investment = category('Inversió', 'SAVINGS');
+    const funds = category('Fons d\'inversió', 'VARIABLE', investment);
+    const income = category('Ingressos', 'INCOME');
+    const tree = [income, savings, investment, variable, funds,
+        category('Inversions', 'VARIABLE', funds),
+        category('Inversió de risc', 'VARIABLE', investment),
+        category('Menjar', 'VARIABLE', variable),
+        category('Nòmina', null, income)];
+
+    assert.deepEqual(labels(module.categoryOptions(tree)), [
+        'Gastos variables · Gast mensual',
+        'Estalvi i inversió · Estalvis',
+        'Estalvi i inversió · Inversió',
+        'Ingresos · Ingressos'
+    ]);
+    // Dins d'Inversió, el camí diu de quin grup és cada fulla.
+    assert.deepEqual(texts(module.categoryOptions(tree), 'Estalvi i inversió · Inversió'),
+        ['Fons d&#39;inversió › Inversions', 'Inversió de risc']);
+    // Els diners que s'aparten també surten del compte: és a les seccions de despesa.
+    assert.ok(module.EXPENSE_SECTIONS.includes('SAVINGS'));
+    assert.equal(module.sectionOfCategory(tree, tree.find(candidate => candidate.nom === 'Inversions').id), 'SAVINGS');
+});
+
