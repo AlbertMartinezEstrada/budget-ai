@@ -49,29 +49,19 @@ test('els noms dels comptes s\'escapen', () => {
     assert.ok(html.includes('&lt;b&gt;O&#39;Brien&lt;/b&gt;'));
 });
 
-test('només compta el que és ingrés o despesa de debò: ni traspassos ni «no comptar»', () => {
-    // El mateix criteri que AnalyticsService.counts: el tauler i l'anàlisi
-    // han de donar la mateixa xifra.
-    assert.deepEqual(module.countedLines({ type: 'EXPENSE', cost: '1276.00', compte_contrapart_id: 3 }), []);
-    assert.deepEqual(module.countedLines({ type: 'INCOME', cost: '200.00', exclos_pressupost: true }), []);
-    assert.deepEqual(module.countedLines({ type: 'EXPENSE', cost: '553.33', categoria: 'Lloguer' }),
-        [{ type: 'EXPENSE', categoryName: 'Lloguer', amount: 553.33 }]);
+test('a Estalvi i inversió mana la categoria: des del dia a dia és estalvi, marcat com a traspàs o no', () => {
+    const hint = module.savingsCategoryHint('EXPENSE', principal, '');
+    assert.match(hint, /compta com a estalviat, encara que no ho marquis com a traspàs/);
+    assert.match(hint, /categoria de despesa/);
+    assert.match(module.savingsCategoryHint('INCOME', principal, ''), /resta de l'estalviat/);
 });
 
-test('d\'un moviment dividit compten les parts, cadascuna a la seva categoria, menys les marcades', () => {
-    const lines = module.countedLines({
-        type: 'EXPENSE',
-        cost: '500.00',
-        categoria: 'Estalvis',
-        parts: [
-            { import: '300.00', category: { nom: 'Estalvis' }, exclos_pressupost: false },
-            { import: '160.00', category: { nom: 'Assegurances' }, exclos_pressupost: false },
-            { import: '40.00', category: { nom: 'Estalvis' }, exclos_pressupost: true }
-        ]
-    });
+test('el que es paga des d\'un compte d\'estalvi és gastat del fons', () => {
+    assert.match(module.savingsCategoryHint('EXPENSE', tradeRepublic, ''), /gastat del fons/);
+    // El que hi entra s'hi queda: no cal dir res.
+    assert.equal(module.savingsCategoryHint('INCOME', tradeRepublic, ''), '');
+});
 
-    assert.deepEqual(lines, [
-        { type: 'EXPENSE', categoryName: 'Estalvis', amount: 300 },
-        { type: 'EXPENSE', categoryName: 'Assegurances', amount: 160 }
-    ]);
+test('d\'un traspàs ja en parla l\'avís de l\'altre compte', () => {
+    assert.equal(module.savingsCategoryHint('EXPENSE', principal, '3'), '');
 });

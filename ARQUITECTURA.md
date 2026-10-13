@@ -467,11 +467,11 @@ a día se guarda con `exclos_pressupost`, y así el presupuesto y las deudas lo
 respetan sin saber nada de traspasos. Si después cambias el tipo de una cuenta,
 los traspasos ya guardados no se recalculan.
 
-**El análisis y el panel solo cuentan ingresos y gastos de verdad**: ni
-traspasos —tampoco los de ahorro, que sí cuentan en el presupuesto— ni lo
-marcado como «no comptar», que solo mueve el saldo de la cuenta. El criterio es
-uno (`AnalyticsService.counts` y `countedLines` en el navegador) y va por
-líneas: de un movimiento dividido, la parte marcada no suma.
+**El análisis y el tablero solo cuentan ingresos y gastos de verdad**: ni los
+traspasos entre cuentas del día a día ni lo marcado como «no comptar», que solo
+mueve el saldo de la cuenta. Los de ahorro cuentan como ahorro, igual que en el
+presupuesto. El criterio es uno, `MoneyFlows` (ver «Un solo criterio» más
+abajo), y va por líneas: de un movimiento dividido, la parte marcada no suma.
 
 **Las dos patas guardadas por separado se juntan.** Si se importaron los dos
 extractos antes de marcar el traspaso, el mismo dinero está dos veces: un gasto
@@ -535,20 +535,41 @@ Estalvi i inversió
     └── Inversió de risc
 ```
 
-- **Ahorrado** (`estalviat`, y `cost_vida_real` en la sección) es lo que pasa a
-  una cuenta de ahorro o inversión con esa categoría, menos lo que vuelve. Se
-  mira la cuenta de destino (`InternalTransferService.savingsDirection`), no el
-  tipo del movimiento: el traspaso puede estar guardado en Principal o en Trade
-  Republic, según qué extracto llegó antes.
-- **Gastado del fondo** (`gastat_del_fons`) es lo que se paga con esa categoría y
-  no es un traspaso: el regalo comprado con lo de «Regals i altres». Es gasto
-  —en Análisis lo es—, pero del fondo y no del mes: no resta de lo ahorrado.
+- **Ahorrado** (`estalviat`, y `cost_vida_real` en la sección) es lo que va a
+  esa categoría, **esté marcado como traspaso o no**, menos lo que vuelve. En un
+  traspaso se mira el sentido del dinero
+  (`InternalTransferService.savingsDirection`), no el tipo del movimiento: puede
+  estar guardado en Principal o en Trade Republic, según qué extracto llegó
+  antes.
+- **Gastado del fondo** (`gastat_del_fons`) es lo que se paga con esa categoría
+  **desde una cuenta de ahorro**: el regalo comprado con la tarjeta de Trade
+  Republic. Es gasto —en Análisis lo es—, pero del fondo y no del mes: no resta
+  de lo ahorrado ni de lo que queda sin destinar. Un regalo pagado desde
+  Principal con una categoría de ahorro cuenta como ahorro: no hay forma de
+  distinguirlo del dinero que se aparta, así que las compras van en una
+  categoría de gasto.
 - «Altres», donde caen los movimientos sin categoría, está en Gast mensual: en un
   bloque de ahorro, un gasto sin clasificar habría contado como ahorro.
 
-Análisis cuenta el ahorro **por cuentas**, no por categorías (`total_savings`,
-`savings_rate`): todo lo que entra en Trade Republic se ha apartado, sea para
-Estalvis, para un regalo o para el seguro.
+### Un solo criterio: `MoneyFlows`
+
+Qué es cada línea —ingreso, gasto, ahorro o nada— lo decide `MoneyFlows`, y lo
+usan el presupuesto, Análisis y el tablero (`GET /analytics/overall`). Antes
+cada uno tenía el suyo: el presupuesto miraba la categoría, Análisis si era un
+traspaso y el tablero no sabía qué era el ahorro, y los mismos 300 € a Estalvis
+eran ahorro en una pantalla y gasto en las otras dos.
+
+| Línea | Es |
+|---|---|
+| Marcada como «no comptar» (también los traspasos entre cuentas del día a día) | nada |
+| Estalvi i inversió, traspaso | ahorro, con el signo del sentido del dinero |
+| Estalvi i inversió, pagada desde una cuenta de ahorro | gasto (del fondo) |
+| Estalvi i inversió, cualquier otra | ahorro (lo que vuelve, en negativo) |
+| Otra categoría, traspaso | gasto: lo que se aparta para ella suma, lo que vuelve resta |
+| Otra categoría | ingreso o gasto, según el tipo |
+
+«Sin destinar» (`unassigned`) es ingresos menos gastos y ahorro, sin restar lo
+pagado desde una cuenta de ahorro: sale de lo que ya se había apartado.
 
 La categoría de ahorro se llamaba «Trade Republic», que dice dónde está el
 dinero y no para qué es; desde la `014` se llama «Estalvis».

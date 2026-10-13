@@ -140,9 +140,25 @@ Les claus que retorna el servei són contracte amb el frontend, i tres d'elles
 estaven mal llegides. També comprova que la suma de `291.21 - 262.95` doni
 exactament `28.26` i no `28.25999999999999`, i que ni els traspassos ni el que
 està marcat com a «no comptar» (tampoc una part d'un moviment dividit) surtin al
-resum, al desglossament, a la tendència ni a l'any. I l'estalviat: el que passa
-als comptes d'estalvi menys el que en torna, que no és despesa, amb la seva taxa
-(i sense taxa quan no hi ha ingressos).
+resum, al desglossament, a la tendència ni a l'any. I l'estalviat, amb el
+criteri de `MoneyFlows`: el que va a Estalvis, marcat com a traspàs o no, menys
+el que en torna, que no és despesa, amb la seva taxa (i sense taxa quan no hi ha
+ingressos); que el que es paga des d'un compte d'estalvi sigui despesa però no
+resti del que queda sense destinar; i el resum de tot per al tauler, amb les
+cinc categories on més s'ha gastat.
+
+### `MoneyFlowsTest`
+
+L'únic lloc que decideix què és cada línia per al pressupost, l'anàlisi i el
+tauler. Que a Estalvi i inversió (també una subcategoria) mani la categoria:
+estalvi estigui marcat com a traspàs o no, des de qualsevol de les dues potes, i
+el que en torna en resta; que el que es paga des de Trade Republic sigui gastat
+del fons, i un regal des de Principal amb una categoria d'estalvi, estalvi. Que
+fora d'Estalvi i inversió un ingrés sigui ingrés i una despesa despesa, i que la
+part de l'assegurança que s'aparta a Trade Republic compti a Assegurances des
+de qualsevol pota (abans l'entrada a Trade Republic en restava). Que el «no
+comptar» no sigui res, que d'un moviment dividit cada part vagi per la seva
+categoria, i el que queda sense destinar.
 
 ### `AiEngineServiceTest`
 
@@ -207,9 +223,10 @@ canviï sense voler.
 Els traspassos al navegador: que un traspàs entre comptes del dia a dia no
 compti i un cap a l'estalvi sí, amb el mateix criteri que el backend (si no, el
 formulari diria una cosa i en desar-lo en passaria una altra), que el
-desplegable no ofereixi el mateix compte i que els noms s'escapin. I que el
-tauler compti com l'anàlisi (`countedLines`): ni traspassos ni «no comptar», i
-d'un moviment dividit, les parts que compten.
+desplegable no ofereixi el mateix compte i que els noms s'escapin. I l'avís
+d'una categoria d'estalvi (`savingsCategoryHint`), amb el criteri de
+`MoneyFlows`: des del dia a dia és estalvi, marcat com a traspàs o no, i pagat
+des d'un compte d'estalvi és gastat del fons.
 
 ### `frontend/test/assets.test.js`
 
@@ -299,13 +316,15 @@ nova.
   Revolut l'entrada d'un traspàs ja desat surti reconeguda; que una regla el
   marqui sola; i que filtrar per Trade Republic el trobi. I les dues potes
   desades com a moviments normals: que surtin com a traspàs sense marcar, que
-  ajuntar-les les tregui de l'anàlisi sense tocar cap saldo (i l'estalvi
+  ajuntar-les tregui de l'anàlisi l'ingrés que no ho era sense tocar cap saldo (i l'estalvi
   segueixi comptant al pressupost), que marcar el traspàs editant-lo o amb una
   regla en importar ajunti sola l'altra pota, i que dos moviments que no fan un
   traspàs no s'ajuntin. I Estalvi i inversió: que el que passa a Trade Republic
-  sigui estalviat i un regal pagat amb Regals i altres, gastat del fons (i
-  despesa a l'anàlisi), i que l'estalvi es compti pel compte on entren els
-  diners encara que el traspàs s'hagi desat a Trade Republic.
+  sigui estalviat, també sense marcar com a traspàs, i un regal pagat amb la
+  targeta de Trade Republic, gastat del fons (i despesa a l'anàlisi); que el
+  pressupost, l'anàlisi i el tauler (`/analytics/overall`) donin les mateixes
+  xifres; i que l'estalvi es compti pel compte on entren els diners encara que
+  el traspàs s'hagi desat a Trade Republic.
 - `MonthlySummaryIntegrationTest`: el resum del mes que pinta Pressupostos.
   Entre d'altres, que Estalvi i inversió sigui una secció pròpia però que el
   seu percentatge surti del mateix bot que els variables (el que sobra dels

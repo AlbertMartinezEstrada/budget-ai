@@ -229,14 +229,23 @@ es uno. Una sección que se repartía *antes* de los variables se probó y se qu
 (migraciones 014 y 016); la de ahora (018) comparte el bote y solo cambia cómo
 se mide. No la saques del bote común sin preguntar.
 
-**Es ahorro lo que pasa a una cuenta de ahorro o inversión**, neto de lo que
-vuelve (`InternalTransferService.savingsDirection`, que mira la cuenta de
-destino y no el tipus del movimiento). Lo que se paga después con ese dinero —un
-regalo con lo de «Regals i altres»— es **gasto del fondo**: en el presupuesto
-sale aparte (`gastat_del_fons`) y en Análisis es gasto. Análisis cuenta el
-ahorro por cuentas (`total_savings`), no por categorías. «Altres», donde caen los
-movimientos sin categoría, está en Gast mensual: dentro de un bloque de ahorro
-contaría como ahorro.
+**Qué es cada línea (ingreso, gasto, ahorro o nada) lo decide solo
+`MoneyFlows`**, y lo usan el presupuesto, Análisis y el tablero (que pide sus
+números a `GET /analytics/overall` en vez de calcularlos). Antes cada pantalla
+tenía su criterio y 300 € a Estalvis salían como ahorro en una y como gasto en
+otra. **No vuelvas a filtrar líneas por tu cuenta** para sumar ingresos, gastos
+o ahorro: pasa por `MoneyFlows`.
+
+**Manda la categoría.** Lo que va a Estalvi i inversió es ahorro, esté marcado
+como traspaso o no, neto de lo que vuelve; en un traspaso manda el sentido del
+dinero (`InternalTransferService.savingsDirection`), no el tipus del movimiento.
+Solo lo que se paga **desde una cuenta de ahorro** a un tercero —el regalo con
+la tarjeta de Trade Republic— es **gasto del fondo**: gasto en Análisis,
+aparte en el presupuesto (`gastat_del_fons`) y no resta de «Sin destinar». Un
+regalo pagado desde Principal con una categoría de ahorro cuenta como ahorro (el
+usuario lo aceptó: las compras van en una categoría de gasto). «Altres», donde
+caen los movimientos sin categoría, está en Gast mensual: dentro de un bloque de
+ahorro contaría como ahorro.
 
 **Lo que se reparte es la suma de los ingresos**, no el sueldo: el sueldo es un
 bloque de ingreso más. Cada hoja aporta el **mayor** entre su previsión y lo
@@ -287,9 +296,9 @@ pares sin marcar (`GET /traspassos/sense-marcar`) y el usuario decide
 traspaso (alta, edición o una regla al confirmar), la otra pota sin marcar se
 junta sola, porque si no el saldo se movería dos veces.
 
-**Análisis y panel cuentan solo ingresos y gastos de verdad**
-(`AnalyticsService.counts`, `countedLines` en el frontend): ni traspasos ni lo
-marcado como «no comptar». Los dos criterios tienen que ser el mismo.
+**Análisis y tablero cuentan solo ingresos y gastos de verdad**, con
+`MoneyFlows`: ni los traspasos entre cuentas del día a día ni lo marcado como
+«no comptar»; los de ahorro, como ahorro.
 
 Antes la regla era «una vez sale de la cuenta principal, ya está contado», y lo
 que se pagaba desde Revolut se marcaba como no contado. Servía para el ahorro,
@@ -389,8 +398,8 @@ de contar**. Por eso todo lo que sume dinero por categoría o por deuda pasa por
 `TransactionLines`, que da una línea por movimiento o una por parte. **Sumar
 `transactionRepository.findAll()` directamente funciona hasta el día que se
 divide algo**, y entonces ese movimiento cuenta entero en su categoría de antes,
-sin ningún error que avise. Lo usan el presupuesto, las deudas y el análisis; el
-tablero hace lo mismo en el navegador con `transaction.parts`.
+sin ningún error que avise. Lo usan el presupuesto, las deudas y el análisis (y
+el tablero, a través de él).
 
 Un movimiento dividido no puede cambiar de importe sin cambiar sus partes, ni
 llevar la deuda en el movimiento: el vínculo es de la parte.

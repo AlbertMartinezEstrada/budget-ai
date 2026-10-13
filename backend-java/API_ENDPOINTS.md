@@ -305,14 +305,25 @@ primero sin pagar.
     "total_income": 2500.00,
     "total_expense": 1800.00,
     "total_savings": 500.00,
+    "spent_from_savings": 0.00,
     "savings_rate": 20.00,
     "balance": 700.00,
+    "unassigned": 200.00,
     "transaction_count": 45
   }
   ```
-  Ni los traspasos ni lo marcado como «no comptar» son ingreso o gasto.
-  `total_savings` es lo que ha pasado a las cuentas de ahorro e inversión menos
-  lo que ha vuelto; `savings_rate`, su % de los ingresos (`null` sin ingresos).
+  Con el mismo criterio que el presupuesto (`MoneyFlows`): ni los traspasos entre
+  cuentas del día a día ni lo marcado como «no comptar» son ingreso o gasto.
+  `total_savings` es lo que ha ido a las categorías de Estalvi i inversió, esté
+  marcado como traspaso o no, menos lo que ha vuelto; `savings_rate`, su % de
+  los ingresos (`null` sin ingresos). `spent_from_savings` es la parte de
+  `total_expense` pagada desde una cuenta de ahorro, y `unassigned` lo que queda
+  sin destinar: ingresos menos gastos y ahorro, sin restar esa parte.
+
+### Resumen de todo (tablero)
+- `GET /analytics/overall` - Las mismas claves que el resumen mensual, sin
+  `period`, de todos los movimientos, y `top_categories`: las cinco categorías
+  con más gasto, como en el desglose.
 
 ### Desglose por Categorías
 - `GET /analytics/category-breakdown` - Gastos por categoría del mes

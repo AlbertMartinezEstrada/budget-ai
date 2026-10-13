@@ -41,32 +41,23 @@ export function counterpartOptions(accounts, ownAccountId, selected = null, empt
 }
 
 /**
- * Les línies d'un moviment que són un ingrés o una despesa de debò.
+ * Què passarà amb un moviment d'una categoria d'Estalvi i inversió, per dir-ho
+ * abans de desar. El mateix criteri que MoneyFlows al backend: mana la
+ * categoria, estigui marcat com a traspàs o no.
  *
- * Ni un traspàs entre comptes propis, que només mou diners de lloc, ni el que
- * està marcat com a «no comptar». D'un moviment dividit, les parts que
- * compten, cadascuna amb la seva categoria. El mateix criteri que
- * AnalyticsService.counts: si fossin diferents, el tauler i l'anàlisi
- * donarien xifres diferents del mateix mes.
- *
- * @returns [{ type, categoryName, amount }], buida si no compta res
+ * @param own el compte del moviment
+ * @param counterpart l'altre compte, si és un traspàs: ja ho explica el seu avís
+ * @returns el text de l'avís, o '' si no cal dir res
  */
-export function countedLines(transaction) {
-    if (!transaction || transaction.compte_contrapart_id) return [];
-    const parts = transaction.parts || [];
-    if (parts.length > 0) {
-        return parts
-            .filter(part => !part.exclos_pressupost)
-            .map(part => ({
-                type: transaction.type,
-                categoryName: part.category?.nom,
-                amount: Number.parseFloat(part.import) || 0
-            }));
+export function savingsCategoryHint(type, own, counterpart) {
+    if (counterpart) return '';
+    if (isSavingsAccount(own)) {
+        return type === 'EXPENSE'
+            ? 'Pagat des d\'un compte d\'estalvi: compta com a gastat del fons. És despesa, però surt del que ja havies apartat.'
+            : '';
     }
-    if (transaction.exclos_pressupost) return [];
-    return [{
-        type: transaction.type,
-        categoryName: transaction.categoria,
-        amount: Number.parseFloat(transaction.cost) || 0
-    }];
+    return type === 'EXPENSE'
+        ? 'És una categoria d\'estalvi: compta com a estalviat, encara que no ho marquis com a traspàs. '
+            + 'Si és una compra (un regal), posa-la en una categoria de despesa.'
+        : 'És una categoria d\'estalvi: el que torna al dia a dia resta de l\'estalviat.';
 }
