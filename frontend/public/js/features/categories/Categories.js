@@ -62,6 +62,7 @@ export async function initCategories(container) {
                             <option value="AUTO">Deducir de las subcategorías</option>
                             <option value="FIXED">Gastos fijos</option>
                             <option value="VARIABLE">Gastos variables</option>
+                            <option value="SAVINGS">Estalvi i inversió — lo que apartas, del mismo bote que los variables</option>
                             <option value="INCOME">Ingresos — dinero que entra, no se reparte</option>
                         </select>
                     </div>
@@ -100,7 +101,7 @@ async function loadCategories() {
 const childrenOf = (id) => categories.filter(category => category.parent_id === id);
 
 /** Seccions que no diuen com es mesura una fulla, només on va el bloc. */
-const SECTION_ONLY = new Set(['INCOME']);
+const SECTION_ONLY = new Set(['INCOME', 'SAVINGS']);
 const isGroup = (category) => childrenOf(category.id).length > 0;
 
 function renderTree() {
@@ -118,9 +119,7 @@ function renderTree() {
     const cards = groups.map(group => `
         <div class="bg-white dark:bg-slate-800 rounded-xl p-4 shadow-sm border border-slate-200 dark:border-slate-700">
             ${renderRow(group, true)}
-            <div class="mt-3 pl-4 border-l-2 border-slate-200 dark:border-slate-700 space-y-2">
-                ${childrenOf(group.id).map(child => renderRow(child, false)).join('')}
-            </div>
+            ${renderChildren(group, new Set([group.id]))}
         </div>
     `);
 
@@ -136,6 +135,23 @@ function renderTree() {
     }
 
     container.innerHTML = cards.join('');
+}
+
+/**
+ * Els fills d'un grup, i els dels seus grups, sagnats. Inversió té Fons
+ * d'inversió a dins, i Fons d'inversió, Inversions: amb un sol nivell,
+ * Inversions no sortia enlloc.
+ */
+function renderChildren(group, visited) {
+    return `
+        <div class="mt-3 pl-4 border-l-2 border-slate-200 dark:border-slate-700 space-y-2">
+            ${childrenOf(group.id).map(child => {
+                // Un parent_id mal informat podria fer un cicle i penjar la pàgina.
+                if (visited.has(child.id)) return '';
+                visited.add(child.id);
+                return renderRow(child, false) + (isGroup(child) ? renderChildren(child, visited) : '');
+            }).join('')}
+        </div>`;
 }
 
 function renderRow(category, asGroupHeader) {
@@ -189,6 +205,9 @@ function sectionBadge(category, group) {
     }
     if (category.tipus_cost === 'INCOME') {
         return '<span class="text-xs px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">en ingresos</span>';
+    }
+    if (category.tipus_cost === 'SAVINGS') {
+        return '<span class="text-xs px-2 py-0.5 rounded-full bg-teal-100 text-teal-700">en estalvi i inversió</span>';
     }
     return '<span class="text-xs px-2 py-0.5 rounded-full bg-violet-100 text-violet-700">en gastos variables</span>';
 }

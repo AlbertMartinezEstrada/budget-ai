@@ -12,10 +12,11 @@ CREATE TABLE IF NOT EXISTS categories (
     --   a una FULLA, com es mesura: FIXED pel prorrateig, VARIABLE pel gasto
     --     real del mes. NULL compta com a VARIABLE.
     --   a un BLOC de primer nivell, a quina secció del repartiment va: FIXED,
-    --     VARIABLE o INCOME. NULL la dedueix de les seves fulles.
+    --     VARIABLE, SAVINGS (estalvi i inversió) o INCOME. NULL la dedueix de
+    --     les seves fulles.
     -- INCOME només té sentit a un bloc: marca els diners que entren, que ni es
     -- prorrategen ni es comparen amb un sostre.
-    tipus_cost VARCHAR(20) CHECK (tipus_cost IN ('FIXED', 'VARIABLE', 'INCOME'))
+    tipus_cost VARCHAR(20) CHECK (tipus_cost IN ('FIXED', 'VARIABLE', 'INCOME', 'SAVINGS'))
 );
 
 -- Taula d'Empreses
@@ -244,17 +245,27 @@ CREATE TABLE IF NOT EXISTS import_rules (
 -- migrations/004_blocs_de_repartiment.sql és el preu de tenir una instal·lació
 -- nova i una d'existent acabant igual.
 -- Blocs de primer nivell. A un bloc, tipus_cost diu a quina secció del
--- repartiment va (FIXED, VARIABLE o INCOME); a null, es dedueix de les fulles.
+-- repartiment va (FIXED, VARIABLE, SAVINGS o INCOME); a null, es dedueix de
+-- les fulles.
 INSERT INTO categories (nom, tipus_cost) VALUES
 ('Llar', 'FIXED'), ('Subscripcions', 'FIXED'), ('Assegurances i salut', 'FIXED'),
--- Estalvis és el que s'aparta cada mes, un variable més: del que sobra dels
--- fixos se'n reparteix un percentatge. Es deia "Trade Republic", que és on són
--- els diners i no per a què són.
-('Estalvis', 'VARIABLE'), ('Gastos compartits', 'VARIABLE'),
-('Fons d''inversió', 'VARIABLE'), ('Gast mensual', 'VARIABLE'),
-('Inversió de risc', 'VARIABLE'), ('Regals i altres', 'VARIABLE'),
+('Gastos compartits', 'VARIABLE'), ('Gast mensual', 'VARIABLE'),
+-- Estalvi i inversió: el que s'aparta, no el que es gasta. Es reparteix del
+-- mateix bot que els variables, però compta el que passa a un compte d'estalvi
+-- o d'inversió. Estalvis es deia "Trade Republic", que és on són els diners i
+-- no per a què són; Regals i altres és l'estalvi per a objectius.
+('Estalvis', 'SAVINGS'), ('Regals i altres', 'SAVINGS'), ('Inversió', 'SAVINGS'),
 ('Deutes i préstecs', 'FIXED'),
 ('Ingressos', 'INCOME')
+ON CONFLICT (nom) DO NOTHING;
+
+-- Grups de segon nivell, que necessiten l'id del seu bloc.
+INSERT INTO categories (nom, parent_id, tipus_cost)
+SELECT sub.nom, (SELECT id FROM categories WHERE nom = sub.bloc), sub.natura
+FROM (VALUES
+    ('Fons d''inversió', 'Inversió', 'VARIABLE'),
+    ('Inversió de risc', 'Inversió', 'VARIABLE')
+) AS sub(nom, bloc, natura)
 ON CONFLICT (nom) DO NOTHING;
 
 -- A una fulla, en canvi, tipus_cost diu com es mesura: un fix pel prorrateig
@@ -287,7 +298,8 @@ FROM (VALUES
     ('Casa i mobiliari', 'Gast mensual', 'VARIABLE'),
     ('Mascotes', 'Gast mensual', 'VARIABLE'), ('Educació', 'Gast mensual', 'VARIABLE'),
     ('Regals i detalls', 'Regals i altres', 'VARIABLE'),
-    ('Altres', 'Regals i altres', 'VARIABLE'),
+    -- On cauen els moviments sense categoria: ha de ser despesa, no estalvi.
+    ('Altres', 'Gast mensual', 'VARIABLE'),
     ('Inversions', 'Fons d''inversió', 'VARIABLE'),
     -- Tornar un préstec és un compromís de cada mes, com un cost fix: les
     -- quotes pactades s'hi reserven soles. Deixar diners, en canvi, és puntual.

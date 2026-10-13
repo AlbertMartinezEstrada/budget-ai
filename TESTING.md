@@ -85,7 +85,9 @@ reconegui una sola línia. També els traspassos sense marcar: que una despesa i
 un ingrés del mateix import en comptes diferents, a tres dies o menys, facin un
 parell (i no si són del mateix compte, d'una setmana després, dividits, d'un
 deute o ja marcats), que cada moviment vagi a un sol parell, el més proper, i
-que només s'ajunti una despesa i un ingrés del mateix import.
+que només s'ajunti una despesa i un ingrés del mateix import. I en quin sentit
+mou estalvi un traspàs: cap a l'estalvi suma i en sentit contrari resta, estigui
+desat al compte d'on surt o al d'on arriba.
 
 ### `TransactionLinesTest` i `TransactionPartServiceTest`
 
@@ -138,7 +140,9 @@ Les claus que retorna el servei són contracte amb el frontend, i tres d'elles
 estaven mal llegides. També comprova que la suma de `291.21 - 262.95` doni
 exactament `28.26` i no `28.25999999999999`, i que ni els traspassos ni el que
 està marcat com a «no comptar» (tampoc una part d'un moviment dividit) surtin al
-resum, al desglossament, a la tendència ni a l'any.
+resum, al desglossament, a la tendència ni a l'any. I l'estalviat: el que passa
+als comptes d'estalvi menys el que en torna, que no és despesa, amb la seva taxa
+(i sense taxa quan no hi ha ingressos).
 
 ### `AiEngineServiceTest`
 
@@ -187,7 +191,8 @@ pressupost i un grup per bloc, que la secció d'un bloc sense secció declarada 
 dedueixi de les fulles igual que a `BudgetService`, que per defecte no s'ofereixi
 cap bloc (un moviment en un bloc comptaria dues vegades) i que els noms
 s'escapin. Abans cada pantalla muntava el seu, desendreçat, i algun oferia
-blocs on només hi poden anar fulles.
+blocs on només hi poden anar fulles. També que Estalvi i inversió surti com a
+secció pròpia, amb el camí de les fulles d'Inversió, i dins de les de despesa.
 
 ### `frontend/test/debtReceipts.test.js`
 
@@ -297,11 +302,14 @@ nova.
   ajuntar-les les tregui de l'anàlisi sense tocar cap saldo (i l'estalvi
   segueixi comptant al pressupost), que marcar el traspàs editant-lo o amb una
   regla en importar ajunti sola l'altra pota, i que dos moviments que no fan un
-  traspàs no s'ajuntin.
+  traspàs no s'ajuntin. I Estalvi i inversió: que el que passa a Trade Republic
+  sigui estalviat i un regal pagat amb Regals i altres, gastat del fons (i
+  despesa a l'anàlisi), i que l'estalvi es compti pel compte on entren els
+  diners encara que el traspàs s'hagi desat a Trade Republic.
 - `MonthlySummaryIntegrationTest`: el resum del mes que pinta Pressupostos.
-  Entre d'altres, que Estalvis sigui un variable més: el seu percentatge surt
-  del que sobra dels fixos, com el dels altres, i no hi ha cap secció d'estalvi
-  a part.
+  Entre d'altres, que Estalvi i inversió sigui una secció pròpia però que el
+  seu percentatge surti del mateix bot que els variables (el que sobra dels
+  fixos), i que el que queda per repartir sigui el mateix a les dues seccions.
 - `FixedCostIntegrationTest`: el menú de recurrents de Pressupostos. Que un
   canvi valgui des d'un mes sense tocar els anteriors, que un import posat en un
   sol mes no es copiï als següents, i que s'hi pugui posar la llum, una fulla

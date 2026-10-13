@@ -32,9 +32,9 @@ docker compose logs -f backend        # logs
 scripts\backup.bat                    # copia de la base de datos (backup.sh fuera de Windows)
 scripts/migrate.sh                    # aplica las migraciones pendientes (copia antes; --estat para ver cuáles)
 
-cd backend-java && ./gradlew test              # 202 unitarios, sin Docker
-cd backend-java && ./gradlew integrationTest   # 154, requieren Docker
-cd frontend && npm test                        # 54
+cd backend-java && ./gradlew test              # 204 unitarios, sin Docker
+cd backend-java && ./gradlew integrationTest   # 156, requieren Docker
+cd frontend && npm test                        # 55
 ```
 
 **Ejecuta los tests antes de dar nada por terminado.** El backend hay que
@@ -223,10 +223,20 @@ actualización parcial no distingue «vacío» de «no enviado».
 movimientos de entrada, no los de gasto. Con el filtro de gasto sumaban siempre
 cero.
 
-**El ahorro («Estalvis») es un bloque variable más**: de lo que sobra de los
-fijos se reparten porcentajes, y el ahorro es uno. Una sección de ahorro aparte
-se probó y se quitó (migraciones 014 y 016): no la vuelvas a separar sin
-preguntar.
+**«Estalvi i inversió» (`SAVINGS`) se reparte del mismo bote que los
+variables**: de lo que sobra de los fijos se reparten porcentajes, y el ahorro
+es uno. Una sección que se repartía *antes* de los variables se probó y se quitó
+(migraciones 014 y 016); la de ahora (018) comparte el bote y solo cambia cómo
+se mide. No la saques del bote común sin preguntar.
+
+**Es ahorro lo que pasa a una cuenta de ahorro o inversión**, neto de lo que
+vuelve (`InternalTransferService.savingsDirection`, que mira la cuenta de
+destino y no el tipus del movimiento). Lo que se paga después con ese dinero —un
+regalo con lo de «Regals i altres»— es **gasto del fondo**: en el presupuesto
+sale aparte (`gastat_del_fons`) y en Análisis es gasto. Análisis cuenta el
+ahorro por cuentas (`total_savings`), no por categorías. «Altres», donde caen los
+movimientos sin categoría, está en Gast mensual: dentro de un bloque de ahorro
+contaría como ahorro.
 
 **Lo que se reparte es la suma de los ingresos**, no el sueldo: el sueldo es un
 bloque de ingreso más. Cada hoja aporta el **mayor** entre su previsión y lo

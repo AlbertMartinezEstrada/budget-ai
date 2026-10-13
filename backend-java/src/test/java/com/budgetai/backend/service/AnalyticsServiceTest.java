@@ -204,4 +204,37 @@ class AnalyticsServiceTest {
         assertThat((BigDecimal) summary.get("total_expense")).isEqualByComparingTo("460.00");
         assertThat(summary.get("transaction_count")).isEqualTo(1);
     }
+
+    @Test
+    @DisplayName("L'estalviat és el que passa als comptes d'estalvi menys el que en torna, i no és despesa")
+    void savingsAreTheNetTransfersIntoSavings() {
+        Account principal = account(1L, "Compte Principal");
+        Account revolut = account(2L, "Revolut");
+        Account tradeRepublic = account(3L, "Trade Republic");
+        tradeRepublic.setType("INVERSIONES");
+
+        Transaction salary = transaction("INCOME", "2000.00", LocalDate.of(2026, 10, 1), null);
+        Transaction toSavings = transaction("EXPENSE", "500.00", LocalDate.of(2026, 10, 6), "Estalvis");
+        toSavings.setAccount(principal);
+        toSavings.setCounterpartAccount(tradeRepublic);
+        Transaction back = transaction("INCOME", "100.00", LocalDate.of(2026, 10, 20), "Estalvis");
+        back.setAccount(principal);
+        back.setCounterpartAccount(tradeRepublic);
+        Transaction toRevolut = transaction("EXPENSE", "80.00", LocalDate.of(2026, 10, 7), null);
+        toRevolut.setAccount(principal);
+        toRevolut.setCounterpartAccount(revolut);
+        toRevolut.setExcludedFromBudget(true);
+        when(transactionRepository.findAll()).thenReturn(List.of(salary, toSavings, back, toRevolut));
+
+        Map<String, Object> summary = service.getMonthlySummary(2026, 10);
+
+        assertThat((BigDecimal) summary.get("total_savings")).isEqualByComparingTo("400.00");
+        assertThat((BigDecimal) summary.get("savings_rate")).isEqualByComparingTo("20.00");
+        assertThat((BigDecimal) summary.get("total_expense")).isEqualByComparingTo("0");
+        assertThat((BigDecimal) summary.get("total_income")).isEqualByComparingTo("2000.00");
+        assertThat((BigDecimal) service.getYearlySummary(2026).get("total_savings")).isEqualByComparingTo("400.00");
+        assertThat((BigDecimal) service.getMonthlyTrend(2026).get(9).get("total_savings")).isEqualByComparingTo("400.00");
+        // Sense ingressos no hi ha taxa: no és 0 %, és que no se sap.
+        assertThat(service.getMonthlySummary(2026, 11).get("savings_rate")).isNull();
+    }
 }
