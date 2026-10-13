@@ -334,25 +334,34 @@ class MonthlySummaryIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("L'estalvi és un variable més: el seu percentatge surt del que sobra dels fixos, com els altres")
+    @DisplayName("L'estalvi té la seva secció, però el seu percentatge surt del mateix bot que els variables")
     void savingsShareTheVariablePot() {
         settingsService.updateSettings(settingsWithIncome("2000.00"));
         Long rent = saveCategory("Lloguer", null, Category.FIXED).getId();
         saveBudget(rent, "800.00", null);
-        Long savings = saveCategory("Estalvis", null, Category.VARIABLE).getId();
+        Long savings = saveCategory("Estalvis", null, Category.SAVINGS).getId();
         // quantitat_limit és NOT NULL; mana el percentatge.
         saveBudget(savings, "0.00", "25.00");
+        saveBudget(groupId, "600.00", null);
 
-        // 2000 − 800 de fixos = 1200 per repartir, i el 25% en són 300. Es va
-        // provar de posar l'estalvi en una secció abans dels variables, i el
-        // percentatge deixava de ser del mateix bot que la resta.
+        // 2000 − 800 de fixos = 1200 per repartir, i el 25% en són 300. Una
+        // secció d'estalvi que es repartís abans dels variables deixava el
+        // percentatge fora d'aquest bot: es reparteix del mateix.
         Map<String, Object> estalvis = groupsOf(2026, 3).stream()
                 .filter(node -> "Estalvis".equals(((Category) node.get("categoria")).getName()))
                 .findFirst().orElseThrow();
         assertThat((BigDecimal) estalvis.get("cost_vida_pla")).isEqualByComparingTo("300.00");
-        assertThat(section("VARIABLE").get("grups").toString()).contains("Estalvis");
+        assertThat((BigDecimal) estalvis.get("base_assignacio")).isEqualByComparingTo("1200.00");
+
         assertThat(sectionsOf(2026, 3)).extracting(section -> section.get("tipus"))
-                .containsExactly("INCOME", "FIXED", "VARIABLE");
+                .containsExactly("INCOME", "FIXED", "VARIABLE", "SAVINGS");
+        assertThat(section("SAVINGS").get("grups").toString()).contains("Estalvis");
+        assertThat(section("VARIABLE").get("grups").toString()).doesNotContain("Estalvis");
+        assertThat((BigDecimal) section("SAVINGS").get("assignat")).isEqualByComparingTo("300.00");
+        assertThat((BigDecimal) section("SAVINGS").get("base")).isEqualByComparingTo("1200.00");
+        // El que queda del bot és el mateix a les dues seccions: 1200 − 600 − 300.
+        assertThat((BigDecimal) section("VARIABLE").get("restant")).isEqualByComparingTo("300.00");
+        assertThat((BigDecimal) section("SAVINGS").get("restant")).isEqualByComparingTo("300.00");
     }
 
     @Test

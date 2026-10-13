@@ -76,7 +76,7 @@ class InternalTransfersIntegrationTest extends AbstractIntegrationTest {
         categoryRepository.save(new Category("Altres"));
         Category subscriptions = saveCategory("Subscripcions", null, Category.FIXED);
         claude = saveCategory("Claude", subscriptions.getId(), Category.FIXED);
-        savings = saveCategory("Estalvis", null, Category.VARIABLE);
+        savings = saveCategory("Estalvis", null, Category.SAVINGS);
 
         principal = saveAccount("Compte Principal", "CORRIENTE", "1000.00");
         revolut = saveAccount("Revolut", "CORRIENTE", "0.00");
@@ -423,5 +423,47 @@ class InternalTransfersIntegrationTest extends AbstractIntegrationTest {
         assertThat(transactionRepository.findAll()).hasSize(2);
         assertThat(balanceOf(principal)).isEqualByComparingTo("900.00");
         assertThat(balanceOf(revolut)).isEqualByComparingTo("-100.00");
+    }
+
+    // ============ ESTALVI I INVERSIÓ ============
+
+    @Test
+    @DisplayName("A Estalvi i inversió, el que passa a Trade Republic és estalviat; un regal pagat després, gastat del fons")
+    void savingsAndSpendingFromTheFund() throws Exception {
+        Category gifts = saveCategory("Regals i altres", null, Category.SAVINGS);
+        saveCategory("Nòmina", saveCategory("Ingressos", null, "INCOME").getId(), null);
+
+        create(form("INCOME", "2000.00", "Nòmina", principal, null));
+        // S'aparten 50 € per a regals a Trade Republic, i se'n paga un de 120.
+        create(form("EXPENSE", "50.00", "Regals i altres", principal, tradeRepublic));
+        create(form("EXPENSE", "120.00", "Regals i altres", principal, null));
+        create(form("EXPENSE", "300.00", "Estalvis", principal, tradeRepublic));
+
+        Map<String, Object> node = nodeOf(gifts);
+        assertThat((BigDecimal) node.get("estalviat")).isEqualByComparingTo("50.00");
+        assertThat((BigDecimal) node.get("gastat_del_fons")).isEqualByComparingTo("120.00");
+        // El que es compara amb el pla és l'estalviat, no el que s'ha pagat.
+        assertThat((BigDecimal) node.get("cost_vida_real")).isEqualByComparingTo("50.00");
+
+        // A l'anàlisi: l'estalvi no és despesa, i el regal sí.
+        mockMvc.perform(get("/analytics/monthly-summary").param("year", "2026").param("month", "10").cookie(session))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.total_income").value(2000.00))
+                .andExpect(jsonPath("$.total_expense").value(120.00))
+                .andExpect(jsonPath("$.total_savings").value(350.00))
+                .andExpect(jsonPath("$.savings_rate").value(17.50));
+    }
+
+    @Test
+    @DisplayName("L'estalvi es compta pel compte on entren els diners, encara que el traspàs s'hagi desat a Trade Republic")
+    void savingsFollowTheMoneyWhicheverLegWasStored() throws Exception {
+        // L'extracte de Trade Republic importat primer: el traspàs és un
+        // ingrés a Trade Republic, des de Principal. També és estalvi.
+        create(form("INCOME", "200.00", "Estalvis", tradeRepublic, principal));
+
+        assertThat(realOf(savings)).isEqualByComparingTo("200.00");
+        mockMvc.perform(get("/analytics/monthly-summary").param("year", "2026").param("month", "10").cookie(session))
+                .andExpect(jsonPath("$.total_savings").value(200.00))
+                .andExpect(jsonPath("$.total_income").value(0));
     }
 }

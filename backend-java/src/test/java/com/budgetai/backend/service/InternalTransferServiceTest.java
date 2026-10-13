@@ -285,4 +285,31 @@ class InternalTransferServiceTest {
         // I un parell bo passa.
         service.requireJoinable(outgoing, stored(6L, revolut, "INCOME", "100.00", LocalDate.of(2026, 10, 2)));
     }
+
+    // ============ EN QUIN SENTIT MOU ESTALVI ============
+
+    @Test
+    @DisplayName("Un traspàs cap a l'estalvi suma, el que en torna resta, i entre comptes del mateix tipus no compta")
+    void savingsDirectionFollowsTheMoney() {
+        Transaction toSavings = movement(principal, "EXPENSE", "300.00", LocalDate.of(2026, 10, 1));
+        toSavings.setCounterpartAccount(tradeRepublic);
+        // El mateix traspàs desat des de l'extracte de Trade Republic.
+        Transaction arrivedAtSavings = movement(tradeRepublic, "INCOME", "300.00", LocalDate.of(2026, 10, 1));
+        arrivedAtSavings.setCounterpartAccount(principal);
+        Transaction backFromSavings = movement(principal, "INCOME", "100.00", LocalDate.of(2026, 10, 1));
+        backFromSavings.setCounterpartAccount(tradeRepublic);
+        Transaction leftSavings = movement(tradeRepublic, "EXPENSE", "100.00", LocalDate.of(2026, 10, 1));
+        leftSavings.setCounterpartAccount(principal);
+        Transaction dayToDay = movement(principal, "EXPENSE", "50.00", LocalDate.of(2026, 10, 1));
+        dayToDay.setCounterpartAccount(revolut);
+
+        assertThat(InternalTransferService.savingsDirection(toSavings)).isEqualTo(1);
+        assertThat(InternalTransferService.savingsDirection(arrivedAtSavings)).isEqualTo(1);
+        assertThat(InternalTransferService.savingsDirection(backFromSavings)).isEqualTo(-1);
+        assertThat(InternalTransferService.savingsDirection(leftSavings)).isEqualTo(-1);
+        assertThat(InternalTransferService.savingsDirection(dayToDay)).isZero();
+        // Un pagament normal no és cap traspàs.
+        assertThat(InternalTransferService.savingsDirection(
+                movement(principal, "EXPENSE", "20.00", LocalDate.of(2026, 10, 1)))).isZero();
+    }
 }

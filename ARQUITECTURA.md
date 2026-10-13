@@ -353,8 +353,8 @@ niveles, y **cada nivel se reparte dentro de lo que le ha tocado al de encima**:
 INGRESOS  ──> nómina, regalos, premios, trabajos puntuales
     │         su suma es lo que hay para repartir
     ├──> FIJOS       importe exacto de cada bloque
-    └──> VARIABLES   lo que queda: ingresos − fijos (el ahorro es uno más)
-                     └─> bloques       % del bote de variables
+    └──> VARIABLES   lo que queda: ingresos − fijos
+         Y AHORRO    └─> bloques       % de ese bote, el mismo para las dos
                                        └─> subsecciones  % de su bloque
 ```
 
@@ -508,7 +508,7 @@ identidad vieja y volver a subir el mismo fichero los duplicaría.
 | Dónde | Qué significa |
 |---|---|
 | En una **hoja** | Cómo se mide: un fijo por su prorrateo, un variable por el gasto real |
-| En un **bloque** de primer nivel | A qué sección va el bloque: `FIXED`, `VARIABLE` o `INCOME` |
+| En un **bloque** de primer nivel | A qué sección va el bloque: `FIXED`, `VARIABLE`, `SAVINGS` o `INCOME` |
 
 **`INCOME` solo tiene sentido en un bloque**, y no es una tercera forma de
 gastar: es de donde sale el dinero. Sus hojas no se prorratean ni se comparan
@@ -517,13 +517,41 @@ estuvieron entre los gastos, una categoría de ingreso caía en variables por
 descarte y salía como un bloque de cero euros compitiendo por un bote que es
 justamente suyo.
 
-**El ahorro es un bloque variable más**, a propósito: «Estalvis». De lo que
-sobra de los fijos se reparten porcentajes, y el ahorro es uno de ellos. Se
-probó una sección de ahorro aparte, entre fijos y variables (migración `014`),
-y se quitó (migración `016`): el porcentaje del ahorro dejaba de salir del
-mismo bote que los demás, y el reparto ya no era el que se hace de verdad. Lo
-que sí se quedó de aquel cambio es el nombre: la categoría se llamaba «Trade
-Republic», que dice dónde está el dinero y no para qué es.
+**«Estalvi i inversió» (`SAVINGS`) comparte el bote de los variables.** De lo
+que sobra de los fijos se reparten porcentajes, y el ahorro es uno de ellos: un
+25 % de Estalvis es el 25 % del mismo bote que Gast mensual, y lo que queda por
+repartir (`restant`) es el mismo en las dos secciones. Hubo antes una sección
+de ahorro que se repartía *entre* fijos y variables (migración `014`) y se quitó
+(`016`), porque el porcentaje dejaba de salir de ese bote. La de ahora
+(`018`) solo cambia **cómo se mide**:
+
+```
+Estalvi i inversió
+├── Estalvis
+├── Regals i altres          el ahorro para objetivos
+│   └── Regals i detalls
+└── Inversió
+    ├── Fons d'inversió › Inversions
+    └── Inversió de risc
+```
+
+- **Ahorrado** (`estalviat`, y `cost_vida_real` en la sección) es lo que pasa a
+  una cuenta de ahorro o inversión con esa categoría, menos lo que vuelve. Se
+  mira la cuenta de destino (`InternalTransferService.savingsDirection`), no el
+  tipo del movimiento: el traspaso puede estar guardado en Principal o en Trade
+  Republic, según qué extracto llegó antes.
+- **Gastado del fondo** (`gastat_del_fons`) es lo que se paga con esa categoría y
+  no es un traspaso: el regalo comprado con lo de «Regals i altres». Es gasto
+  —en Análisis lo es—, pero del fondo y no del mes: no resta de lo ahorrado.
+- «Altres», donde caen los movimientos sin categoría, está en Gast mensual: en un
+  bloque de ahorro, un gasto sin clasificar habría contado como ahorro.
+
+Análisis cuenta el ahorro **por cuentas**, no por categorías (`total_savings`,
+`savings_rate`): todo lo que entra en Trade Republic se ha apartado, sea para
+Estalvis, para un regalo o para el seguro.
+
+La categoría de ahorro se llamaba «Trade Republic», que dice dónde está el
+dinero y no para qué es; desde la `014` se llama «Estalvis».
 
 Una categoría de primer nivel sin subcategorías también elige su sección en
 Categorías, no su naturaleza: con el desplegable de fijo o variable, editar un
@@ -584,8 +612,11 @@ calculado:
       "percentatge_del_sou": null, "restant": null, "grups": [ ... ] },
     { "tipus": "FIXED",    "base": 2000.00, "assignat": 800.00,
       "percentatge_del_sou": 40.00, "restant": 1200.00, "grups": [ ... ] },
-    { "tipus": "VARIABLE", "base": 1200.00, "assignat": 900.00,
-      "percentatge_del_sou": 45.00, "restant":  300.00, "grups": [ ... ] }
+    { "tipus": "VARIABLE", "base": 1200.00, "assignat": 600.00,
+      "percentatge_del_sou": 30.00, "restant":  300.00, "grups": [ ... ] },
+    { "tipus": "SAVINGS",  "base": 1200.00, "assignat": 300.00, "real": 250.00,
+      "percentatge_del_sou": 15.00, "restant":  300.00, "gastat_del_fons": 80.00,
+      "grups": [ ... ] }
   ],
   "grups": [ ... ]
 }

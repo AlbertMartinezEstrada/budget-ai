@@ -12,6 +12,7 @@ export async function initAnalytics(container) {
                     <h2 class="text-2xl font-bold text-slate-800 dark:text-slate-100">Análisis</h2>
                     <p class="text-sm text-slate-500 dark:text-slate-400">
                         Solo ingresos y gastos de verdad: sin traspasos entre tus cuentas ni lo marcado como «no comptar».
+                        Lo que pasas a tus cuentas de ahorro e inversión sale como ahorrado, no como gasto.
                     </p>
                 </div>
                 <div class="flex gap-2">
@@ -45,12 +46,14 @@ export async function initAnalytics(container) {
                 <div class="text-2xl font-bold text-red-600" id="total-expenses">${formatCurrency(0)}</div>
             </div>
             <div class="bg-white dark:bg-slate-800 rounded-xl p-4 shadow-sm border border-slate-200 dark:border-slate-700">
-                <div class="text-sm text-gray-500 dark:text-slate-400 mb-1">Balance</div>
-                <div class="text-2xl font-bold" id="total-balance">${formatCurrency(0)}</div>
+                <div class="text-sm text-gray-500 dark:text-slate-400 mb-1">Ahorrado</div>
+                <div class="text-2xl font-bold text-teal-600" id="total-savings">${formatCurrency(0)}</div>
+                <div class="text-xs text-gray-500 dark:text-slate-400" id="savings-rate"></div>
             </div>
             <div class="bg-white dark:bg-slate-800 rounded-xl p-4 shadow-sm border border-slate-200 dark:border-slate-700">
-                <div class="text-sm text-gray-500 dark:text-slate-400 mb-1">Ahorro</div>
-                <div class="text-2xl font-bold text-primary" id="savings-rate">0%</div>
+                <div class="text-sm text-gray-500 dark:text-slate-400 mb-1"
+                     title="Ingresos menos gastos y ahorro: lo que se queda en tus cuentas del día a día.">Sin destinar</div>
+                <div class="text-2xl font-bold" id="total-balance">${formatCurrency(0)}</div>
             </div>
         </div>
 
@@ -107,14 +110,21 @@ function renderSummary(summary) {
     // AnalyticsService retorna "total_expense" en singular.
     const income = summary?.total_income || 0;
     const expenses = summary?.total_expense || 0;
-    const balance = income - expenses;
-    const savingsRate = income > 0 ? ((balance / income) * 100) : 0;
+    // Lo que ha pasado a las cuentas de ahorro e inversión, menos lo que ha
+    // vuelto. Antes la «tasa de ahorro» era ingresos menos gastos: no decía
+    // cuánto se había apartado de verdad.
+    const savings = summary?.total_savings || 0;
+    const rate = summary?.savings_rate;
+    const unassigned = income - expenses - savings;
 
     document.getElementById('total-income').textContent = formatCurrency(income);
     document.getElementById('total-expenses').textContent = formatCurrency(expenses);
-    document.getElementById('total-balance').textContent = formatCurrency(balance);
-    document.getElementById('total-balance').className = `text-2xl font-bold ${balance >= 0 ? 'text-green-600' : 'text-red-600'}`;
-    document.getElementById('savings-rate').textContent = savingsRate.toFixed(1) + '%';
+    document.getElementById('total-savings').textContent = formatCurrency(savings);
+    document.getElementById('savings-rate').textContent = rate != null
+        ? `${Number(rate).toFixed(1)}% de los ingresos`
+        : 'sin ingresos este mes';
+    document.getElementById('total-balance').textContent = formatCurrency(unassigned);
+    document.getElementById('total-balance').className = `text-2xl font-bold ${unassigned >= 0 ? 'text-green-600' : 'text-red-600'}`;
 }
 
 function renderCategories(categories) {
@@ -158,15 +168,24 @@ function renderTrend(trend) {
     // L'escala ha de contemplar ingressos i despeses: si només mira les
     // despeses, les barres d'ingressos se'n surten quan són més grans.
     const maxValue = Math.max(
-        ...trend.map(month => Math.max(month.total_income || 0, month.total_expense || 0)),
+        ...trend.map(month => Math.max(month.total_income || 0, month.total_expense || 0, month.total_savings || 0)),
         1
     );
 
-    container.innerHTML = trend.map(item => {
+    container.innerHTML = `
+        <div class="flex gap-4 text-xs text-gray-500 dark:text-slate-400 mb-1">
+            <span class="flex items-center gap-1"><span class="w-3 h-3 rounded bg-green-400"></span>ingresos</span>
+            <span class="flex items-center gap-1"><span class="w-3 h-3 rounded bg-red-400"></span>gastos</span>
+            <span class="flex items-center gap-1"><span class="w-3 h-3 rounded bg-teal-400"></span>ahorrado</span>
+            <span class="ml-auto">a la derecha, lo ahorrado</span>
+        </div>` + trend.map(item => {
         const income = item.total_income || 0;
         const expense = item.total_expense || 0;
+        // Lo que vuelve del ahorro puede dejar el mes en negativo: la barra no.
+        const savings = item.total_savings || 0;
         const incomeWidth = income / maxValue * 100;
         const expenseWidth = expense / maxValue * 100;
+        const savingsWidth = Math.max(savings, 0) / maxValue * 100;
 
         return `
             <div class="flex items-center gap-2">
@@ -174,9 +193,10 @@ function renderTrend(trend) {
                 <div class="flex-1 flex gap-1 h-6">
                     <div class="h-full bg-green-400 rounded" style="width: ${incomeWidth}%"></div>
                     <div class="h-full bg-red-400 rounded" style="width: ${expenseWidth}%"></div>
+                    <div class="h-full bg-teal-400 rounded" style="width: ${savingsWidth}%"></div>
                 </div>
-                <span class="text-xs text-gray-600 dark:text-slate-300 w-20 text-right">
-                    ${formatCurrency(income - expense)}
+                <span class="text-xs w-20 text-right ${savings < 0 ? 'text-red-600' : 'text-teal-700 dark:text-teal-300'}">
+                    ${formatCurrency(savings)}
                 </span>
             </div>
         `;
