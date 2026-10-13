@@ -160,6 +160,16 @@ de qualsevol pota (abans l'entrada a Trade Republic en restava). Que el «no
 comptar» no sigui res, que d'un moviment dividit cada part vagi per la seva
 categoria, i el que queda sense destinar.
 
+### `BudgetReviewServiceTest`
+
+El semàfor del pla contra el real: que a les despeses el dolent sigui passar-se'n
+i a l'estalvi i als ingressos quedar-se'n curt; que fins al 10 % (mínim 5 €)
+sigui un avís; que un càrrec trimestral o anual surti com a puntual i no com a
+desviament; que al mes en curs l'estalvi que encara no hi és vagi «en curs»
+però una despesa ja passada no. I el rang: sis mesos per defecte, sense passar
+del mes actual, i un rang al revés o de més de 24 mesos rebutjat sense calcular
+res.
+
 ### `AiEngineServiceTest`
 
 Que la resposta de la IA no pugui corrompre les dades del banc. La IA només pot
@@ -227,6 +237,14 @@ desplegable no ofereixi el mateix compte i que els noms s'escapin. I l'avís
 d'una categoria d'estalvi (`savingsCategoryHint`), amb el criteri de
 `MoneyFlows`: des del dia a dia és estalvi, marcat com a traspàs o no, i pagat
 des d'un compte d'estalvi és gastat del fons.
+
+### `frontend/test/budgetReview.test.js`
+
+La pestanya Presupuesto de l'anàlisi: que les paraules del semàfor depenguin de
+la secció («Pasado» en una despesa, «Corto» en l'estalvi), que la desviació
+porti sempre el signe, que els mesos es comptin enrere bé al canvi d'any, el
+resum de l'historial de cada bloc i que l'historial vagi per seccions amb el que
+més s'ha desviat primer.
 
 ### `frontend/test/assets.test.js`
 
@@ -325,6 +343,11 @@ nova.
   pressupost, l'anàlisi i el tauler (`/analytics/overall`) donin les mateixes
   xifres; i que l'estalvi es compti pel compte on entren els diners encara que
   el traspàs s'hagi desat a Trade Republic.
+- `BudgetReviewIntegrationTest`: el pla contra el real per HTTP, amb tres mesos
+  de pressupostos i moviments. Que cada bloc i subcategoria surti amb el pla, el
+  real i el semàfor; que el càrrec anual de l'assegurança surti com a puntual;
+  que l'historial compti només els mesos tancats; i que un mes mal escrit o un
+  rang al revés tornin un 400.
 - `MonthlySummaryIntegrationTest`: el resum del mes que pinta Pressupostos.
   Entre d'altres, que Estalvi i inversió sigui una secció pròpia però que el
   seu percentatge surti del mateix bot que els variables (el que sobra dels

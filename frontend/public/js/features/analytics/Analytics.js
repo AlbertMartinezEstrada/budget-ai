@@ -1,20 +1,64 @@
 import { getMonthlySummary, getCategoryBreakdown, getMonthlyTrend, formatCurrency, escapeHtml } from '../../api.js';
+import { initBudgetReview } from './BudgetReview.js';
 
-export async function initAnalytics(container) {
+/**
+ * Les pestanyes de l'anàlisi. Cadascuna té la seva adreça (#analytics,
+ * #analytics/presupuesto): recarregar la pàgina o tornar enrere hi torna.
+ */
+const TABS = [
+    {
+        id: 'general',
+        label: 'General',
+        hash: '#analytics',
+        description: 'Solo ingresos y gastos de verdad: sin traspasos entre tus cuentas ni lo marcado como «no comptar». '
+            + 'Lo que va a una categoría de Estalvi i inversió sale como ahorrado, no como gasto, como en el presupuesto.'
+    },
+    {
+        id: 'presupuesto',
+        label: 'Presupuesto',
+        hash: '#analytics/presupuesto',
+        description: 'Lo que habías planeado frente a lo que ha pasado de verdad, mes a mes, y en qué bloques te sales del plan casi siempre.'
+    }
+];
+
+/** @param tab la part de l'adreça després de #analytics/; buida, General */
+export async function initAnalytics(container, tab = '') {
+    const active = TABS.find(candidate => candidate.id === tab) || TABS[0];
+
+    container.innerHTML = `
+        <div class="page-header mb-4">
+            <h2 class="text-2xl font-bold text-slate-800 dark:text-slate-100">Análisis</h2>
+            <p class="text-sm text-slate-500 dark:text-slate-400">${escapeHtml(active.description)}</p>
+        </div>
+        <nav class="flex gap-1 border-b border-slate-200 dark:border-slate-700 mb-6" role="tablist">
+            ${TABS.map(candidate => `
+                <a href="${candidate.hash}" role="tab" data-tab="${candidate.id}"
+                   aria-selected="${candidate === active}"
+                   class="px-4 py-2 -mb-px border-b-2 text-sm ${candidate === active
+                       ? 'border-primary text-primary font-medium'
+                       : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-primary'}">
+                    ${escapeHtml(candidate.label)}
+                </a>`).join('')}
+        </nav>
+        <div id="analytics-tab"></div>
+    `;
+
+    const tabContainer = container.querySelector('#analytics-tab');
+    if (active.id === 'presupuesto') {
+        await initBudgetReview(tabContainer);
+        return;
+    }
+    await initGeneral(tabContainer);
+}
+
+async function initGeneral(container) {
     const currentDate = new Date();
     const currentYear = currentDate.getFullYear();
     const currentMonth = currentDate.getMonth() + 1;
 
     container.innerHTML = `
-        <div class="page-header mb-6">
-            <div class="flex justify-between items-center">
-                <div>
-                    <h2 class="text-2xl font-bold text-slate-800 dark:text-slate-100">Análisis</h2>
-                    <p class="text-sm text-slate-500 dark:text-slate-400">
-                        Solo ingresos y gastos de verdad: sin traspasos entre tus cuentas ni lo marcado como «no comptar».
-                        Lo que va a una categoría de Estalvi i inversió sale como ahorrado, no como gasto, como en el presupuesto.
-                    </p>
-                </div>
+        <div class="mb-6">
+            <div class="flex justify-end items-center">
                 <div class="flex gap-2">
                     <select id="year-select" class="px-3 py-2 border rounded-lg"></select>
                     <select id="month-select" class="px-3 py-2 border rounded-lg">

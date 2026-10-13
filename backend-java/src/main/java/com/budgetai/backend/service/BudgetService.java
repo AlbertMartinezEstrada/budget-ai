@@ -339,6 +339,9 @@ public class BudgetService {
      */
     private static final String SECTION_SAVINGS = "SAVINGS";
 
+    /** Les freqüències que no es cobren cada mes. */
+    private static final Set<String> UNEVEN_FREQUENCIES = Set.of("TRIMESTRAL", "ANUAL");
+
     /** El sentit d'un recurrent, al seu camp tipus. */
     private static final String EXPENSE = "EXPENSE";
     private static final String INCOME = "INCOME";
@@ -647,6 +650,11 @@ public class BudgetService {
                     ? fillLeaf(node, category, assigned, section)
                     : fillGroup(node, subNodes, assigned);
 
+            // Un fix anual o trimestral no es cobra cada mes: el mes que cau,
+            // el real passa de llarg del pla sense que res vagi malament.
+            node.put("carrec_irregular", children.isEmpty()
+                    ? chargedUnevenly(category, SECTION_INCOME.equals(section) ? INCOME : EXPENSE)
+                    : subNodes.stream().anyMatch(sub -> Boolean.TRUE.equals(sub.get("carrec_irregular"))));
             node.put("percentatge_efectiu", shareOf(plan, base));
             node.put("percentatge_del_sou", shareOf(plan, salary));
             // El que un grup té assignat i encara no ha repartit entre els seus
@@ -657,6 +665,19 @@ public class BudgetService {
                     : null);
             node.put("subcategories", subNodes);
             return node;
+        }
+
+        /**
+         * Si algun recurrent de la fulla es cobra cada tres mesos o cada any:
+         * el pla en reparteix el prorrateig cada mes, però els diners surten
+         * (o entren, una paga extra) de cop.
+         */
+        private boolean chargedUnevenly(Category leaf, String type) {
+            return recurring.getOrDefault(leaf.getId(), List.of()).stream()
+                    .filter(recurringTransaction -> type.equals(recurringTransaction.getType()))
+                    .map(RecurringTransaction::getFrequency)
+                    .anyMatch(frequency -> frequency != null
+                            && UNEVEN_FREQUENCIES.contains(frequency.toUpperCase()));
         }
 
         /** Fulla: aquí és on es mesura de debò. Retorna el pla. */

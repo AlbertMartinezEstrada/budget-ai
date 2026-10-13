@@ -52,6 +52,10 @@ escucha `hashchange` y llama a la `init` correspondiente. Esto hace que
 recargar mantenga la pantalla, que el botón de atrás funcione y que los enlaces
 se puedan compartir.
 
+Una vista con pestañas lleva la pestaña detrás de una barra
+(`#analytics/presupuesto`): `app.js` pasa esa parte a la `init` de la vista.
+El enlace de la barra lateral vuelve a la vista sin pestaña.
+
 Los clics de navegación se capturan **por delegación en `document`**, no
 enganchando listeners a cada enlace. Es importante: los botones creados dentro
 de una vista (el "Veure tot" del tablero, por ejemplo) no existen cuando la
@@ -660,6 +664,31 @@ pero no lo impide.
 
 `grups` mantiene la lista plana de bloques de primer nivel, para quien no
 necesite saber en qué sección cae cada uno.
+
+## Plan frente a real (Análisis → Presupuesto)
+
+La pestaña Presupuesto de Análisis compara lo planeado con lo que ha pasado,
+mes a mes (`GET /analytics/budget-vs-actual?from=AAAA-MM&to=AAAA-MM`, hasta 24
+meses, sin pasar del mes actual).
+
+- **No calcula nada nuevo**: `BudgetReviewService` lee el resumen mensual del
+  presupuesto de cada mes y lo compara. Con su propia fórmula, tarde o temprano
+  diría otra cosa que Presupuestos. El presupuesto de cada mes se guarda aparte
+  (se copia de un mes a otro), así que el plan de un mes pasado es el que se
+  hizo aquel mes.
+- **El real es lo que ha pasado de verdad** (`caixa_real`): lo gastado, lo
+  apartado y lo cobrado. No el coste de vida, que en un fijo es el mismo
+  prorrateo que el plan y siempre cuadraría.
+- **El semáforo** (`estat`): `BE`, `AVIS` (fuera por poco: hasta el 10 % del
+  plan, mínimo 5 €), `DESVIAT`, `SENSE_PLA`, `CARREC_PUNTUAL` y `EN_CURS`. En
+  gastos lo malo es pasarse; en ahorro e ingresos, quedarse corto.
+- **Un recurrente trimestral o anual** (`carrec_irregular` en el resumen) pasa
+  del prorrateo el mes que cae: sale como cargo puntual, no como desviación.
+  Hay que mirarlo en el acumulado, y con menos de un año ni el acumulado le
+  hace justicia.
+- **El mes en curso** no cuenta en el resumen de cada bloque: aún puede
+  cambiar. Un ahorro que todavía no ha llegado sale «en curso»; un gasto que ya
+  se ha pasado, pasado.
 
 ## Deudas y préstamos
 
