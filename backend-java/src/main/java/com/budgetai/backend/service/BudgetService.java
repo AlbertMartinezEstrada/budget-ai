@@ -1,6 +1,7 @@
 package com.budgetai.backend.service;
 
 import com.budgetai.backend.model.Budget;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.budgetai.backend.model.Category;
 import com.budgetai.backend.model.MonthlyIncome;
 import com.budgetai.backend.model.RecurringTransaction;
@@ -151,6 +152,89 @@ public class BudgetService {
         result.put("origen", source.toString());
         result.put("desti", target.toString());
         result.put("copiats", copied);
+        return result;
+    }
+
+    /**
+     * Un canvi de pla per a una categoria: un import o un percentatge, mai
+     * tots dos.
+     */
+    public record BudgetChange(@JsonProperty("categoria_id") Long categoryId,
+                               @JsonProperty("import") BigDecimal amount,
+                               @JsonProperty("percentatge") BigDecimal percentage) {}
+
+    /**
+     * Aplica uns canvis de pla a un mes: les propostes de l'anàlisi per al mes
+     * que ve.
+     *
+     * Primer copia el pla del mes anterior (copyFromPreviousMonth, que no
+     * trepitja el que ja hi hagi), i després hi posa els canvis. Sense la
+     * còpia, el mes que ve tindria els blocs canviats i res més. Tot en una
+     * transacció: o s'aplica sencer o no s'aplica res.
+     *
+     * Un pla per percentatge es queda per percentatge si el canvi ho és. Una
+     * categoria que té un pressupost més llarg que el mes (trimestral, anual)
+     * no es toca: els imports que solapen un mes se sumen, i es comptaria
+     * dues vegades. Es retorna a omesos.
+     */
+    @Transactional
+    public Map<String, Object> applyChanges(YearMonth target, List<BudgetChange> changes) {
+        if (target == null) throw new IllegalArgumentException("Falta el mes al qual aplicar els canvis.");
+        if (changes == null || changes.isEmpty()) throw new IllegalArgumentException("No hi ha cap canvi per aplicar.");
+
+        CategoryHierarchyService.Tree tree = hierarchyService.loadTree();
+        for (BudgetChange change : changes) {
+            if (change.categoryId() == null || !tree.byId().containsKey(change.categoryId())) {
+                throw new NotFoundException("la categoria", change.categoryId());
+            }
+            if ((change.amount() == null) == (change.percentage() == null)) {
+                throw new IllegalArgumentException("Cada canvi porta un import o un percentatge, i només un.");
+            }
+            if (change.amount() != null && change.amount().signum() < 0) {
+                throw new IllegalArgumentException("Un import de pla no pot ser negatiu.");
+            }
+            if (change.percentage() != null
+                    && (change.percentage().signum() < 0 || change.percentage().compareTo(BigDecimal.valueOf(100)) > 0)) {
+                throw new IllegalArgumentException("Un percentatge ha de ser entre 0 i 100.");
+            }
+        }
+
+        Map<String, Object> copy = copyFromPreviousMonth(target.getYear(), target.getMonthValue());
+
+        int applied = 0;
+        List<String> skipped = new ArrayList<>();
+        for (BudgetChange change : changes) {
+            Category category = tree.byId().get(change.categoryId());
+            Optional<Budget> existing = monthlyBudgetOf(category, target);
+            if (existing.isEmpty() && coveredByLongerBudget(category, target)) {
+                skipped.add(category.getName());
+                continue;
+            }
+            Budget budget = existing.orElseGet(() -> {
+                Budget created = new Budget();
+                created.setCategory(category);
+                created.setPeriodStart(target.atDay(1));
+                created.setPeriodEnd(target.atEndOfMonth());
+                created.setActive(true);
+                return created;
+            });
+            if (change.amount() != null) {
+                budget.setLimitAmount(change.amount());
+                budget.setPercentage(null);
+            } else {
+                // La columna de l'import no pot ser nul·la; amb percentatge no es fa servir.
+                if (budget.getLimitAmount() == null) budget.setLimitAmount(BigDecimal.ZERO);
+                budget.setPercentage(change.percentage());
+            }
+            budgetRepository.save(budget);
+            applied++;
+        }
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("periode", target.toString());
+        result.put("copiats", copy.get("copiats"));
+        result.put("aplicats", applied);
+        result.put("omesos", skipped);
         return result;
     }
 

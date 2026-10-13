@@ -1,6 +1,7 @@
 package com.budgetai.backend.controller;
 
 import com.budgetai.backend.service.AnalyticsService;
+import com.budgetai.backend.service.BudgetAdviceService;
 import com.budgetai.backend.service.BudgetReviewService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
@@ -19,6 +20,9 @@ public class AnalyticsController {
 
     @Autowired
     private BudgetReviewService budgetReviewService;
+
+    @Autowired
+    private BudgetAdviceService budgetAdviceService;
 
     @GetMapping("/monthly-summary")
     public Map<String, Object> getMonthlySummary(
@@ -40,6 +44,15 @@ public class AnalyticsController {
     public Map<String, Object> getBudgetVsActual(@RequestParam(required = false) String from,
                                                  @RequestParam(required = false) String to) {
         return budgetReviewService.review(monthOf(from), monthOf(to));
+    }
+
+    /**
+     * Com acabarà el mes en curs (blocs variables) i què canviar del pla el
+     * mes que ve, a partir dels últims mesos tancats.
+     */
+    @GetMapping("/budget-advice")
+    public Map<String, Object> getBudgetAdvice() {
+        return budgetAdviceService.advice();
     }
 
     private static YearMonth monthOf(String value) {

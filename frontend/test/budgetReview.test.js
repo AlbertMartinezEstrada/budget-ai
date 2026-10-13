@@ -84,3 +84,44 @@ test('l\'historial va per seccions, i dins de cada una, primer el que més s\'ha
     ]);
     assert.deepEqual(sorted.map(block => block.nom), ['Ingressos', 'Llar', 'Gast mensual', 'Oci', 'Estalvis']);
 });
+
+// ============ LA PREVISIÓ I LES PROPOSTES ============
+
+const raise = {
+    categoria_id: 7, nom: 'Bars i restaurants', tipus: 'PUJAR', pla_actual: '100', proposta: '125',
+    diferencia: '25', mitjana_real: '125', maxim_real: '150', mesos_passats: 2,
+    mesos: [{ periode: '2026-09', real: '150' }, { periode: '2026-08', real: '130' }, { periode: '2026-07', real: '95' }],
+    percentatge_actual: null, percentatge_proposat: null
+};
+const lower = {
+    categoria_id: 8, nom: 'Supermercat', tipus: 'BAIXAR', pla_actual: '100', proposta: '60',
+    diferencia: '-40', mitjana_real: '50', maxim_real: '58', mesos_passats: 0,
+    mesos: [{ periode: '2026-09', real: '40' }, { periode: '2026-08', real: '58' }],
+    percentatge_actual: '10', percentatge_proposat: '6.0'
+};
+
+test('el perquè de cada proposta, amb les xifres', () => {
+    assert.equal(module.adviceReason(raise),
+        'Te has pasado 2 de 3 meses; de media gastas 125.00 €. El plan no es realista.');
+    assert.equal(module.adviceReason(lower), 'Te sobra todos los meses: como mucho gastaste 58.00 €.');
+    assert.equal(module.adviceReason({ ...lower, maxim_real: '0' }), 'No lo has usado en 2 meses.');
+});
+
+test('l\'efecte net compta només les propostes marcades', () => {
+    assert.equal(module.netEffect([raise, lower], [7, 8]), -15);
+    assert.equal(module.netEffect([raise, lower], ['7']), 25);
+    assert.equal(module.netEffect([raise, lower], []), 0);
+    assert.match(module.netEffectText(-15), /liberas 15.00 € al mes/);
+    assert.match(module.netEffectText(25), /necesitas 25.00 € más al mes/);
+    assert.equal(module.netEffectText(0), 'Las marcadas no cambian el total del mes.');
+});
+
+test('el que s\'envia: un pla per percentatge es queda per percentatge', () => {
+    assert.deepEqual(module.changesFor([raise, lower], [7, 8]), [
+        { categoria_id: 7, import: 125 },
+        { categoria_id: 8, percentatge: 6 }
+    ]);
+    assert.deepEqual(module.changesFor([raise, lower], [8]), [{ categoria_id: 8, percentatge: 6 }]);
+    assert.equal(module.planLabel('100', '10'), '10 % (100.00 €)');
+    assert.equal(module.planLabel('125', null), '125.00 €');
+});

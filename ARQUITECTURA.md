@@ -690,6 +690,28 @@ meses, sin pasar del mes actual).
   cambiar. Un ahorro que todavía no ha llegado sale «en curso»; un gasto que ya
   se ha pasado, pasado.
 
+Con el mes en curso elegido, la pestaña añade qué hacer
+(`GET /analytics/budget-advice`, `BudgetAdviceService`, que tampoco tiene
+fórmula propia):
+
+- **Cómo acabará el mes**, solo de los gastos variables (los fijos ya tienen
+  su importe): lo gastado hasta hoy más lo que se suele gastar en los días que
+  quedan, con la media de los últimos meses. No es el ritmo del mes estirado
+  hasta el final: una compra grande el día 2 diría que el mes acaba en mil
+  euros. Sin meses anteriores, el plan; sin plan, el ritmo.
+- **Propuestas para el mes que viene**, de los variables con un plan puesto a
+  mano (lo que sale de un recurrente se cambia en Recurrentes), comparando el
+  plan de ahora con los últimos tres meses cerrados con movimientos (los meses
+  vacíos son de antes de usar la aplicación y dirían que no se gasta nada):
+  **subir** a la media si se ha pasado al menos dos veces y de media gasta
+  más; **bajar** al máximo gastado si en todos ha gastado menos del 85 % del
+  plan. Redondeado a 5 € hacia arriba, y un cambio de menos de 5 € no se
+  propone.
+- **Aplicarlas** (`POST /budgets/apply-changes`) copia el plan del mes al
+  siguiente sin tocar lo que ya tenga y pone los cambios encima, todo o nada.
+  Un plan por porcentaje sigue siéndolo, y una categoría con un presupuesto de
+  más de un mes no se toca (los importes que solapan un mes se suman).
+
 ## Deudas y préstamos
 
 Cuando me prestan 1.000 €, el saldo sube pero no soy más rico: los debo. Un
