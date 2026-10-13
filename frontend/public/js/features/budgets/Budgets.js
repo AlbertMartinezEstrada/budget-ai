@@ -32,12 +32,12 @@ const SECTIONS = {
         buit: 'Todavía no hay bloques variables.'
     },
     // El ahorro se reparte del mismo bote que los variables (con su porcentaje,
-    // como siempre), pero no es gasto: lo que cuenta es lo que pasa a una cuenta
-    // de ahorro o inversión. Lo que se paga después con ese dinero es «gastado
-    // del fondo» y sale aparte.
+    // como siempre), pero no es gasto: cuenta lo que va a sus categorías, esté
+    // marcado como traspaso o no. Lo que se paga después desde una cuenta de
+    // ahorro es «gastado del fondo» y sale aparte.
     SAVINGS: {
         titol: 'Estalvi i inversió',
-        descripcio: 'Del mismo bote que los variables, pero no es gasto: cuenta lo que pasas a tus cuentas de ahorro e inversión.',
+        descripcio: 'Del mismo bote que los variables, pero no es gasto: cuenta lo que apartas en estas categorías, igual que en Análisis y en el tablero.',
         accent: 'border-l-4 border-teal-500',
         pastilla: 'bg-teal-100 text-teal-700 dark:bg-teal-500/20 dark:text-teal-300',
         barra: 'bg-teal-500',
@@ -717,7 +717,7 @@ function fundSpent(node, { inline = true } = {}) {
     const spent = toNumber(node.gastat_del_fons) || 0;
     if (spent <= 0) return '';
     return `<span class="text-gray-500 dark:text-slate-400 font-normal"
-                  title="Pagado con el dinero apartado: cuenta como gasto en Análisis, pero no resta de lo ahorrado.">
+                  title="Pagado desde una cuenta de ahorro: cuenta como gasto en Análisis, pero no resta de lo ahorrado.">
                 ${inline ? '· ' : ''}gastado del fondo ${formatCurrency(spent)}
             </span>`;
 }

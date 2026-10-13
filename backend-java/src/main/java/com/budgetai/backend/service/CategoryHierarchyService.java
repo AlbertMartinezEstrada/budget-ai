@@ -87,11 +87,65 @@ public class CategoryHierarchyService {
             for (Category leaf : leavesOf(categoryId)) ids.add(leaf.getId());
             return ids;
         }
+
+        /** El bloc de primer nivell d'on penja una categoria; ella mateixa si ho és. */
+        public Category rootOf(Long categoryId) {
+            Category current = byId.get(categoryId);
+            Set<Long> visited = new HashSet<>();
+            while (current != null && current.getParentId() != null
+                    && byId.containsKey(current.getParentId()) && visited.add(current.getId())) {
+                current = byId.get(current.getParentId());
+            }
+            return current;
+        }
+
+        /**
+         * A quina secció del pressupost va una categoria: la del bloc d'on penja.
+         *
+         * @return FIXED, VARIABLE, SAVINGS o INCOME. Sense categoria, VARIABLE:
+         *         un moviment sense classificar és despesa.
+         */
+        public String sectionOf(Long categoryId) {
+            Category root = categoryId != null ? rootOf(categoryId) : null;
+            return root != null ? sectionOfRoot(root) : Category.VARIABLE;
+        }
+
+        /**
+         * A quina secció cau un bloc de primer nivell.
+         *
+         * Són dues preguntes diferents i per això es responen en dos llocs:
+         *
+         *   ON VIU EL BLOC    el declara el bloc amb el seu tipus_cost
+         *   COM ES MESURA     el declara cada fulla amb el seu
+         *
+         * "Llar" és una despesa fixa —el sostre no es negocia cada mes— però la
+         * llum i l'aigua de dins es mesuren pel consum real. Sense separar-ho,
+         * dues fulles variables se n'enduien el bloc sencer, lloguer inclòs, a
+         * la secció de variables.
+         *
+         * Un bloc que no declara res es dedueix de les fulles: és fix quan tot
+         * el que hi penja ho és. Un bloc que barreja compta com a variable,
+         * perquè partir-lo pel mig deixaria el mateix bloc a les dues seccions i
+         * no es podria repartir ni en un lloc ni en l'altre.
+         */
+        public String sectionOfRoot(Category root) {
+            String declared = root.getCostType();
+            if (Category.FIXED.equals(declared) || Category.VARIABLE.equals(declared)
+                    || INCOME.equals(declared) || Category.SAVINGS.equals(declared)) {
+                return declared;
+            }
+            List<Category> leaves = leavesOf(root.getId());
+            if (leaves.isEmpty()) return Category.VARIABLE;
+            return leaves.stream().allMatch(Category::isFixed) ? Category.FIXED : Category.VARIABLE;
+        }
     }
 
     public Tree loadTree() {
-        List<Category> all = categoryRepository.findAll();
+        return treeOf(categoryRepository.findAll());
+    }
 
+    /** L'arbre d'unes categories qualssevol: el de la base de dades, o el d'una prova. */
+    public static Tree treeOf(List<Category> all) {
         Map<Long, Category> byId = new HashMap<>();
         Map<Long, List<Category>> childrenByParent = new HashMap<>();
 
