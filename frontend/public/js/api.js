@@ -777,6 +777,25 @@ export async function applyBudgetChanges(period, changes) {
     return handleResponse(response);
 }
 
+/**
+ * La pestanya General de l'anàlisi d'un període de mesos («AAAA-MM»,
+ * inclosos): el resum, l'anterior, l'habitual, l'estructura, l'evolució, les
+ * categories, els comerços i la despesa formiga.
+ */
+export async function getGeneralAnalysis(from, to) {
+    const params = new URLSearchParams({ from, to });
+    const response = await apiFetch(`/analytics/general?${params.toString()}`);
+    return handleResponse(response);
+}
+
+/** Les línies de despesa d'una categoria en un període; sense categoria (null), les que no en tenen. */
+export async function getCategoryMovements(categoryId, from, to) {
+    const params = new URLSearchParams({ from, to });
+    if (categoryId !== null && categoryId !== undefined) params.set('categoryId', categoryId);
+    const response = await apiFetch(`/analytics/category-movements?${params.toString()}`);
+    return handleResponse(response);
+}
+
 export async function getMonthlySummary(year, month) {
     const params = new URLSearchParams({ year, month });
     const response = await apiFetch(`/analytics/monthly-summary?${params.toString()}`);

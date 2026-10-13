@@ -76,8 +76,11 @@ public class AnalyticsService {
      * que n'ha tornat), spent_from_savings (la part de la despesa pagada des
      * d'un compte d'estalvi), savings_rate, balance (ingressos menys despeses)
      * i unassigned (el que no s'ha destinat a res).
+     *
+     * El fa servir també la pestanya General (GeneralAnalysisService): el
+     * resum d'un període ha de ser el mateix a tot arreu.
      */
-    private static Map<String, Object> summaryOf(MoneyFlows flows, List<Line> allLines,
+    static Map<String, Object> summaryOf(MoneyFlows flows, List<Line> allLines,
                                                  LocalDate from, LocalDate to) {
         List<Line> lines = allLines.stream().filter(line -> line.isBetween(from, to)).toList();
         BigDecimal totalIncome = flows.sum(lines, Kind.INCOME, from, to);
