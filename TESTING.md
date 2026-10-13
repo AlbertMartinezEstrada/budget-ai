@@ -170,6 +170,16 @@ però una despesa ja passada no. I el rang: sis mesos per defecte, sense passar
 del mes actual, i un rang al revés o de més de 24 mesos rebutjat sense calcular
 res.
 
+### `BudgetAdviceServiceTest`
+
+La previsió i les propostes, amb resums del pressupost fets a mà. Que es
+proposi pujar a la mitjana quan s'ha passat almenys dues vegades, i baixar al
+màxim gastat quan en sobra tots els mesos; que un pla que s'ajusta, un pla que
+surt d'un recurrent o un canvi de menys de 5 € no es toquin; que un pla per
+percentatge es proposi en percentatge; que els mesos sense moviments no
+comptin. I la previsió: el gastat més la mitjana dels dies que queden, o el pla
+o el ritme si no hi ha historial, amb el que es pot gastar cada dia.
+
 ### `AiEngineServiceTest`
 
 Que la resposta de la IA no pugui corrompre les dades del banc. La IA només pot
@@ -244,7 +254,9 @@ La pestanya Presupuesto de l'anàlisi: que les paraules del semàfor depenguin d
 la secció («Pasado» en una despesa, «Corto» en l'estalvi), que la desviació
 porti sempre el signe, que els mesos es comptin enrere bé al canvi d'any, el
 resum de l'historial de cada bloc i que l'historial vagi per seccions amb el que
-més s'ha desviat primer.
+més s'ha desviat primer. I les propostes: el perquè de cadascuna, l'efecte net
+de les marcades i que en aplicar-les un pla per percentatge s'enviï com a
+percentatge.
 
 ### `frontend/test/assets.test.js`
 
@@ -348,6 +360,11 @@ nova.
   real i el semàfor; que el càrrec anual de l'assegurança surti com a puntual;
   que l'historial compti només els mesos tancats; i que un mes mal escrit o un
   rang al revés tornin un 400.
+- `BudgetAdviceIntegrationTest`: les propostes per HTTP, de punta a punta.
+  Que es proposi pujar Restaurants a la mitjana, que aplicar-ho ho posi al pla
+  del mes que ve (amb la resta copiada, el percentatge com a percentatge i el
+  pressupost trimestral sense tocar), i que un canvi mal fet no apliqui res, ni
+  tan sols la còpia.
 - `MonthlySummaryIntegrationTest`: el resum del mes que pinta Pressupostos.
   Entre d'altres, que Estalvi i inversió sigui una secció pròpia però que el
   seu percentatge surti del mateix bot que els variables (el que sobra dels
