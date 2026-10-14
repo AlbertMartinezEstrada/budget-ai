@@ -1,6 +1,7 @@
 import { escapeHtml } from '../../api.js';
 import { initBudgetReview } from './BudgetReview.js';
 import { initGeneral } from './General.js';
+import { initDecisions } from './Decisions.js';
 
 /**
  * Les pestanyes de l'anàlisi. Cadascuna té la seva adreça (#analytics,
@@ -19,6 +20,13 @@ const TABS = [
         label: 'Presupuesto',
         hash: '#analytics/presupuesto',
         description: 'Lo que habías planeado frente a lo que ha pasado de verdad, mes a mes, y en qué bloques te sales del plan casi siempre.'
+    },
+    {
+        id: 'decisiones',
+        label: 'Decisiones',
+        hash: '#analytics/decisiones',
+        description: 'Prueba un cambio antes de aplicarlo y mira qué pasa con el ahorro y tus metas, '
+            + 'cuánto te cuesta lo fijo al año y qué gastos se están disparando.'
     }
 ];
 
@@ -47,6 +55,10 @@ export async function initAnalytics(container, tab = '') {
     const tabContainer = container.querySelector('#analytics-tab');
     if (active.id === 'presupuesto') {
         await initBudgetReview(tabContainer);
+        return;
+    }
+    if (active.id === 'decisiones') {
+        await initDecisions(tabContainer);
         return;
     }
     await initGeneral(tabContainer);

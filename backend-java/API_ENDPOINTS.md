@@ -366,6 +366,38 @@ primero sin pagar.
      "import": 2.40, "es_part": false }]
   ```
 
+### La pestaña Decisiones
+- `GET /analytics/decisions` - Recurrentes al año, lo que sube y los datos del
+  simulador
+  ```json
+  {
+    "periode": "2026-10", "mes_desti": "2026-11",
+    "mesos_mostra": ["2026-09", "2026-08", "2026-07"],
+    "recurrents": {
+      "total_anual": 8031.72, "total_mensual": 669.31,
+      "partides": [{ "id": 3, "nom": "Netflix", "categoria": "Netflix", "bloc": "Subscripcions",
+                     "frequencia": "MENSUAL", "import": 12.99, "mensual": 12.99, "anual": 155.88,
+                     "proxima_data": "2026-11-01" }]
+    },
+    "tendencies": [{ "categoria_id": 12, "nom": "Compres i roba", "bloc": "Gast mensual",
+                     "mesos": [{ "periode": "2026-05", "real": 30.00 }],
+                     "abans": 31.00, "ultim": 85.00, "increment": 54.00, "increment_percent": 174 }],
+    "simulador": {
+      "estalvi_mensual": 250.00, "ingressos_mensuals": 2000.00, "estalvi_pla": 300.00,
+      "partides": [{ "categoria_id": 7, "nom": "Delivery", "bloc": "Gast mensual", "pla": 60.00,
+                     "mitjana_real": 90.00, "te_pla_propi": true, "percentatge": null, "base": 1446.67 }]
+    },
+    "metes": [{ "id": 1, "nom": "Viatge", "objectiu": 3000.00, "actual": 1200.00,
+                "falta": 1800.00, "data_objectiu": "2027-04-30" }]
+  }
+  ```
+  `mesos_mostra`: los meses cerrados con movimientos de los que salen las medias
+  (hasta tres). `estalvi_mensual` e `ingressos_mensuals` son `null` sin ninguno.
+  Una tendencia es una subcategoría variable que ha subido los tres últimos
+  meses cerrados y cuyo último mes está al menos un 20 % y 10 € por encima de
+  la media anterior (`abans`). `percentatge` y `base` sirven para aplicar un
+  cambio a un plan por porcentaje sin convertirlo en importe.
+
 ### Plan frente a real
 - `GET /analytics/budget-vs-actual` - El plan del presupuesto frente a lo que
   ha pasado de verdad, mes a mes
