@@ -18,67 +18,60 @@
     <link rel="stylesheet" href="vendor/inter/inter.css">
     <link rel="stylesheet" href="vendor/material-symbols/outlined.css">
     <link rel="stylesheet" href="css/tailwind.css">
+    <!-- Després de Tailwind: hi tradueix al tema fosc les classes que les
+         vistes fan servir sense la variant dark:. -->
+    <link rel="stylesheet" href="css/dark.css">
 </head>
 <body>
     <div class="app-container">
         <!-- Sidebar -->
         <nav class="sidebar">
             <div class="sidebar-header">
-                <span class="material-symbols-outlined" style="font-size: 2rem; color: #4f46e5;">account_balance_wallet</span>
+                <span class="material-symbols-outlined" style="font-size: 2rem; color: #818cf8;">account_balance_wallet</span>
                 <span class="sidebar-logo">Budget AI</span>
             </div>
             <nav class="nav-links flex-1 px-4 space-y-1">
-                <a class="nav-link flex items-center gap-3 px-4 py-3 rounded-xl text-slate-600
-                dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors" href="#" data-view="dashboard">
+                <a class="nav-link flex items-center gap-3 px-4 py-3 rounded-xl transition-colors" href="#" data-view="dashboard">
                     <span class="material-symbols-outlined">dashboard</span>
                     <span class="font-medium text-sm">Dashboard</span>
                 </a>
-                <a class="nav-link flex items-center gap-3 px-4 py-3 rounded-xl text-slate-600
-                dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors" data-view="transactions"  href="#">
+                <a class="nav-link flex items-center gap-3 px-4 py-3 rounded-xl transition-colors" data-view="transactions"  href="#">
                     <span class="material-symbols-outlined">receipt_long</span>
                     <span class="font-medium text-sm" >Transacciones</span>
                 </a>
-<a class="nav-link flex items-center gap-3 px-4 py-3 rounded-xl text-slate-600
-                dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors" href="#" data-view="categories">
+<a class="nav-link flex items-center gap-3 px-4 py-3 rounded-xl transition-colors" href="#" data-view="categories">
                     <span class="material-symbols-outlined">label</span>
                     <span class="font-medium text-sm">Categorías</span>
                 </a>
-                <a class="nav-link flex items-center gap-3 px-4 py-3 rounded-xl text-slate-600
-                dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors" href="#" data-view="accounts">
+                <a class="nav-link flex items-center gap-3 px-4 py-3 rounded-xl transition-colors" href="#" data-view="accounts">
                     <span class="material-symbols-outlined">account_balance_wallet</span>
                     <span class="font-medium text-sm">Cuentas</span>
                 </a>
-                <a class="nav-link flex items-center gap-3 px-4 py-3 rounded-xl text-slate-600
-                dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors" href="#" data-view="budgets">
+                <a class="nav-link flex items-center gap-3 px-4 py-3 rounded-xl transition-colors" href="#" data-view="budgets">
                     <span class="material-symbols-outlined">pie_chart</span>
                     <span class="font-medium text-sm">Presupuestos</span>
                 </a>
-                <a class="nav-link flex items-center gap-3 px-4 py-3 rounded-xl text-slate-600
-                dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors" href="#" data-view="goals">
+                <a class="nav-link flex items-center gap-3 px-4 py-3 rounded-xl transition-colors" href="#" data-view="goals">
                     <span class="material-symbols-outlined">flag</span>
                     <span class="font-medium text-sm">Metas</span>
                 </a>
-                <a class="nav-link flex items-center gap-3 px-4 py-3 rounded-xl text-slate-600
-                dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors" href="#" data-view="debts">
+                <a class="nav-link flex items-center gap-3 px-4 py-3 rounded-xl transition-colors" href="#" data-view="debts">
                     <span class="material-symbols-outlined">handshake</span>
                     <span class="font-medium text-sm">Deudas</span>
                 </a>
-                <a class="nav-link flex items-center gap-3 px-4 py-3 rounded-xl text-slate-600
-                dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors" href="#" data-view="transfers">
+                <a class="nav-link flex items-center gap-3 px-4 py-3 rounded-xl transition-colors" href="#" data-view="transfers">
                     <span class="material-symbols-outlined">swap_horiz</span>
                     <span class="font-medium text-sm">Transferencias</span>
                 </a>
-                <a class="nav-link flex items-center gap-3 px-4 py-3 rounded-xl text-slate-600
-                dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors" href="#" data-view="recurring">
+                <a class="nav-link flex items-center gap-3 px-4 py-3 rounded-xl transition-colors" href="#" data-view="recurring">
                     <span class="material-symbols-outlined">autorenew</span>
                     <span class="font-medium text-sm">Recurrentes</span>
                 </a>
-                <a class="nav-link flex items-center gap-3 px-4 py-3 rounded-xl text-slate-600
-                dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors" href="#" data-view="analytics">
+                <a class="nav-link flex items-center gap-3 px-4 py-3 rounded-xl transition-colors" href="#" data-view="analytics">
                     <span class="material-symbols-outlined">insights</span>
                     <span class="font-medium text-sm">Análisis</span>
                 </a>
-                <a class="nav-link flex items-center gap-3 px-4 py-3 rounded-xl text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors" href="#" data-view="settings">
+                <a class="nav-link flex items-center gap-3 px-4 py-3 rounded-xl transition-colors" href="#" data-view="settings">
                     <span class="material-symbols-outlined">settings</span>
                     <span class="font-medium text-sm">Configuración</span>
                 </a>
@@ -87,8 +80,8 @@
 
         <!-- Main Content -->
         <main class="main-content">
-            <header class="top-bar flex justify-between items-center px-6 py-4 bg-white border-b border-slate-200">
-                <h2 class="page-title text-xl font-bold text-slate-800" id="page-title">Resum Financer</h2>
+            <header class="top-bar flex justify-between items-center px-6 py-4 bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700">
+                <h2 class="page-title text-xl font-bold text-slate-800 dark:text-slate-100" id="page-title">Resum Financer</h2>
 
                 <div class="flex items-center gap-4">
                     <button class="nav-link flex items-center gap-2 rounded-lg bg-primary py-2 px-4 text-white text-sm font-bold shadow-lg shadow-primary/20 hover:bg-primary/90 transition-all" data-view="upload">

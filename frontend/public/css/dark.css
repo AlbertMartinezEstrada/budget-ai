@@ -1,0 +1,126 @@
+/*
+ * Tema fosc: el que les vistes no diuen.
+ *
+ * Moltes vistes fan servir classes de Tailwind pensades per al tema clar
+ * (bg-white, text-gray-900, text-red-600…) sense la variant dark:. En fosc
+ * quedaven blanques sobre blanc, o fosques sobre fosc. Aquí es tradueixen al
+ * seu equivalent fosc, en un sol lloc, en comptes de perseguir-les vista per
+ * vista.
+ *
+ * Com mana cada regla:
+ *   - Es carrega després de tailwind.css i amb :where(html.dark) davant, que no
+ *     suma especificitat: guanya la classe clara (mateixa especificitat, més
+ *     tard) però perd contra una variant dark: escrita a la vista
+ *     (.dark\:x:is(.dark *) en té més). On una vista diu el seu color fosc,
+ *     mana la vista.
+ *   - Els camps (input, select, textarea) van amb html.dark davant, que sí que
+ *     suma: han de guanyar els estils base del plugin de formularis i una
+ *     classe clara com bg-white, però no una variant dark:.
+ *
+ * Els colors foscos són els de main.css (--bg-surface, --text-main…) i, per als
+ * colors amb significat (vermell, verd…), el to 300-400 de la mateixa família:
+ * el 600-700 que es llegeix sobre blanc no es llegeix sobre slate-800.
+ * Comprovat amb una auditoria de contrast de totes les vistes (WCAG AA).
+ */
+
+/* ============ VORES ============ */
+
+/* La vora per defecte del preflight (#e5e7eb) és una línia blanca sobre fosc. */
+:where(html.dark) *,
+:where(html.dark) ::before,
+:where(html.dark) ::after {
+    border-color: var(--border-color);
+}
+
+/* ============ CAMPS ============ */
+
+html.dark :where(input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=color]):not([type=file]), select, textarea) {
+    background-color: var(--bg-input);
+    color: var(--text-main);
+    border-color: #475569; /* Slate 600: el camp es veu sense ser una línia blanca */
+}
+
+html.dark ::placeholder {
+    color: #94a3b8; /* Slate 400 */
+    opacity: 1;
+}
+
+html.dark :where(select) option {
+    background-color: var(--bg-surface);
+    color: var(--text-main);
+}
+
+/* ============ FONS ============ */
+
+:where(html.dark) .bg-white { background-color: var(--bg-surface); }
+:where(html.dark) .bg-slate-50 { background-color: var(--bg-subtle); }
+:where(html.dark) .bg-slate-100,
+:where(html.dark) .bg-gray-200 { background-color: #334155; }
+:where(html.dark) .bg-slate-300 { background-color: #475569; }
+
+:where(html.dark) .hover\:bg-gray-50:hover,
+:where(html.dark) .hover\:bg-slate-50:hover { background-color: #273449; }
+:where(html.dark) .hover\:bg-gray-100:hover { background-color: #334155; }
+:where(html.dark) .hover\:bg-red-50:hover { background-color: rgba(239, 68, 68, 0.15); }
+
+/* Les pastilles i avisos de color: el to clar, translúcid sobre el fons fosc. */
+:where(html.dark) .bg-amber-100 { background-color: rgba(245, 158, 11, 0.2); }
+:where(html.dark) .bg-blue-100 { background-color: rgba(59, 130, 246, 0.2); }
+:where(html.dark) .bg-emerald-100 { background-color: rgba(16, 185, 129, 0.2); }
+:where(html.dark) .bg-green-100 { background-color: rgba(34, 197, 94, 0.2); }
+:where(html.dark) .bg-indigo-100 { background-color: rgba(99, 102, 241, 0.2); }
+:where(html.dark) .bg-red-100 { background-color: rgba(239, 68, 68, 0.2); }
+:where(html.dark) .bg-teal-100 { background-color: rgba(20, 184, 166, 0.2); }
+:where(html.dark) .bg-violet-100 { background-color: rgba(139, 92, 246, 0.2); }
+:where(html.dark) .bg-warning-light { background-color: rgba(245, 158, 11, 0.2); }
+
+/* El botó verd amb text blanc: el 600 no arriba a 4.5:1, el 700 sí. */
+:where(html.dark) .bg-green-600 { background-color: #15803d; }
+:where(html.dark) .hover\:bg-green-600\/90:hover,
+:where(html.dark) .hover\:bg-green-700:hover { background-color: #166534; }
+
+/* ============ TEXT ============ */
+
+:where(html.dark) .text-gray-900,
+:where(html.dark) .text-slate-900,
+:where(html.dark) .text-slate-800 { color: var(--text-main); }
+:where(html.dark) .text-gray-700,
+:where(html.dark) .text-slate-700 { color: #e2e8f0; }   /* Slate 200 */
+:where(html.dark) .text-gray-600,
+:where(html.dark) .text-slate-600 { color: #cbd5e1; }   /* Slate 300 */
+:where(html.dark) .text-gray-500,
+:where(html.dark) .text-slate-500,
+:where(html.dark) .text-gray-400,
+:where(html.dark) .text-slate-400 { color: #94a3b8; }   /* Slate 400 */
+
+/* Els colors amb significat, en el to que es llegeix sobre fosc. */
+:where(html.dark) .text-primary { color: #7ca3f5; }
+:where(html.dark) .text-blue-600 { color: #60a5fa; }
+:where(html.dark) .text-blue-700 { color: #93c5fd; }
+:where(html.dark) .text-indigo-700 { color: #a5b4fc; }
+:where(html.dark) .text-violet-700 { color: #c4b5fd; }
+:where(html.dark) .text-red-500,
+:where(html.dark) .text-red-600,
+:where(html.dark) .text-error { color: #f87171; }
+:where(html.dark) .text-red-700 { color: #fca5a5; }
+:where(html.dark) .text-green-600 { color: #4ade80; }
+:where(html.dark) .text-success { color: #34d399; }
+:where(html.dark) .text-emerald-700,
+:where(html.dark) .text-emerald-800 { color: #6ee7b7; }
+:where(html.dark) .text-teal-600 { color: #2dd4bf; }
+:where(html.dark) .text-teal-700 { color: #5eead4; }
+:where(html.dark) .text-orange-600 { color: #fb923c; }
+:where(html.dark) .text-amber-800,
+:where(html.dark) .text-warning-dark { color: #fcd34d; }
+
+/* ============ LÍNIES I COMPONENTS ============ */
+
+:where(html.dark) .border-slate-200 { border-color: var(--border-color); }
+:where(html.dark) .divide-slate-100 > :not([hidden]) ~ :not([hidden]),
+:where(html.dark) .divide-slate-200 > :not([hidden]) ~ :not([hidden]) { border-color: var(--border-color); }
+
+:where(html.dark) .badge-primary { background-color: rgba(99, 102, 241, 0.2); color: #c7d2fe; }
+:where(html.dark) .badge-secondary { background-color: #334155; color: #e2e8f0; }
+
+/* La barra lateral no hi és: és fosca en tots dos temes i ja porta els seus
+   colors a layout.css. */

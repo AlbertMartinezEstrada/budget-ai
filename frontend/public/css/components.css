@@ -70,7 +70,9 @@
     border-radius: var(--radius-md);
     font-family: inherit;
     transition: border-color 0.2s;
-    background-color: white;
+    /* Del tema: amb "white" fix, en fosc el text (que és clar) no es veia. */
+    background-color: var(--bg-input);
+    color: var(--text-main);
 }
 
 .form-control:focus, .input:focus {
@@ -97,7 +99,7 @@
 }
 
 .table th {
-    background-color: #f9fafb;
+    background-color: var(--bg-subtle);
     font-weight: 600;
     color: var(--text-secondary);
     font-size: 0.75rem;
@@ -114,11 +116,11 @@
 }
 
 .table-hover tr:hover {
-    background-color: #f9fafb;
+    background-color: var(--bg-subtle);
 }
 
 .table-group-row td {
-    background-color: #f3f4f6;
+    background-color: var(--bg-muted);
     color: var(--text-main);
     font-size: 0.75rem;
     font-weight: 700;
@@ -192,7 +194,7 @@
     padding: 2rem;
     text-align: center;
     transition: border-color 0.2s;
-    background-color: #f9fafb;
+    background-color: var(--bg-subtle);
     display: flex;
     flex-direction: column;
     align-items: center;
