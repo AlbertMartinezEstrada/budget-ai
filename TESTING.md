@@ -191,6 +191,16 @@ blocs, de més a menys, amb el que no està classificat; els comerços per impor
 per visites (un moviment dividit és una visita); la despesa formiga (fins a 10 €
 i fora dels fixos); i els moviments d'un bloc, amb l'import de cada part.
 
+### `DecisionsServiceTest`
+
+La pestanya Decisions, amb resums del pressupost fets a mà. Els recurrents de
+despesa vigents passats a cost anual i ordenats (sense els d'ingrés ni els que
+ja s'han acabat); que una subcategoria que puja tres mesos seguits i ja és un
+20 % i 10 € per sobre sigui una tendència, i que no ho sigui la que puja poc,
+la de pocs euros o la que no puja cada mes, ni res amb menys de quatre mesos;
+el simulador (partides amb pla propi o, si no n'hi ha, les fulles on s'ha
+gastat, i l'estalvi i els ingressos mitjans); i les metes pendents.
+
 ### `AiEngineServiceTest`
 
 Que la resposta de la IA no pugui corrompre les dades del banc. La IA només pot
@@ -277,6 +287,15 @@ referència digui si és bo o dolent segons la xifra (més despesa és dolent, m
 estalvi és bo) i no doni cap % sobre zero, l'estructura en % dels ingressos (amb
 el que s'ha gastat de més a part), que els mesos buits del principi no surtin
 al gràfic, que l'eix arribi al 100 % i els colors fixos de cada sèrie.
+
+### `frontend/test/decisions.test.js`
+
+El simulador de la pestanya Decisiones: que retallar una partida alliberi
+diners per estalviar i pujar-la en tregui (sense negatius ni camps mal escrits
+que canviïn res), quants mesos falten per a una meta i si és a temps, quants
+mesos abans s'hi arriba amb la simulació, que aplicar-la enviï només el que
+canvia (un percentatge com a percentatge), els recurrents per blocs i el text
+de les tendències.
 
 ### `frontend/test/assets.test.js`
 
@@ -389,6 +408,9 @@ nova.
   amb les categories, els comerços i la despesa formiga; els moviments d'un
   bloc amb la data com la llegeix el navegador; i els errors (400 per un mes mal
   escrit, 404 per una categoria que no existeix).
+- `DecisionsIntegrationTest`: la pestanya Decisions per HTTP, amb el pressupost
+  de debò: el recurrent a l'any, el Delivery que puja, el simulador amb el pla i
+  l'estalvi mitjà, i la meta.
 - `MonthlySummaryIntegrationTest`: el resum del mes que pinta Pressupostos.
   Entre d'altres, que Estalvi i inversió sigui una secció pròpia però que el
   seu percentatge surti del mateix bot que els variables (el que sobra dels
