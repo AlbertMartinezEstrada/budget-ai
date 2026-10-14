@@ -3,6 +3,7 @@ package com.budgetai.backend.controller;
 import com.budgetai.backend.service.AnalyticsService;
 import com.budgetai.backend.service.BudgetAdviceService;
 import com.budgetai.backend.service.BudgetReviewService;
+import com.budgetai.backend.service.DecisionsService;
 import com.budgetai.backend.service.GeneralAnalysisService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
@@ -27,6 +28,9 @@ public class AnalyticsController {
 
     @Autowired
     private GeneralAnalysisService generalAnalysisService;
+
+    @Autowired
+    private DecisionsService decisionsService;
 
     @GetMapping("/monthly-summary")
     public Map<String, Object> getMonthlySummary(
@@ -77,6 +81,16 @@ public class AnalyticsController {
                                                           @RequestParam(required = false) String from,
                                                           @RequestParam(required = false) String to) {
         return generalAnalysisService.movements(categoryId, monthOf(from), monthOf(to));
+    }
+
+    /**
+     * La pestanya Decisions: els recurrents passats a cost anual, les
+     * subcategories que pugen i les dades del simulador (partides, estalvi
+     * mitjà i metes).
+     */
+    @GetMapping("/decisions")
+    public Map<String, Object> getDecisions() {
+        return decisionsService.decisions();
     }
 
     private static YearMonth monthOf(String value) {

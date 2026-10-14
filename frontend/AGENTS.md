@@ -33,7 +33,7 @@ test/                 tests con el ejecutor integrado de Node
 
 ```bash
 npm ci                 # instalar exactamente las versiones del lockfile
-npm test               # 75 tests (hace falta npm ci antes: compilan Tailwind)
+npm test               # 81 tests (hace falta npm ci antes: compilan Tailwind)
 npm run build:assets   # regenerar tailwind.css, las fuentes y Chart.js de public/vendor
 ```
 
