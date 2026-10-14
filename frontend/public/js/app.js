@@ -57,18 +57,10 @@ async function startApp() {
 
     /** @param sub el que va després de la vista a l'adreça: #analytics/presupuesto */
     function navigate(view, sub = '') {
-        // Update Active Link in the sidebar
-        const sidebarLinks = document.querySelectorAll('.sidebar .nav-link');
-        sidebarLinks.forEach(link => {
-            // Reset styles for all links
-            link.classList.remove('bg-primary/10', 'text-primary');
-            link.classList.add('text-slate-600', 'dark:text-slate-400', 'hover:bg-slate-50', 'dark:hover:bg-slate-800');
-
-            // Apply active styles to the correct link
-            if (link.dataset.view === view) {
-                link.classList.remove('text-slate-600', 'dark:text-slate-400', 'hover:bg-slate-50', 'dark:hover:bg-slate-800');
-                link.classList.add('bg-primary/10', 'text-primary');
-            }
+        // L'enllaç de la vista oberta, marcat. Els colors són a layout.css: la
+        // barra és fosca en tots dos temes.
+        document.querySelectorAll('.sidebar .nav-link').forEach(link => {
+            link.classList.toggle('active', link.dataset.view === view);
         });
 
         // Clear Content
