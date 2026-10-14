@@ -778,6 +778,16 @@ export async function applyBudgetChanges(period, changes) {
 }
 
 /**
+ * La pestanya Decisiones de l'anàlisi: els recurrents passats a cost anual,
+ * les subcategories que pugen i les dades del simulador (partides, estalvi
+ * mitjà i metes).
+ */
+export async function getDecisions() {
+    const response = await apiFetch('/analytics/decisions');
+    return handleResponse(response);
+}
+
+/**
  * La pestanya General de l'anàlisi d'un període de mesos («AAAA-MM»,
  * inclosos): el resum, l'anterior, l'habitual, l'estructura, l'evolució, les
  * categories, els comerços i la despesa formiga.

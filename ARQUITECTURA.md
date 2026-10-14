@@ -694,6 +694,32 @@ Los gráficos son de Chart.js, guardado en `public/vendor/` como las fuentes
 (ver `frontend/AGENTS.md`), con una paleta validada para daltonismo, un solo eje
 y una tabla con los mismos datos.
 
+## La pestaña Decisiones de Análisis
+
+Para decidir antes de cambiar nada, en una llamada (`GET /analytics/decisions`,
+`DecisionsService`). Como el resto de Análisis, sin fórmula propia: el plan y el
+real salen del resumen mensual del presupuesto, y el ahorro y los ingresos, de
+`MoneyFlows`. Los meses sin ningún movimiento no cuentan.
+
+- **¿Y si…?** Las partidas variables con un plan puesto a mano (si no hay
+  ninguna, las hojas variables donde se ha gastado algo), con lo que se gasta
+  de media en los tres últimos meses cerrados. La simulación se hace en el
+  navegador (`js/decisions.js`) y responde a cada tecla: lo que se recorta va a
+  ahorro, lo que se sube sale de él. Aplicarla usa el mismo
+  `POST /budgets/apply-changes` que las propuestas: copia el plan al mes
+  siguiente y cambia solo las partidas tocadas.
+- **Metas**: las pendientes, con cuándo se llega a cada una con el ahorro medio
+  de ahora y con el de la simulación, y si es a tiempo de su fecha. Cada una
+  como si todo lo que se ahorra al mes fuera a ella: no hay un reparto entre
+  metas que modelar.
+- **Lo fijo, al año**: los recurrentes de gasto vigentes, pasados a coste anual
+  y agrupados por bloque. 3 € al mes no parecen nada; 36 € al año ya hacen
+  pensar.
+- **Lo que está subiendo**: las subcategorías variables que han subido los tres
+  últimos meses cerrados, cada mes más que el anterior, y cuyo último mes está
+  al menos un 20 % y 10 € por encima de la media de los meses de antes. Hacen
+  falta cuatro meses con movimientos.
+
 ## Plan frente a real (Análisis → Presupuesto)
 
 La pestaña Presupuesto de Análisis compara lo planeado con lo que ha pasado,
