@@ -33,7 +33,7 @@ test/                 tests con el ejecutor integrado de Node
 
 ```bash
 npm ci                 # instalar exactamente las versiones del lockfile
-npm test               # 81 tests (hace falta npm ci antes: compilan Tailwind)
+npm test               # 86 tests (hace falta npm ci antes: compilan Tailwind)
 npm run build:assets   # regenerar tailwind.css, las fuentes y Chart.js de public/vendor
 ```
 
@@ -62,9 +62,28 @@ nada.
 pantalla de entrada y no se pide ni un dato. Un `401` en cualquier llamada
 devuelve a esa pantalla automáticamente.
 
-**El tema oscuro tiene dos mitades**: las variables CSS bajo `html.dark` en
-`main.css` para los componentes propios, y las variantes `dark:` de Tailwind en
-las vistas. Si tocas una, mira la otra.
+**El tema oscuro tiene tres piezas**:
+- Las variables CSS bajo `html.dark` en `main.css` (`--bg-surface`,
+  `--bg-input`, `--text-main`…) para los componentes propios. Un componente
+  nuevo usa variables, nunca un `white` o un `#f9fafb` fijo: así era como los
+  campos salían blancos con el texto claro del tema, ilegibles.
+- Las variantes `dark:` de Tailwind en las vistas, que es lo preferible en una
+  vista nueva.
+- `css/dark.css`, cargado después de Tailwind, que traduce al oscuro las clases
+  que las vistas usan sin `dark:` (`bg-white`, `text-gray-900`,
+  `text-red-600`…) y da a todos los campos los colores del tema. Va con
+  `:where(html.dark)` delante, que no suma especificidad: si una vista pone su
+  propio `dark:`, manda la vista. `test/darkMode.test.js` falla si la app usa
+  una clase clara de esas que no está traducida: añádela ahí.
+
+La barra lateral es oscura en los dos temas (`--bg-sidebar`), así que el logo y
+los enlaces llevan sus colores en `layout.css`, pensados para fondo oscuro, y el
+enlace activo se marca con la clase `active`. No le pongas clases de texto del
+contenido (`text-slate-600`, `text-primary`): en claro no se leían.
+
+Para revisar el oscuro no basta con mirar: se comprobó midiendo el contraste
+de cada texto y cada campo contra su fondo en todas las vistas (WCAG AA,
+4.5:1), con Playwright y la clase `dark` puesta en `<html>`.
 
 **Nada viene de un CDN.** Tailwind, la fuente Inter, los iconos (Material
 Symbols) y Chart.js se sirven desde `public/`: un script de terceros tiene acceso a toda la

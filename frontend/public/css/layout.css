@@ -23,10 +23,13 @@
     gap: var(--spacing-sm);
 }
 
+/* La barra lateral és fosca en tots dos temes (--bg-sidebar): el logotip i els
+   enllaços porten colors per a fons fosc, no els del contingut. L'indi 600 i el
+   slate 600 que es llegeixen sobre blanc no arriben a 2.5:1 sobre gray-800. */
 .sidebar-logo {
     font-size: 1.5rem;
     font-weight: 700;
-    color: var(--primary-color);
+    color: #a5b4fc; /* Indigo 300 */
 }
 
 .nav-links {
@@ -47,10 +50,19 @@
     cursor: pointer;
 }
 
-/*.nav-link:hover, .nav-link.active {*/
-/*    background-color: rgba(255, 255, 255, 0.1);*/
-/*    color: var(--text-inverse);*/
-/*}*/
+.sidebar .nav-link {
+    color: #94a3b8; /* Slate 400 */
+}
+
+.sidebar .nav-link:hover {
+    background-color: rgba(255, 255, 255, 0.06);
+    color: #e2e8f0; /* Slate 200 */
+}
+
+.sidebar .nav-link.active {
+    background-color: rgba(99, 102, 241, 0.2);
+    color: #c7d2fe; /* Indigo 200 */
+}
 
 .nav-icon {
     width: 24px;
@@ -68,7 +80,7 @@
     display: flex;
     flex-direction: column;
     overflow: hidden;
-    background-color: #f9fafb; /* Gray 50 */
+    background-color: var(--bg-content);
 }
 
 .top-bar {

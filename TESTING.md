@@ -297,6 +297,19 @@ mesos abans s'hi arriba amb la simulació, que aplicar-la enviï només el que
 canvia (un percentatge com a percentatge), els recurrents per blocs i el text
 de les tendències.
 
+### `frontend/test/darkMode.test.js`
+
+Que el tema fosc no es trenqui en silenci. Que cada classe de color pensada per
+al tema clar que fa servir l'aplicació (fons clars, grisos de text, colors amb
+significat en to fosc) tingui el seu equivalent a `css/dark.css`; que
+`dark.css` es carregui després de Tailwind; que les seves traduccions vagin amb
+`:where(html.dark)` i no trepitgin una variant `dark:` de la vista; i que els
+camps i les taules agafin els colors de les variables del tema, no un blanc
+fix. Abans, els camps eren blancs amb el text clar del tema i no es veia què
+s'escrivia. També, que la barra lateral (fosca en tots dos temes) no faci servir
+colors de text per a fons clar: en clar, els enllaços i el logotip no arribaven
+a 2.5:1.
+
 ### `frontend/test/assets.test.js`
 
 Tailwind, les fonts i Chart.js es generen amb `npm run build:assets` i es desen

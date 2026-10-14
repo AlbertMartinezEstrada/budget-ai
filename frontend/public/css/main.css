@@ -8,6 +8,10 @@
     --bg-body: #f3f4f6; /* Gray 100 */
     --bg-surface: #ffffff;
     --bg-sidebar: #1f2937; /* Gray 800 */
+    --bg-content: #f9fafb;   /* Gray 50: on es pinten les vistes */
+    --bg-input: #ffffff;
+    --bg-subtle: #f9fafb;    /* Capçaleres de taula, zones dins d'una targeta */
+    --bg-muted: #f3f4f6;     /* Files d'agrupació */
 
     /* Colors de Text */
     --text-main: #111827; /* Gray 900 */
@@ -33,9 +37,17 @@
 /* Tema fosc. El selector de tema ja posava la classe "dark" a <html>, però
    no hi havia cap regla que hi respongués: el contingut es quedava en clar. */
 html.dark {
+    /* Els controls del navegador (desplegables oberts, calendari, barres de
+       desplaçament, fletxes dels números) també en fosc. */
+    color-scheme: dark;
+
     --bg-body: #0f172a;      /* Slate 900 */
     --bg-surface: #1e293b;   /* Slate 800 */
     --bg-sidebar: #020617;   /* Slate 950 */
+    --bg-content: #0f172a;
+    --bg-input: #0f172a;     /* Més fosc que la targeta: el camp es distingeix */
+    --bg-subtle: #172235;
+    --bg-muted: #334155;     /* Slate 700 */
 
     --text-main: #f1f5f9;    /* Slate 100 */
     --text-secondary: #94a3b8; /* Slate 400 */
