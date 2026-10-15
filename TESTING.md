@@ -310,6 +310,18 @@ s'escrivia. També, que la barra lateral (fosca en tots dos temes) no faci servi
 colors de text per a fons clar: en clar, els enllaços i el logotip no arribaven
 a 2.5:1.
 
+### `frontend/test/lightContrast.test.js`
+
+Que el tema clar es llegeixi: cap text per sota de 4.5:1 (WCAG AA). Que cada
+color de text que fa servir l'aplicació (les classes de Tailwind i les pròpies
+com `text-success`) arribi a 4.5:1 sobre blanc; que el text d'una pastilla o
+d'un botó arribi a 4.5:1 sobre el seu fons (`bg-emerald-100 text-emerald-700`,
+`bg-green-700 text-white`…, buscats a totes les vistes); i que els botons propis
+amb text blanc (`.btn-success`…) tinguin un fons prou fosc. Abans, el verd dels
+ingressos es quedava a 2.5:1, el vermell de les despeses a 3.8:1 i el botó
+verd amb text blanc a 3.3:1. Comprovat que, amb el codi d'abans, els tres
+tests fallen.
+
 ### `frontend/test/assets.test.js`
 
 Tailwind, les fonts i Chart.js es generen amb `npm run build:assets` i es desen

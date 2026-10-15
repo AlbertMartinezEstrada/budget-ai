@@ -8,7 +8,7 @@ export async function initRecurring(container) {
         <div class="page-header flex justify-between items-center mb-6">
             <h2 class="text-2xl font-bold text-slate-800 dark:text-slate-100">Transacciones Recurrentes</h2>
             <div class="flex gap-2">
-                <button id="process-btn" class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-600/90 flex items-center gap-2">
+                <button id="process-btn" class="bg-green-700 text-white px-4 py-2 rounded-lg hover:bg-green-800 flex items-center gap-2">
                     <span class="material-symbols-outlined">play_arrow</span>
                     Procesar
                 </button>
@@ -120,7 +120,7 @@ async function loadRecurrings() {
         renderRecurrings(recurrings);
     } catch (error) {
         console.error('Error loading recurring transactions:', error);
-        document.getElementById('recurring-list').innerHTML = '<p class="text-red-500">Error al cargar transacciones recurrentes</p>';
+        document.getElementById('recurring-list').innerHTML = '<p class="text-red-600">Error al cargar transacciones recurrentes</p>';
     }
 }
 
@@ -144,7 +144,7 @@ function renderRecurrings(recurrings) {
             <div class="flex items-center justify-between mb-3">
                 <div class="flex items-center gap-3">
                     <div class="w-10 h-10 rounded-lg flex items-center justify-center ${item.tipus === 'INCOME' ? 'bg-green-100' : 'bg-red-100'}">
-                        <span class="material-symbols-outlined ${item.tipus === 'INCOME' ? 'text-green-600' : 'text-red-600'}">${item.tipus === 'INCOME' ? 'trending_up' : 'trending_down'}</span>
+                        <span class="material-symbols-outlined ${item.tipus === 'INCOME' ? 'text-green-700' : 'text-red-600'}">${item.tipus === 'INCOME' ? 'trending_up' : 'trending_down'}</span>
                     </div>
                     <div>
                         <h3 class="font-semibold">${escapeHtml(item.nom)}</h3>
@@ -155,16 +155,16 @@ function renderRecurrings(recurrings) {
                     <button data-action="edit" data-id="${item.id}" class="p-1 hover:bg-gray-100 dark:hover:bg-slate-700 rounded" title="Editar">
                         <span class="material-symbols-outlined text-sm">edit</span>
                     </button>
-                    <button data-action="delete" data-id="${item.id}" class="p-1 hover:bg-red-50 text-red-500 rounded" title="Eliminar">
+                    <button data-action="delete" data-id="${item.id}" class="p-1 hover:bg-red-50 text-red-600 rounded" title="Eliminar">
                         <span class="material-symbols-outlined text-sm">delete</span>
                     </button>
                 </div>
             </div>
             <div class="flex justify-between items-center">
-                <span class="text-xl font-bold ${item.tipus === 'INCOME' ? 'text-green-600' : 'text-red-600'}">
+                <span class="text-xl font-bold ${item.tipus === 'INCOME' ? 'text-green-700' : 'text-red-600'}">
                     ${item.tipus === 'INCOME' ? '+' : '-'}${formatCurrency(item.import)}
                 </span>
-                <span class="text-xs ${item.activa ? 'text-green-600' : 'text-gray-400'}">${item.activa ? 'Activa' : 'Inactiva'}</span>
+                <span class="text-xs ${item.activa ? 'text-green-700' : 'text-gray-500'}">${item.activa ? 'Activa' : 'Inactiva'}</span>
             </div>
             ${budgetLine(item)}
         </div>

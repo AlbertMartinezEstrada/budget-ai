@@ -97,7 +97,7 @@ export async function initSettings(container) {
 
             <!-- Guardar botón principal -->
             <div class="bg-white dark:bg-slate-800 rounded-xl p-6 shadow-sm border lg:col-span-2">
-                <button id="save-all-btn" class="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 font-medium">
+                <button id="save-all-btn" class="bg-green-700 text-white px-6 py-3 rounded-lg hover:bg-green-800 font-medium">
                     Guardar todos los cambios
                 </button>
                 <span id="save-status" class="ml-4 text-sm text-slate-500 dark:text-slate-400"></span>

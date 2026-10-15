@@ -80,7 +80,7 @@ function simulatorCard(data) {
                                     <span class="font-medium">${escapeHtml(item.nom)}</span>
                                     <span class="text-xs text-slate-500 dark:text-slate-400">${escapeHtml(item.bloc || '')}</span>
                                 </td>
-                                <td class="text-right whitespace-nowrap">${item.te_pla_propi ? formatCurrency(item.pla) : '<span class="text-xs text-slate-400">sin plan</span>'}</td>
+                                <td class="text-right whitespace-nowrap">${item.te_pla_propi ? formatCurrency(item.pla) : '<span class="text-xs text-slate-500">sin plan</span>'}</td>
                                 <td class="text-right whitespace-nowrap">${formatCurrency(item.mitjana_real)}</td>
                                 <td class="text-right">
                                     <input type="number" min="0" step="5" inputmode="decimal"

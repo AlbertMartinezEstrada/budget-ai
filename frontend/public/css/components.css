@@ -32,13 +32,15 @@
     background-color: var(--bg-body);
 }
 
+/* El verd del botó és el 700: amb el 500 (--secondary-color), el text blanc
+   quedava a 2.5:1. */
 .btn-success {
-    background-color: var(--secondary-color);
+    background-color: #047857; /* Emerald 700 */
     color: white;
 }
 
 .btn-success:hover {
-    opacity: 0.9;
+    background-color: #065f46; /* Emerald 800 */
 }
 
 .btn-sm {
@@ -171,8 +173,10 @@
 .font-bold { font-weight: 700; }
 .text-sm { font-size: 0.875rem; }
 .text-muted { color: var(--text-secondary); }
-.text-error { color: #ef4444; }
-.text-success { color: #10b981; }
+/* Els tons que es llegeixen sobre blanc (4.5:1): el 500 es quedava a 2.5-3.8:1.
+   En fosc, dark.css els passa a un to clar. */
+.text-error { color: #dc2626; }   /* Red 600 */
+.text-success { color: #047857; } /* Emerald 700 */
 .text-warning-dark { color: #92400e; }
 
 .bg-warning-light { background-color: #fef3c7; }

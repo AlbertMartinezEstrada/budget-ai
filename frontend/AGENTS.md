@@ -33,7 +33,7 @@ test/                 tests con el ejecutor integrado de Node
 
 ```bash
 npm ci                 # instalar exactamente las versiones del lockfile
-npm test               # 86 tests (hace falta npm ci antes: compilan Tailwind)
+npm test               # 89 tests (hace falta npm ci antes: compilan Tailwind)
 npm run build:assets   # regenerar tailwind.css, las fuentes y Chart.js de public/vendor
 ```
 
@@ -81,9 +81,19 @@ los enlaces llevan sus colores en `layout.css`, pensados para fondo oscuro, y el
 enlace activo se marca con la clase `active`. No le pongas clases de texto del
 contenido (`text-slate-600`, `text-primary`): en claro no se leían.
 
-Para revisar el oscuro no basta con mirar: se comprobó midiendo el contraste
-de cada texto y cada campo contra su fondo en todas las vistas (WCAG AA,
-4.5:1), con Playwright y la clase `dark` puesta en `<html>`.
+**En claro, los colores de texto son los tonos que se leen sobre blanco**
+(4.5:1, WCAG AA): grises desde el 500 (`text-slate-500`, nunca el 400), y los
+colores con significado en el 600-700 (`text-red-600`, `text-green-700`,
+`text-orange-700`, `text-teal-700`). El 500 del verde o el rojo parece más
+vivo, pero se queda en 2.5-3.8:1. Lo mismo para un botón con texto blanco: el
+fondo verde es el 700. `test/lightContrast.test.js` falla si entra un color de
+texto, una pastilla (`bg-…-100 text-…`) o un botón que no llega; al cambiar
+de tono, pon su equivalente en `dark.css` para que el oscuro no cambie.
+
+Para revisar los dos temas no basta con mirar: se comprobó midiendo el
+contraste de cada texto y cada campo contra su fondo en todas las vistas y sus
+formularios (WCAG AA, 4.5:1), con Playwright, en claro y con la clase `dark`
+puesta en `<html>`.
 
 **Nada viene de un CDN.** Tailwind, la fuente Inter, los iconos (Material
 Symbols) y Chart.js se sirven desde `public/`: un script de terceros tiene acceso a toda la

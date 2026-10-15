@@ -9,7 +9,7 @@ import { categoryOptions, EXPENSE_SECTIONS } from '../../categoryOptions.js';
 // Tailwind no pot generar classes construïdes en temps d'execució
 // (`bg-${color}-500`), així que s'enumeren senceres.
 const BAR_CLASSES = { low: 'bg-green-500', medium: 'bg-orange-500', high: 'bg-red-500' };
-const TEXT_CLASSES = { low: 'text-green-600', medium: 'text-orange-600', high: 'text-red-600' };
+const TEXT_CLASSES = { low: 'text-green-700', medium: 'text-orange-700', high: 'text-red-600' };
 
 // Les tres seccions es pinten diferent a propòsit: la primera cosa que s'ha de
 // veure en obrir la pantalla és d'on venen els diners, on acaba el que està
@@ -308,7 +308,7 @@ async function loadSummary() {
         renderSections(summary, budgets);
     } catch (error) {
         console.error('Error loading budgets:', error);
-        container.innerHTML = '<p class="text-red-500">Error al cargar presupuestos</p>';
+        container.innerHTML = '<p class="text-red-600">Error al cargar presupuestos</p>';
     }
 }
 
@@ -415,7 +415,7 @@ function renderHeader(summary) {
             <div class="text-right">
                 <div class="text-xs text-gray-500 dark:text-slate-400">Previsto / recibido</div>
                 <div class="text-lg font-semibold">
-                    ${formatCurrency(forecast)} <span class="text-gray-400">/</span> ${formatCurrency(real)}
+                    ${formatCurrency(forecast)} <span class="text-gray-500">/</span> ${formatCurrency(real)}
                 </div>
                 <div class="text-xs text-gray-500 dark:text-slate-400">
                     ${real > forecast && forecast > 0
@@ -587,7 +587,7 @@ function renderBlock(node, budgetByCategory, style) {
                                 ? `<span class="text-xs text-gray-500 dark:text-slate-400">${children.length} subsecciones</span>`
                                 : ''}
                             ${node.carrec_puntual_aquest_mes
-                                ? '<span class="text-xs text-orange-600" title="Este mes ha caído un cargo fijo puntual">⚑ cargo este mes</span>'
+                                ? '<span class="text-xs text-orange-700" title="Este mes ha caído un cargo fijo puntual">⚑ cargo este mes</span>'
                                 : ''}
                         </div>
                     </div>
@@ -690,7 +690,7 @@ function renderLeaf(node, budgetByCategory, style) {
             <div class="flex items-center gap-2 shrink-0">
                 <div class="text-right text-sm">
                     ${style.esIngres
-                        ? `<div class="font-medium ${real > 0 ? 'text-green-600' : ''}">${formatCurrency(Math.max(real, plan))}</div>
+                        ? `<div class="font-medium ${real > 0 ? 'text-green-700' : ''}">${formatCurrency(Math.max(real, plan))}</div>
                            <div class="text-xs text-gray-500 dark:text-slate-400">
                                ${plan > 0 ? `previsto ${formatCurrency(plan)} · recibido ${formatCurrency(real)}` : 'recibido'}
                            </div>`
@@ -698,7 +698,7 @@ function renderLeaf(node, budgetByCategory, style) {
                             ? `<div class="font-medium">${formatCurrency(plan)}</div>
                                <div class="text-xs ${textClass}">${verb} ${formatCurrency(real)}</div>`
                             : real > 0
-                                ? `<div class="font-medium ${style.esEstalvi ? 'text-teal-700 dark:text-teal-300' : 'text-orange-600'}">${formatCurrency(real)}</div>
+                                ? `<div class="font-medium ${style.esEstalvi ? 'text-teal-700 dark:text-teal-300' : 'text-orange-700'}">${formatCurrency(real)}</div>
                                    <div class="text-xs text-gray-500 dark:text-slate-400">${verb} sin asignar</div>`
                                 : '<div class="text-xs text-gray-500 dark:text-slate-400">sin asignar</div>'}
                 </div>
@@ -776,7 +776,7 @@ function actionButtons(node, budgetByCategory) {
             <button data-action="edit" data-id="${budget.id}" class="p-1 hover:bg-gray-100 dark:hover:bg-slate-700 rounded" title="Cambiar la asignación">
                 <span class="material-symbols-outlined text-sm">edit</span>
             </button>
-            <button data-action="delete" data-id="${budget.id}" data-fixed="${hasFixedCost}" class="p-1 hover:bg-red-50 dark:hover:bg-red-500/10 text-red-500 rounded"
+            <button data-action="delete" data-id="${budget.id}" data-fixed="${hasFixedCost}" class="p-1 hover:bg-red-50 dark:hover:bg-red-500/10 text-red-600 rounded"
                     title="${hasFixedCost ? 'Volver al recurrente' : 'Quitar la asignación'}">
                 <span class="material-symbols-outlined text-sm">${hasFixedCost ? 'undo' : 'delete'}</span>
             </button>`;
@@ -1011,7 +1011,7 @@ async function loadFixedCosts() {
         loadedFixedCosts = response.costos || [];
         renderFixedCosts(loadedFixedCosts, toNumber(response.total_mensual) || 0);
     } catch (error) {
-        list.innerHTML = `<p class="text-red-500 text-sm">${escapeHtml(error.message || 'Error al cargar los recurrentes')}</p>`;
+        list.innerHTML = `<p class="text-red-600 text-sm">${escapeHtml(error.message || 'Error al cargar los recurrentes')}</p>`;
     }
 }
 
@@ -1044,7 +1044,7 @@ function renderFixedCosts(fixedCosts, monthlyTotal) {
                     <button data-action="edit-fixed" data-id="${fixedCost.id}" class="p-1 hover:bg-gray-100 dark:hover:bg-slate-700 rounded" title="Cambiar desde este mes">
                         <span class="material-symbols-outlined text-sm">edit</span>
                     </button>
-                    <button data-action="delete-fixed" data-id="${fixedCost.id}" class="p-1 hover:bg-red-50 dark:hover:bg-red-500/10 text-red-500 rounded" title="Quitar desde este mes">
+                    <button data-action="delete-fixed" data-id="${fixedCost.id}" class="p-1 hover:bg-red-50 dark:hover:bg-red-500/10 text-red-600 rounded" title="Quitar desde este mes">
                         <span class="material-symbols-outlined text-sm">delete</span>
                     </button>
                 </div>

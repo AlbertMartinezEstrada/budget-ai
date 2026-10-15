@@ -86,7 +86,7 @@ export function setUpSplitEditor(container, { categories, debts, save, remove })
                 <select class="form-control col-span-10 md:col-span-5" data-field="debt" aria-label="Deute de la part">
                     ${debtOptions}
                 </select>
-                <button type="button" class="col-span-2 md:col-span-1 p-1 hover:bg-red-50 dark:hover:bg-red-500/10 text-red-500 rounded justify-self-end"
+                <button type="button" class="col-span-2 md:col-span-1 p-1 hover:bg-red-50 dark:hover:bg-red-500/10 text-red-600 rounded justify-self-end"
                         data-action="remove-part" title="Treure aquesta part">
                     <span class="material-symbols-outlined text-sm">close</span>
                 </button>

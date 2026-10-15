@@ -58,7 +58,7 @@ async function loadGoals() {
     } catch (error) {
         console.error('Error carregant objectius:', error);
         document.getElementById('goals-list').innerHTML = `
-            <div class="text-center py-8 text-red-500">Error carregant objectius</div>
+            <div class="text-center py-8 text-red-600">Error carregant objectius</div>
         `;
     }
 }
@@ -78,7 +78,7 @@ function renderGoals(goals) {
             <div class="bg-white dark:bg-slate-800 rounded-xl p-4 shadow-sm border">
                 <div class="flex justify-between items-start mb-2">
                     <h3 class="font-semibold">${escapeHtml(goal.nom)}</h3>
-                    <button data-action="delete" data-id="${goal.id}" class="text-red-500 hover:text-red-700">
+                    <button data-action="delete" data-id="${goal.id}" class="text-red-600 hover:text-red-700">
                         <span class="material-symbols-outlined">delete</span>
                     </button>
                 </div>
@@ -87,7 +87,7 @@ function renderGoals(goals) {
                     <div class="bg-primary h-2 rounded-full" style="width: ${Math.min(progress, 100)}%"></div>
                 </div>
                 <div class="text-sm text-slate-500 dark:text-slate-400">${progress.toFixed(1)}% completat</div>
-                ${goal.data_objectiu ? `<div class="text-xs text-slate-400 mt-1">Data: ${escapeHtml(goal.data_objectiu)}</div>` : ''}
+                ${goal.data_objectiu ? `<div class="text-xs text-slate-500 mt-1">Data: ${escapeHtml(goal.data_objectiu)}</div>` : ''}
                 <button data-action="add-amount" data-id="${goal.id}" class="mt-2 text-sm text-primary hover:underline">Afegir quantitat</button>
             </div>
         `;

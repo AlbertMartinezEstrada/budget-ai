@@ -36,8 +36,8 @@ const FREQUENCIES = {
 };
 
 const RECEIPT_STATUS_CLASSES = {
-    PAGAT: 'text-green-600',
-    PARCIAL: 'text-orange-600',
+    PAGAT: 'text-green-700',
+    PARCIAL: 'text-orange-700',
     TOCA: 'text-primary font-medium',
     PENDENT: 'text-gray-500 dark:text-slate-400',
     ENDARRERIT: 'text-red-600',
@@ -222,7 +222,7 @@ async function loadDebts() {
     } catch (error) {
         console.error('Error carregant deutes:', error);
         document.getElementById('debts-list').innerHTML = `
-            <div class="text-center py-8 text-red-500">Error carregant deutes: ${escapeHtml(error.message)}</div>
+            <div class="text-center py-8 text-red-600">Error carregant deutes: ${escapeHtml(error.message)}</div>
         `;
     }
 }
@@ -270,7 +270,7 @@ function renderTotals() {
         return `
             <div class="bg-white dark:bg-slate-800 rounded-xl p-4 shadow-sm border">
                 <div class="text-sm text-slate-500 dark:text-slate-400">${labels.titol}</div>
-                <div class="text-2xl font-bold ${direction === 'DEC' ? 'text-red-600' : 'text-green-600'}">
+                <div class="text-2xl font-bold ${direction === 'DEC' ? 'text-red-600' : 'text-green-700'}">
                     ${formatCurrency(pending)}
                 </div>
                 <div class="text-xs ${overdue > 0 ? 'text-red-600' : 'text-slate-500 dark:text-slate-400'}">
@@ -307,7 +307,7 @@ function renderCard(debt) {
                     <button data-action="edit" data-id="${debt.id}" class="p-1 hover:bg-gray-100 dark:hover:bg-slate-700 rounded" title="Editar">
                         <span class="material-symbols-outlined text-sm">edit</span>
                     </button>
-                    <button data-action="delete" data-id="${debt.id}" class="p-1 hover:bg-red-50 dark:hover:bg-red-500/10 text-red-500 rounded" title="Esborrar">
+                    <button data-action="delete" data-id="${debt.id}" class="p-1 hover:bg-red-50 dark:hover:bg-red-500/10 text-red-600 rounded" title="Esborrar">
                         <span class="material-symbols-outlined text-sm">delete</span>
                     </button>
                 </div>
@@ -416,14 +416,14 @@ function receiptStatusText(receipt, frequency) {
 function receiptAction(debt, receipt, label) {
     if (receipt.eliminable) {
         return `<button data-action="remove-receipt" data-id="${debt.id}" data-date="${escapeHtml(receipt.data)}"
-                        class="flex rounded text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10"
+                        class="flex rounded text-slate-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10"
                         title="Treure el rebut ${escapeHtml(ofReceipt(label))}" aria-label="Treure el rebut ${escapeHtml(ofReceipt(label))}">
                     <span class="material-symbols-outlined text-base leading-none">close</span>
                 </button>`;
     }
     if (!isActiveReceipt(receipt)) {
         return `<button data-action="restore-receipt" data-id="${debt.id}" data-date="${escapeHtml(receipt.data)}"
-                        class="flex rounded text-slate-400 hover:text-primary hover:bg-gray-100 dark:hover:bg-slate-700"
+                        class="flex rounded text-slate-500 hover:text-primary hover:bg-gray-100 dark:hover:bg-slate-700"
                         title="Tornar-lo al calendari" aria-label="Tornar el rebut ${escapeHtml(ofReceipt(label))} al calendari">
                     <span class="material-symbols-outlined text-base leading-none">undo</span>
                 </button>`;
@@ -503,7 +503,7 @@ function renderMovement(movement, debt) {
                 </span>
                 ${receipt}
             </span>
-            <span class="shrink-0 font-medium ${isIncome ? 'text-green-600' : 'text-red-600'}">
+            <span class="shrink-0 font-medium ${isIncome ? 'text-green-700' : 'text-red-600'}">
                 ${isIncome ? '+' : '−'}${formatCurrency(movement.cost)}
             </span>
         </div>
