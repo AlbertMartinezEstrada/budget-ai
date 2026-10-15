@@ -33,7 +33,7 @@ export async function initDashboard(container) {
                     <h3 class="card-title">Estalviat</h3>
                     <span class="material-symbols-outlined" style="font-size: 1.5rem; color: #0d9488;">savings</span>
                 </div>
-                <div class="stat-value text-teal-600" id="total-estalviat">${formatCurrency(0)}</div>
+                <div class="stat-value text-teal-700 dark:text-teal-400" id="total-estalviat">${formatCurrency(0)}</div>
                 <div class="stat-label" id="taxa-estalvi">A Estalvi i inversió</div>
             </div>
             <div class="card">

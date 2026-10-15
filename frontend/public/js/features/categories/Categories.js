@@ -94,7 +94,7 @@ async function loadCategories() {
     } catch (error) {
         console.error('Error loading categories:', error);
         document.getElementById('categories-list').innerHTML =
-            '<p class="text-red-500">Error al cargar categorías</p>';
+            '<p class="text-red-600">Error al cargar categorías</p>';
     }
 }
 
@@ -179,7 +179,7 @@ function renderRow(category, asGroupHeader) {
                 <button data-action="edit" data-id="${category.id}" class="p-1 hover:bg-gray-100 dark:hover:bg-slate-700 rounded" title="Editar">
                     <span class="material-symbols-outlined text-sm">edit</span>
                 </button>
-                <button data-action="delete" data-id="${category.id}" class="p-1 hover:bg-red-50 text-red-500 rounded" title="Eliminar">
+                <button data-action="delete" data-id="${category.id}" class="p-1 hover:bg-red-50 text-red-600 rounded" title="Eliminar">
                     <span class="material-symbols-outlined text-sm">delete</span>
                 </button>
             </span>

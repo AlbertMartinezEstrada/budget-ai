@@ -95,7 +95,7 @@ async function loadAccounts() {
         renderAccounts(accounts);
     } catch (error) {
         console.error('Error loading accounts:', error);
-        document.getElementById('accounts-list').innerHTML = '<p class="text-red-500">Error al cargar cuentas</p>';
+        document.getElementById('accounts-list').innerHTML = '<p class="text-red-600">Error al cargar cuentas</p>';
     }
 }
 
@@ -127,7 +127,7 @@ function renderAccounts(accounts) {
                     <button data-action="edit" data-id="${account.id}" class="p-1 hover:bg-gray-100 dark:hover:bg-slate-700 rounded" title="Editar">
                         <span class="material-symbols-outlined text-sm">settings</span>
                     </button>
-                    <button data-action="delete" data-id="${account.id}" class="p-1 hover:bg-red-50 text-red-500 rounded" title="Eliminar">
+                    <button data-action="delete" data-id="${account.id}" class="p-1 hover:bg-red-50 text-red-600 rounded" title="Eliminar">
                         <span class="material-symbols-outlined text-sm">delete</span>
                     </button>
                 </div>

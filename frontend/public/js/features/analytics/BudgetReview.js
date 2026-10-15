@@ -174,7 +174,7 @@ function blockRows(node, section, depth, ancestors) {
     const fund = Number(node.gastat_del_fons) || 0;
     const parent = ancestors[ancestors.length - 1];
     const toggle = children.length > 0
-        ? `<button type="button" class="text-slate-400 hover:text-primary mr-1" data-toggle="${node.categoria_id}"
+        ? `<button type="button" class="text-slate-500 hover:text-primary mr-1" data-toggle="${node.categoria_id}"
                    aria-expanded="false" title="Ver subcategorías">▸</button>`
         : '<span class="inline-block w-3 mr-1"></span>';
 
@@ -187,7 +187,7 @@ function blockRows(node, section, depth, ancestors) {
             <td class="text-right whitespace-nowrap">${formatCurrency(node.pla)}</td>
             <td class="text-right whitespace-nowrap">${formatCurrency(node.real)}</td>
             <td class="text-right whitespace-nowrap">${formatDeviation(node.desviacio)}${node.desviacio_percent != null
-                ? ` <span class="text-xs text-slate-400">(${Number(node.desviacio_percent) > 0 ? '+' : ''}${Number(node.desviacio_percent).toFixed(0)} %)</span>` : ''}</td>
+                ? ` <span class="text-xs text-slate-500">(${Number(node.desviacio_percent) > 0 ? '+' : ''}${Number(node.desviacio_percent).toFixed(0)} %)</span>` : ''}</td>
             <td>${statusPill(node.estat, section)}</td>
         </tr>
     `;
@@ -313,7 +313,7 @@ function forecastRows(node, depth, ancestors) {
     const parent = ancestors[ancestors.length - 1];
     const perDay = Number(node.disponible_per_dia) || 0;
     const toggle = children.length > 0
-        ? `<button type="button" class="text-slate-400 hover:text-primary mr-1" data-toggle="${node.categoria_id}"
+        ? `<button type="button" class="text-slate-500 hover:text-primary mr-1" data-toggle="${node.categoria_id}"
                    aria-expanded="false" title="Ver subcategorías">▸</button>`
         : '<span class="inline-block w-3 mr-1"></span>';
     const row = `

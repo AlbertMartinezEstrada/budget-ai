@@ -85,7 +85,7 @@ export function statusPill(status, section) {
 /** El punt de color d'una cel·la de l'historial. Un mes sense res, un guionet. */
 export function statusDot(status, title = '') {
     if (!STATUSES[status]) {
-        return `<span class="text-xs text-slate-400" title="${escapeHtml(title || 'Sin plan ni movimientos')}">–</span>`;
+        return `<span class="text-xs text-slate-500" title="${escapeHtml(title || 'Sin plan ni movimientos')}">–</span>`;
     }
     return `<span class="inline-block w-3 h-3 rounded-full ${STATUSES[status].dot}" title="${escapeHtml(title)}"></span>`;
 }

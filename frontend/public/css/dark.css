@@ -74,11 +74,6 @@ html.dark :where(select) option {
 :where(html.dark) .bg-violet-100 { background-color: rgba(139, 92, 246, 0.2); }
 :where(html.dark) .bg-warning-light { background-color: rgba(245, 158, 11, 0.2); }
 
-/* El botó verd amb text blanc: el 600 no arriba a 4.5:1, el 700 sí. */
-:where(html.dark) .bg-green-600 { background-color: #15803d; }
-:where(html.dark) .hover\:bg-green-600\/90:hover,
-:where(html.dark) .hover\:bg-green-700:hover { background-color: #166534; }
-
 /* ============ TEXT ============ */
 
 :where(html.dark) .text-gray-900,
@@ -89,9 +84,7 @@ html.dark :where(select) option {
 :where(html.dark) .text-gray-600,
 :where(html.dark) .text-slate-600 { color: #cbd5e1; }   /* Slate 300 */
 :where(html.dark) .text-gray-500,
-:where(html.dark) .text-slate-500,
-:where(html.dark) .text-gray-400,
-:where(html.dark) .text-slate-400 { color: #94a3b8; }   /* Slate 400 */
+:where(html.dark) .text-slate-500 { color: #94a3b8; }   /* Slate 400 */
 
 /* Els colors amb significat, en el to que es llegeix sobre fosc. */
 :where(html.dark) .text-primary { color: #7ca3f5; }
@@ -99,17 +92,15 @@ html.dark :where(select) option {
 :where(html.dark) .text-blue-700 { color: #93c5fd; }
 :where(html.dark) .text-indigo-700 { color: #a5b4fc; }
 :where(html.dark) .text-violet-700 { color: #c4b5fd; }
-:where(html.dark) .text-red-500,
 :where(html.dark) .text-red-600,
 :where(html.dark) .text-error { color: #f87171; }
 :where(html.dark) .text-red-700 { color: #fca5a5; }
-:where(html.dark) .text-green-600 { color: #4ade80; }
+:where(html.dark) .text-green-700 { color: #4ade80; }
 :where(html.dark) .text-success { color: #34d399; }
 :where(html.dark) .text-emerald-700,
 :where(html.dark) .text-emerald-800 { color: #6ee7b7; }
-:where(html.dark) .text-teal-600 { color: #2dd4bf; }
 :where(html.dark) .text-teal-700 { color: #5eead4; }
-:where(html.dark) .text-orange-600 { color: #fb923c; }
+:where(html.dark) .text-orange-700 { color: #fb923c; }
 :where(html.dark) .text-amber-800,
 :where(html.dark) .text-warning-dark { color: #fcd34d; }
 

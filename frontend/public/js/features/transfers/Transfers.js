@@ -78,7 +78,7 @@ async function loadTransfers() {
         renderTransfers(transfers);
     } catch (error) {
         console.error('Error loading transfers:', error);
-        document.getElementById('transfers-list').innerHTML = '<p class="text-red-500">Error al cargar transferencias</p>';
+        document.getElementById('transfers-list').innerHTML = '<p class="text-red-600">Error al cargar transferencias</p>';
     }
 }
 
@@ -102,7 +102,7 @@ function renderTransfers(transfers) {
             </div>
             <div class="flex items-center gap-3">
                 <span class="text-lg font-bold text-slate-800 dark:text-slate-100">${formatCurrency(transfer.import)}</span>
-                <button data-action="delete" data-id="${transfer.id}" class="p-1 hover:bg-red-50 text-red-500 rounded" title="Eliminar">
+                <button data-action="delete" data-id="${transfer.id}" class="p-1 hover:bg-red-50 text-red-600 rounded" title="Eliminar">
                     <span class="material-symbols-outlined text-sm">delete</span>
                 </button>
             </div>

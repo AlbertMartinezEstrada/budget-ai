@@ -305,7 +305,7 @@ function structureTable(structure) {
                     <tbody>
                         ${(structure || []).map(month => {
                             const row = structureShares(month);
-                            const share = key => (row.shares ? ` <span class="text-xs text-slate-400">${row.shares[key]} %</span>` : '');
+                            const share = key => (row.shares ? ` <span class="text-xs text-slate-500">${row.shares[key]} %</span>` : '');
                             return `<tr>
                                 <td>${escapeHtml(rangeLabel(month.periode, month.periode))}${row.excedit
                                     ? ` <span class="text-xs text-red-700 dark:text-red-300">gastaste un ${row.excedit} % más de lo que entró</span>` : ''}</td>
@@ -338,7 +338,7 @@ function categoryList(nodes, depth) {
                 <button type="button" class="w-full text-left" ${action} aria-expanded="false">
                     <div class="flex items-center justify-between gap-3 text-sm">
                         <span class="${depth === 0 ? 'font-medium' : ''}">
-                            <span class="text-slate-400 mr-1" aria-hidden="true">▸</span>${escapeHtml(node.nom)}
+                            <span class="text-slate-500 mr-1" aria-hidden="true">▸</span>${escapeHtml(node.nom)}
                         </span>
                         <span class="whitespace-nowrap">
                             <span class="font-medium">${formatCurrency(node.total)}</span>
@@ -397,8 +397,8 @@ function movementList(movements) {
                 ${movements.map(movement => `<tr data-movement>
                     <td class="py-1 pr-2 whitespace-nowrap text-slate-500 dark:text-slate-400">${escapeHtml(dayLabel(movement.data))}</td>
                     <td class="py-1 pr-2">${escapeHtml(movement.empresa)}${movement.descripcio && movement.descripcio !== movement.empresa
-                        ? ` <span class="text-slate-400">· ${escapeHtml(movement.descripcio)}</span>` : ''}${movement.es_part
-                        ? ' <span class="text-slate-400">(parte)</span>' : ''}</td>
+                        ? ` <span class="text-slate-500">· ${escapeHtml(movement.descripcio)}</span>` : ''}${movement.es_part
+                        ? ' <span class="text-slate-500">(parte)</span>' : ''}</td>
                     <td class="py-1 text-right whitespace-nowrap">${formatCurrency(movement.import)}</td>
                 </tr>`).join('')}
             </tbody>
