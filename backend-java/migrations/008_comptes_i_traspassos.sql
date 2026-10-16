@@ -37,7 +37,14 @@ ALTER TABLE transactions
 --    importats amb una identitat antiga i tornar a pujar el mateix fitxer els
 --    duplicaria. El que s'amplia és l'abast de la unicitat.
 ALTER TABLE transactions DROP CONSTRAINT IF EXISTS transactions_hash_verificacio_key;
-ALTER TABLE transactions
-    ADD CONSTRAINT transactions_hash_compte_key UNIQUE (hash_verificacio, account_id);
+-- Dins d'un DO perquè es pugui tornar a passar: un ADD CONSTRAINT sense
+-- comprovar fallava la segona vegada ("already exists").
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'transactions_hash_compte_key') THEN
+        ALTER TABLE transactions
+            ADD CONSTRAINT transactions_hash_compte_key UNIQUE (hash_verificacio, account_id);
+    END IF;
+END $$;
 
 COMMIT;

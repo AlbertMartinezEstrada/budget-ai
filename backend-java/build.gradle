@@ -56,6 +56,9 @@ tasks.named('test') {
     useJUnitPlatform {
         excludeTags 'integration'
     }
+    // DockerComposeEnvironmentTest el llegeix: sense declarar-lo, canviar-lo
+    // no tornava a executar els tests (Gradle els donava per fets).
+    inputs.file('../docker-compose.yml').withPathSensitivity(PathSensitivity.RELATIVE)
 }
 
 /**
@@ -107,6 +110,12 @@ tasks.register('integrationTest', Test) {
         includeTags 'integration'
     }
     shouldRunAfter tasks.named('test')
+
+    // Els tests construeixen la base de dades amb aquests fitxers. Sense
+    // declarar-los, canviar init.sql o una migració no tornava a executar els
+    // tests d'integració: Gradle reaprofitava el resultat anterior.
+    inputs.file('init.sql').withPathSensitivity(PathSensitivity.RELATIVE)
+    inputs.dir('migrations').withPathSensitivity(PathSensitivity.RELATIVE)
 
     // A doFirst i no a la configuració: així només es crida Docker quan els
     // tests s'executen de debò, no cada vegada que Gradle llegeix el fitxer.
