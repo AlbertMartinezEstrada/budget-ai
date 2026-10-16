@@ -1,0 +1,7 @@
+# Sense això, "COPY . ." hi copiava els node_modules de la màquina (amb tot
+# el que fa servir Tailwind) per sobre dels de la imatge, i un .env si n'hi
+# havia.
+node_modules
+npm-debug.log*
+.env
+.env.*

@@ -83,10 +83,10 @@ jobs:
       # es va haver de corregir un cop perquè no era portable entre versions
       # de Node, així que val la pena que la integració contínua fixi la del
       # contenidor i el desenvolupament faci servir la de la màquina.
-      - name: Preparar Node 18
+      - name: Preparar Node 22
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: '22'
           cache: npm
           cache-dependency-path: frontend/package-lock.json
 
@@ -97,6 +97,13 @@ jobs:
       - name: Executar els tests
         working-directory: frontend
         run: npm test
+
+      # Només les dependències que corren al servidor (express i les seves).
+      # Les de Tailwind només generen el CSS i no són a la imatge. Si en surt
+      # una de greu, el CI ho diu en lloc d'esperar que algú ho miri.
+      - name: Revisar vulnerabilitats de les dependències de producció
+        working-directory: frontend
+        run: npm audit --omit=dev --audit-level=high
 
   build-images:
     name: Construir les imatges de Docker
@@ -111,3 +118,19 @@ jobs:
 
       - name: Construir el frontend
         run: docker build -t budget-ai-frontend:ci ./frontend
+
+      # Que construeixin no vol dir que funcionin. El backend copiava dos jars
+      # al mateix nom i es quedava el bo per ordre alfabètic.
+      - name: Comprovar el backend (un sol jar, sense root)
+        run: |
+          docker run --rm --entrypoint sh budget-ai-backend:ci -c \
+            'test -f app.jar && test "$(id -u)" != 0 && echo "app.jar correcte, usuari $(id -un)"'
+
+      - name: Comprovar el frontend (serveix la pàgina amb les capçaleres, sense root)
+        run: |
+          docker run -d --name frontend-ci -p 3000:3000 budget-ai-frontend:ci
+          for attempt in $(seq 1 20); do curl -fs -o /dev/null http://localhost:3000/ && break; sleep 1; done
+          curl -fsI http://localhost:3000/ | tee headers.txt
+          grep -qi '^content-security-policy:' headers.txt
+          test "$(docker exec frontend-ci id -u)" != 0
+          docker rm -f frontend-ci
