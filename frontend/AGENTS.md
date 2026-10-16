@@ -33,7 +33,7 @@ test/                 tests con el ejecutor integrado de Node
 
 ```bash
 npm ci                 # instalar exactamente las versiones del lockfile
-npm test               # 89 tests (hace falta npm ci antes: compilan Tailwind)
+npm test               # 95 tests (hace falta npm ci antes: compilan Tailwind)
 npm run build:assets   # regenerar tailwind.css, las fuentes y Chart.js de public/vendor
 ```
 
@@ -99,6 +99,16 @@ puesta en `<html>`.
 Symbols) y Chart.js se sirven desde `public/`: un script de terceros tiene acceso a toda la
 página, y sin internet la app se quedaba sin estilos. Un test de
 `contract.test.js` falla si `index.html` o los CSS cargan algo de otro dominio.
+
+**El servidor (`index.js`) manda las cabeceras de seguridad.** Una
+Content-Security-Policy que solo deja ejecutar scripts propios (ni inline ni de
+otros dominios), no deja meter la página en un iframe de otra web y solo deja
+conectar con la misma dirección y con el backend en el puerto 8000. Si una
+vista nueva necesita algo fuera de eso (un `onclick=""`, un `<script>` inline,
+otro dominio), no funcionará: hazlo con `addEventListener` desde el módulo.
+`test/server.test.js` comprueba las cabeceras. La imagen de Docker usa Node 22
+e instala solo `express` (`npm ci --omit=dev`): Tailwind y el resto solo hacen
+falta para generar `public/css` y `public/vendor`, que ya vienen hechos.
 
 **Tailwind está compilado y guardado en el repositorio**
 (`public/css/tailwind.css`), porque el frontend se sirve desde disco tal cual,

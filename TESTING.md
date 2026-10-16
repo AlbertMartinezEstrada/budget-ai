@@ -208,13 +208,26 @@ decidir empresa, categoria i descripció; l'import, la data, el tipus i el hash
 de verificació no es toquen mai. Es cobreix el cas en què retorna un nombre de
 files diferent del que se li ha enviat.
 
+També la crida a Gemini, amb un servidor simulat (`MockRestServiceServer`): que
+la clau vagi a la capçalera `x-goog-api-key` i no a l'adreça, i que si Gemini
+falla o respon amb una forma inesperada la importació continuï amb els
+moviments tal com eren, sense classificar.
+
 ### `JwtServiceTest`, `LoginThrottleTest`, `AuthCookiesTest`, `LocalCredentialsTest`
 
 La sessió. Que un token amb la signatura manipulada, signat amb una altra clau
 o caducat es rebutgi; que la cookie porti sempre `HttpOnly` i `SameSite=Strict`;
 que la contrasenya no es desi mai en clar; que faltar una credencial faci
 fallar l'arrencada en comptes de deixar l'API oberta; i que el límit d'intents
-bloquegi al cinquè error i es desbloquegi sol.
+bloquegi al cinquè error i es desbloquegi sol. Cada bloqueig seguit dura el
+doble que l'anterior fins al màxim, i un login correcte torna al primer minut.
+
+### `DockerComposeEnvironmentTest`
+
+Que cada variable d'entorn que llegeix `application.properties` es passi al
+contenidor del backend a `docker-compose.yml`. Amb Docker, una opció que no hi
+és no arriba: posar-la al `.env` no fa res. Va passar amb `CORS_ALLOWED_ORIGINS`
+i després amb totes les opcions de sessió (`AUTH_SECURE_COOKIE` inclosa).
 
 ### `NamingConventionTest`
 
@@ -222,6 +235,9 @@ Recorre tot `src` i falla si hi troba una variable d'una sola lletra (`t ->`,
 `catch (Exception e)`, `Transaction t = ...`). Abans en llegir el codi calia
 buscar d'on sortia cada `t` per saber què era. Buida comentaris i literals
 abans de mirar-ho, perquè un comentari en català com "t'ho" no la faci saltar.
+Com que buida els literals, una segona regla mira a part els àlies de les
+consultes de `@Query` (`FROM Budget b`), que viuen dins de les cometes i hi
+passaven.
 
 ### `frontend/test/api.test.js`
 
@@ -235,7 +251,10 @@ Guàrdia contra patrons concrets que ja han fallat: noms de camp inexistents,
 URLs del backend escrites a mà fora d'`api.js`, `onclick` amb dades
 interpolades, classes de Tailwind construïdes en temps d'execució i vistes que
 interpolen dades sense escapar-les. També que cap variable es digui amb una
-sola lletra, i que la pàgina no carregui res d'un altre domini (CDN).
+sola lletra (a tot el JavaScript del frontend: la pàgina, els tests, el
+servidor i els scripts), que cap missatge d'error s'afegeixi a l'HTML sense
+`escapeHtml` (el backend repeteix el que se li envia), i que la pàgina no
+carregui res d'un altre domini (CDN).
 
 No comprova que el codi sigui correcte; comprova que no tornin errors coneguts.
 Analitza el codi amb els comentaris eliminats, perquè uns quants comentaris
@@ -322,6 +341,14 @@ ingressos es quedava a 2.5:1, el vermell de les despeses a 3.8:1 i el botó
 verd amb text blanc a 3.3:1. Comprovat que, amb el codi d'abans, els tres
 tests fallen.
 
+### `frontend/test/server.test.js`
+
+El servidor que entrega la pàgina: que enviï la Content-Security-Policy (només
+scripts propis, cap iframe d'una altra web, connexions només a la mateixa
+adreça i al backend del port 8000), `nosniff`, `X-Frame-Options` i
+`Referrer-Policy`; que no s'anunciï com a Express ni obri CORS a tothom; i que
+una capçalera `Host` estranya no pugui afegir regles a la política.
+
 ### `frontend/test/assets.test.js`
 
 Tailwind, les fonts i Chart.js es generen amb `npm run build:assets` i es desen
@@ -363,7 +390,17 @@ nova.
 - `ConfirmUploadIntegrationTest`: que confirmar desi els moviments i ajusti el
   saldo, i que confirmar dues vegades el mateix lot no dupliqui res.
 - `ApiSecurityIntegrationTest`: l'API sencera per HTTP amb la cadena de
-  seguretat de debò. Que cap endpoint retorni dades sense cookie.
+  seguretat de debò. Que cap endpoint retorni dades sense cookie: es pregunten
+  a Spring totes les rutes que existeixen, de manera que una de nova queda
+  comprovada sola. Abans era una llista feta a mà d'una dotzena.
+- `MigrationsIntegrationTest`: que una base de dades de l'agost (l'`init.sql`
+  d'abans de la migració 004, a `src/test/resources/migrations`) més totes les
+  migracions quedi igual que una de nova feta amb l'`init.sql` d'ara: mateixes
+  columnes, restriccions, índexs i categories. Que cada migració es pugui passar
+  dues vegades seguides sense errors ni canvis (la 008 no podia). I que estiguin
+  numerades sense salts. Els altres tests fan la base de dades amb `init.sql`;
+  la de debò hi ha arribat amb migracions, i sense aquest test una diferència
+  només es veuria quan el backend no arrenqués a casa.
 - `PersistenceIntegrationTest`: l'escala de les columnes `NUMERIC` en anar i
   tornar, els valors per defecte de `@PrePersist`, les actualitzacions parcials
   i les claus foranes.
