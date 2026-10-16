@@ -95,14 +95,13 @@ entidades y falla al arrancar si no es así.
 
 - Una instalación nueva parte de [`backend-java/init.sql`](backend-java/init.sql).
 - Una instalación existente aplica los ficheros de
-  [`backend-java/migrations/`](backend-java/migrations/) a mano, en orden.
+  [`backend-java/migrations/`](backend-java/migrations/) con
+  `scripts/migrate.sh`, que hace antes una copia de seguridad y solo aplica las
+  que faltan.
 
 ## Limitaciones conocidas
 
 - **Un solo usuario.** No hay tabla de usuarios ni aislamiento de datos.
 - **No se pueden revocar sesiones** una por una; cambiar `JWT_SECRET` las
   invalida todas.
-- **Tailwind se carga por CDN**, lo que muestra un aviso en consola y no es
-  adecuado para producción.
 - **La interfaz mezcla catalán y castellano** según la vista.
-- El backend de Python en `backend-python-legacy/` ya no se usa.
