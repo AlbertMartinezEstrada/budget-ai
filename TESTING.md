@@ -40,6 +40,16 @@ docker exec budget_web npm test
 Cap dels dos necessita la base de dades ni la xarxa: són ràpids i es poden
 executar abans de cada commit.
 
+**Prova de navegador** (`frontend/e2e/navegador.mjs`, Playwright). Necessita el
+backend i el frontend en marxa i **una base de dades de prova**, perquè importa
+moviments:
+
+```bash
+cd frontend && E2E_BASE_DE_DADES_DE_PROVA=si E2E_USERNAME=… E2E_PASSWORD=… npm run test:navegador
+```
+
+El CI la fa a cada PR amb un PostgreSQL nou (job «Navegador»).
+
 ## Què cobreixen, i per què aquests i no uns altres
 
 Els tests no busquen cobertura ampla, sinó els errors que **ja han passat**.
@@ -482,10 +492,29 @@ nova.
   sol mes no es copiï als següents, i que s'hi pugui posar la llum, una fulla
   variable, però no un bloc.
 
+## Prova de navegador
+
+Entra, importa l'extracte d'exemple per la pantalla fins a desar-lo i el torna
+a pujar (ha de dir que ja hi és, no donar error), i recorre les 14 vistes i els
+seus formularis en clar i en fosc. Falla amb:
+
+- errors de JavaScript o a la consola, i peticions que fallen;
+- violacions de la Content-Security-Policy;
+- una capçalera que no diu el nom de la vista;
+- qualsevol text o camp per sota de 4.5:1 (3:1 si és gran), amb les
+  transicions aturades perquè un color a mig canviar no compti.
+
+Abans tot això es comprovava a mà a cada PR. El primer dia va trobar dos
+errors: tornar a pujar un extracte ja importat deia «Resposta inesperada del
+servidor», i el backend registrava com a error inesperat cada petició que el
+navegador tallava en canviar de vista (ara `ApiErrorHandlerTest` ho vigila).
+Comprovada trencant coses a propòsit: amb aquell error de pujada, o traient
+una regla de `dark.css`, falla i diu on.
+
 ## Què NO cobreixen
 
-- **No hi ha tests d'extrem a extrem** del navegador.
-- **No es comprova la interfície**: que una vista pinti el que toca només està
-  verificat a mà.
+- **La interfície es comprova per fora**: la prova de navegador mira que cada
+  vista pinti sense errors i es llegeixi, no que cada xifra sigui la bona; això
+  ho cobreixen els tests del backend i dels mòduls purs del frontend.
 - Els tests d'integració criden els controllers directament o via MockMvc, no
   contra un servidor amb un port obert.

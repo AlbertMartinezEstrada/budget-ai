@@ -31,10 +31,19 @@ docker compose logs -f backend        # logs
 scripts\backup.bat                    # copia de la base de datos (backup.sh fuera de Windows)
 scripts/migrate.sh                    # aplica las migraciones pendientes (copia antes; --estat para ver cuáles)
 
-cd backend-java && ./gradlew test              # 204 unitarios, sin Docker
-cd backend-java && ./gradlew integrationTest   # 156, requieren Docker
-cd frontend && npm test                        # 55
+cd backend-java && ./gradlew test              # 260 unitarios, sin Docker
+cd backend-java && ./gradlew integrationTest   # 170, requieren Docker
+cd frontend && npm test                        # 95
+cd frontend && npm run test:navegador          # todas las vistas en un navegador (ver abajo)
 ```
+
+**La prueba de navegador** (`frontend/e2e/navegador.mjs`) entra, importa el
+extracto de ejemplo y recorre todas las vistas y formularios en claro y en
+oscuro: falla con errores de JavaScript, peticiones que fallan, violaciones de
+la política de seguridad o textos con poco contraste. La ejecuta el CI en cada
+PR contra una base de datos nueva. **Importa movimientos**: en local, solo
+contra una base de datos de prueba (`E2E_BASE_DE_DADES_DE_PROVA=si`), nunca
+contra la de tus finanzas.
 
 **Ejecuta los tests antes de dar nada por terminado.** El backend hay que
 reconstruirlo para ver cambios de Java; el frontend se sirve desde disco y basta
@@ -472,11 +481,13 @@ un fichero con un token y hubo que deshacerlo.
   `check`, que arrastra los tests de integración, y estos necesitan Docker.
 - Los ficheros estáticos van con `Cache-Control: no-cache`. Sin eso el navegador
   se queda con el CSS y el JS viejos y parece que los cambios no se aplican.
-- El **tema oscuro tiene dos mitades**: variables CSS bajo `html.dark` en
-  `main.css`, y variantes `dark:` de Tailwind en las vistas. Si tocas una, mira
-  la otra.
-- El CI **no despliega**: no hay entorno de producción. Solo ejecuta tests y
-  comprueba que los `Dockerfile` construyen.
+- El **tema oscuro tiene tres piezas** (variables en `main.css`, variantes
+  `dark:` y `css/dark.css`): ver `frontend/AGENTS.md`.
+- El CI **no despliega**: no hay entorno de producción. Ejecuta los tests, la
+  prueba de navegador, comprueba que las imágenes de Docker construyen y
+  arrancan, y en `main` envía las dependencias de Gradle a GitHub para las
+  alertas de Dependabot. Las acciones del CI las actualiza Dependabot una vez
+  al mes (`.github/dependabot.yml`).
 
 ## Más contexto
 
