@@ -444,12 +444,28 @@ un fichero con un token y hubo que deshacerlo.
   no `(a, b) ->`. Si el nombre obvio ya está cogido en ese ámbito, busca otro
   que diga la diferencia (`candidate`, `stored`) en vez de acortarlo.
   `NamingConventionTest` (backend) y `contract.test.js` (frontend) fallan con
-  cualquier variable de una sola letra; las abreviaturas no las detectan, así
-  que ahí depende de quien escribe.
+  cualquier variable de una sola letra, también en los tests, los scripts, el
+  servidor del frontend y los alias de las consultas (`FROM Budget budget`, no
+  `FROM Budget b`). Las abreviaturas no las detectan, así que ahí depende de
+  quien escribe. La única excepción son los `.bat`: en `cmd` la variable de un
+  `for` tiene que ser una letra (`%%f`).
 
 ## Trampas conocidas
 
-- El backend escucha en el **8000**. El `EXPOSE 8080` del Dockerfile es residual.
+- El backend escucha en el **8000**.
+- **Una variable nueva del backend se añade también a `docker-compose.yml`.** En
+  Docker el backend solo ve las que el compose le pasa; ponerla en el `.env` no
+  basta. Pasó con `CORS_ALLOWED_ORIGINS` y con todas las opciones de sesión.
+  `DockerComposeEnvironmentTest` falla si falta alguna.
+- **Una migración nueva también cambia `init.sql`**, y al revés. Las dos tienen
+  que llevar al mismo sitio: `MigrationsIntegrationTest` compara una base de
+  datos nueva con una de agosto más todas las migraciones, y comprueba que cada
+  migración se pueda pasar dos veces seguidas. Si una añade una restricción,
+  que mire antes si ya existe (un `DO` con `pg_constraint`, como la 003).
+- **El texto del backend no se pinta con `innerHTML` sin `escapeHtml`**, tampoco
+  los mensajes de error: repiten lo que se les ha enviado. El servidor del
+  frontend manda una Content-Security-Policy que solo permite scripts propios;
+  un `<script>` inline o un `onclick=""` no funcionarían.
 - PostgreSQL solo se publica en `127.0.0.1:5432`: se llega desde la propia
   máquina (DBeaver, copias), no desde la red. El backend no pasa por ahí, entra
   por `db:5432` dentro de Docker. No vuelvas a `"5432:5432"`.

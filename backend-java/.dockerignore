@@ -1,0 +1,7 @@
+# El Dockerfile només copia build.gradle, settings.gradle i src, però Docker
+# envia tota la carpeta abans de començar: així no hi viatgen els resultats
+# de compilacions i tests ni un .env.
+build
+.gradle
+.env
+.env.*

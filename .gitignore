@@ -49,9 +49,16 @@ npm-debug.log*
 notion_update.py
 
 # Dades bancàries i financeres (no pujar extractes reals)
+# El repositori és públic. Abans només s'ignoraven uns noms concrets: un
+# extracte desat amb un altre nom, o una nòmina en PDF, s'haurien pujat amb
+# un «git add -A». Ara cap CSV, PDF ni full de càlcul, llevat de l'exemple.
 uploads/
-temp_banco.csv
-Presupost 2026.xlsx
+*.csv
+!test_bank_statement.csv
+*.pdf
+*.xls
+*.xlsx
+*.ods
 *.ofx
 *.qif
 

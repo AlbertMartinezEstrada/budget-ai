@@ -1069,8 +1069,7 @@ tests de integración dentro de la construcción de la imagen y la rompía.
 
 Recopilación de detalles que cuestan tiempo si no se saben:
 
-- **El backend escucha en el 8000**, no en el 8080. El `EXPOSE 8080` del
-  Dockerfile es residual.
+- **El backend escucha en el 8000**, no en el 8080.
 - **Los ficheros estáticos se sirven con `Cache-Control: no-cache`.** Sin eso el
   navegador se quedaba con el CSS y el JavaScript antiguos, y parecía que los
   cambios no se aplicaban.

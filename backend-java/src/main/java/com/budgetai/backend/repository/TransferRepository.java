@@ -13,7 +13,7 @@ public interface TransferRepository extends JpaRepository<Transfer, Long> {
 
     List<Transfer> findAllByOrderByDateDesc();
 
-    @Query("SELECT t FROM Transfer t WHERE t.sourceAccount.id = :accountId OR t.destinationAccount.id = :accountId " +
-           "ORDER BY t.date DESC")
+    @Query("SELECT transfer FROM Transfer transfer WHERE transfer.sourceAccount.id = :accountId " +
+           "OR transfer.destinationAccount.id = :accountId ORDER BY transfer.date DESC")
     List<Transfer> findByAccountId(@Param("accountId") Long accountId);
 }

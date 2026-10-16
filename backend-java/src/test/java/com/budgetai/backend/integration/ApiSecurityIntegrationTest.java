@@ -5,10 +5,19 @@ import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.web.bind.annotation.RequestMethod;
+import org.springframework.web.servlet.mvc.method.RequestMappingInfo;
+import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
@@ -56,6 +65,41 @@ class ApiSecurityIntegrationTest extends AbstractIntegrationTest {
         mockMvc.perform(delete("/accounts/1")).andExpect(status().isUnauthorized());
         mockMvc.perform(post("/transfers").contentType(MediaType.APPLICATION_JSON).content("{}"))
                 .andExpect(status().isUnauthorized());
+    }
+
+    /** Les úniques rutes que han de respondre sense sessió: entrar i sortir. */
+    private static final Set<String> PUBLIC_ROUTES = Set.of("/auth/login", "/auth/logout");
+
+    @Autowired
+    @Qualifier("requestMappingHandlerMapping")
+    private RequestMappingHandlerMapping routes;
+
+    @Test
+    @DisplayName("Sense sessió, cap ruta del backend respon: totes, també les que s'afegeixin")
+    void everyRouteIsClosedWithoutASession() throws Exception {
+        // La llista de dalt només en té una dotzena; el backend en té moltes
+        // més i en guanya a cada fase. Aquí es pregunten a Spring totes les
+        // que existeixen, de manera que una ruta nova queda comprovada sola,
+        // i una que algú obrís per error faria fallar el test.
+        List<String> open = new ArrayList<>();
+        int checked = 0;
+        for (RequestMappingInfo route : routes.getHandlerMethods().keySet()) {
+            Set<RequestMethod> methods = route.getMethodsCondition().getMethods();
+            for (String pattern : route.getPatternValues()) {
+                if (PUBLIC_ROUTES.contains(pattern)) continue;
+                // Qualsevol valor serveix per als {id}: sense sessió no s'hi arriba.
+                String path = pattern.replaceAll("\\{[^}]+}", "1");
+                for (RequestMethod requestMethod : methods.isEmpty() ? Set.of(RequestMethod.GET) : methods) {
+                    int status = mockMvc.perform(request(HttpMethod.valueOf(requestMethod.name()), path)
+                                    .contentType(MediaType.APPLICATION_JSON).content("{}"))
+                            .andReturn().getResponse().getStatus();
+                    checked++;
+                    if (status != 401) open.add(requestMethod + " " + pattern + " -> " + status);
+                }
+            }
+        }
+        assertThat(checked).as("rutes comprovades").isGreaterThan(40);
+        assertThat(open).as("rutes que responen sense sessió").isEmpty();
     }
 
     @Test

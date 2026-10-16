@@ -150,17 +150,58 @@ test('pressupostos compara el pla amb els moviments, no amb el cost de vida', ()
     assert.ok(!/cost_vida_real/.test(budgets.source), 'Budgets.js llegeix cost_vida_real');
 });
 
+test('els missatges d\'error es pinten escapats a l\'HTML', () => {
+    // Els missatges del backend repeteixen el que se li ha enviat («El valor
+    // «…» no és vàlid»). Posats a innerHTML sense escapar, un valor amb
+    // etiquetes seria HTML de la pàgina: dos llocs ho feien.
+    const unescaped = [];
+    for (const file of files) {
+        for (const [template] of file.source.matchAll(/`[^`]*<[a-zA-Z][^`]*`/g)) {
+            for (const [, expression] of template.matchAll(/\$\{([^{}]*)\}/g)) {
+                if (/\bmessage\b/.test(expression) && !/^\s*escapeHtml\(/.test(expression)) {
+                    unescaped.push(`${file.path}: \${${expression.trim()}}`);
+                }
+            }
+        }
+    }
+    assert.deepEqual(unescaped, [], 'feu servir escapeHtml(...) o textContent');
+});
+
+/**
+ * Tot el JavaScript del frontend, no només el de la pàgina: els tests, el
+ * servidor i els scripts també es llegeixen. Abans la regla només mirava
+ * public/js, i un `(a, b) => b - a` va entrar per un test.
+ */
+function allJavaScript() {
+    const root = path.join(__dirname, '..');
+    const extra = [
+        ...fs.readdirSync(__dirname).filter(name => name.endsWith('.js')).map(name => path.join(__dirname, name)),
+        ...fs.readdirSync(path.join(root, 'scripts')).filter(name => /\.m?js$/.test(name))
+            .map(name => path.join(root, 'scripts', name)),
+        path.join(root, 'index.js')
+    ];
+    return [...jsFiles(), ...extra].map(file => ({
+        path: path.relative(root, file),
+        // També els comentaris al final de línia i el text entre cometes:
+        // aquest mateix fitxer cita els patrons prohibits per explicar-los.
+        source: stripComments(fs.readFileSync(file, 'utf8'))
+            .replace(/(^|[^:\\])\/\/.*$/gm, '$1')
+            .replace(/'(?:[^'\\\n]|\\.)*'|"(?:[^"\\\n]|\\.)*"/g, '""')
+    }));
+}
+
 test('cap variable es diu amb una sola lletra', () => {
     // `t`, `c` o `e` obliguen a buscar d'on surten per saber què són. El nom
     // ha de dir-ho sol: `transaction`, `category`, `event`.
     const singleLetter = [
         /\b(?:const|let|var)\s+[a-z]\b/,          // const t = ...
+        /\b(?:const|let|var)\s*[[{]\s*(?:[a-z]\s*,\s*)*[a-z]\s*[\]}]/, // const [a, b] = ...
         /(?:^|[^\w.$])[a-z]\s*=>/m,               // t => ...
         /\(\s*[a-z](?:\s*,\s*[a-z])*\s*\)\s*=>/,  // (a, b) => ...
         /\bcatch\s*\(\s*[a-z]\s*\)/,               // catch (e)
         /\bfunction\s*\w*\s*\([^)]*\b[a-z]\s*[,)]/ // function f(e)
     ];
-    const offenders = files
+    const offenders = allJavaScript()
         .filter(file => singleLetter.some(pattern => pattern.test(file.source)))
         .map(file => file.path);
     assert.deepEqual(offenders, [], `variables d'una lletra a: ${offenders.join(', ')}`);

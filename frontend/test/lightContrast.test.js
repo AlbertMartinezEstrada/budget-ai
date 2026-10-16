@@ -56,7 +56,7 @@ function luminance(color) {
 }
 
 function contrast(first, second) {
-    const [lighter, darker] = [luminance(first), luminance(second)].sort((a, b) => b - a);
+    const [lighter, darker] = [luminance(first), luminance(second)].sort((left, right) => right - left);
     return Math.round((lighter + 0.05) / (darker + 0.05) * 100) / 100;
 }
 

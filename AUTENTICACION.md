@@ -41,8 +41,18 @@ diferencia es solo si la contraseña en claro llega a tocar el disco.
 |---|---|---|
 | `AUTH_SESSION_DURATION` | `P7D` (7 días) | Cuánto dura la sesión |
 | `AUTH_MAX_LOGIN_ATTEMPTS` | `5` | Intentos fallidos antes de bloquear |
-| `AUTH_LOGIN_LOCK_DURATION` | `PT1M` (1 minuto) | Duración del bloqueo |
+| `AUTH_LOGIN_LOCK_DURATION` | `PT1M` (1 minuto) | Duración del primer bloqueo |
+| `AUTH_LOGIN_LOCK_MAX_DURATION` | `PT15M` (15 minutos) | Hasta dónde crece el bloqueo |
 | `AUTH_SECURE_COOKIE` | `false` | Ponlo a `true` **solo si sirves por HTTPS** |
+
+Hasta octubre de 2026 `docker-compose.yml` no pasaba ninguna de estas opciones
+al backend, y ponerlas en el `.env` no hacía nada. Ahora sí.
+
+Cada bloqueo seguido dura el doble que el anterior (1, 2, 4, 8 minutos…) hasta
+el máximo, y un login correcto lo reinicia. Con un minuto fijo se podían probar
+unas 7.200 contraseñas al día desde cualquier aparato de la wifi; con el máximo
+de 15 minutos, unas 480. Quien se equivoca escribiéndola solo espera el primer
+minuto.
 
 ## Cómo funciona
 
