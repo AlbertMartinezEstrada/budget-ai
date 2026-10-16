@@ -1,16 +1,30 @@
 package com.budgetai.backend.service;
 
+import com.budgetai.backend.model.Category;
 import com.budgetai.backend.model.Transaction;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.MediaType;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.test.web.client.MockRestServiceServer;
+import org.springframework.web.client.RestTemplate;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+import static org.springframework.test.web.client.match.MockRestRequestMatchers.header;
+import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
+import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
+import static org.springframework.test.web.client.response.MockRestResponseCreators.withServerError;
+import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
 /**
  * El punt delicat d'aquest servei és que la resposta de la IA no ha de poder
@@ -161,5 +175,81 @@ class AiEngineServiceTest {
     private List<Transaction> invokeParseAndMerge(String response, List<Transaction> originals) {
         return (List<Transaction>) ReflectionTestUtils.invokeMethod(
                 service, "parseAndMergeTransactions", response, originals);
+    }
+    // ---- La crida a Gemini, amb un servidor simulat ----
+
+    /** Un servei amb clau i una categoria, que parla amb el servidor simulat en comptes de Google. */
+    private AiEngineService serviceTalkingTo(RestTemplate restTemplate) {
+        Category groceries = new Category();
+        groceries.setId(1L);
+        groceries.setName("Menjar i supermercat");
+        Map<Long, List<Category>> childrenByParent = new HashMap<>();
+        childrenByParent.put(null, List.of(groceries));
+        CategoryHierarchyService hierarchy = mock(CategoryHierarchyService.class);
+        when(hierarchy.loadTree()).thenReturn(new CategoryHierarchyService.Tree(Map.of(1L, groceries), childrenByParent));
+
+        AiEngineService talking = new AiEngineService(hierarchy, restTemplate);
+        ReflectionTestUtils.setField(talking, "apiKey", "clau-de-prova");
+        return talking;
+    }
+
+    private static String geminiAnswer(String text) {
+        return "{\"candidates\":[{\"content\":{\"parts\":[{\"text\":" + quoted(text) + "}]}}]}";
+    }
+
+    private static String quoted(String text) {
+        return "\"" + text.replace("\\", "\\\\").replace("\"", "\\\"") + "\"";
+    }
+
+    @Test
+    @DisplayName("La clau viatja a la capçalera, mai a l'adreça")
+    void apiKeyGoesInTheHeaderNotTheUrl() {
+        RestTemplate restTemplate = new RestTemplate();
+        MockRestServiceServer gemini = MockRestServiceServer.bindTo(restTemplate).build();
+        gemini.expect(requestTo(AiEngineService.GEMINI_API_URL))
+                .andExpect(method(HttpMethod.POST))
+                .andExpect(header(AiEngineService.API_KEY_HEADER, "clau-de-prova"))
+                .andRespond(withSuccess(geminiAnswer(
+                        "[{\"companyName\":\"Mercadona\",\"category\":\"Menjar i supermercat\",\"description_curta\":\"Compra\"}]"),
+                        MediaType.APPLICATION_JSON));
+
+        List<Transaction> result = serviceTalkingTo(restTemplate)
+                .classifyTransactions(List.of(original("MERCADONA BARCELONA", "-45.30")));
+
+        gemini.verify();
+        assertThat(AiEngineService.GEMINI_API_URL).doesNotContain("key=");
+        assertThat(result).singleElement().satisfies(transaction -> {
+            assertThat(transaction.getCategoryName()).isEqualTo("Menjar i supermercat");
+            assertThat(transaction.getAmount()).isEqualByComparingTo("-45.30");
+        });
+    }
+
+    @Test
+    @DisplayName("Si Gemini falla, la importació continua amb els moviments tal com eren")
+    void geminiFailureKeepsTheImportGoing() {
+        RestTemplate restTemplate = new RestTemplate();
+        MockRestServiceServer gemini = MockRestServiceServer.bindTo(restTemplate).build();
+        gemini.expect(requestTo(AiEngineService.GEMINI_API_URL)).andRespond(withServerError());
+        Transaction movement = original("MERCADONA BARCELONA", "-45.30");
+
+        List<Transaction> result = serviceTalkingTo(restTemplate).classifyTransactions(List.of(movement));
+
+        gemini.verify();
+        assertThat(result).containsExactly(movement);
+        assertThat(movement.getCategoryName()).isNull();
+    }
+
+    @Test
+    @DisplayName("Una resposta amb una forma inesperada no tomba la importació")
+    void unexpectedAnswerShapeKeepsTheImportGoing() {
+        RestTemplate restTemplate = new RestTemplate();
+        MockRestServiceServer gemini = MockRestServiceServer.bindTo(restTemplate).build();
+        gemini.expect(requestTo(AiEngineService.GEMINI_API_URL))
+                .andRespond(withSuccess("{\"candidates\":[{\"content\":{\"parts\":[{}]}}]}", MediaType.APPLICATION_JSON));
+        Transaction movement = original("MERCADONA BARCELONA", "-45.30");
+
+        List<Transaction> result = serviceTalkingTo(restTemplate).classifyTransactions(List.of(movement));
+
+        assertThat(result).containsExactly(movement);
     }
 }

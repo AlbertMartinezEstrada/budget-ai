@@ -39,6 +39,14 @@ services:
       - AUTH_PASSWORD=${AUTH_PASSWORD}
       - AUTH_PASSWORD_HASH=${AUTH_PASSWORD_HASH:-}
       - JWT_SECRET=${JWT_SECRET}
+      # Opcions de la sessió (AUTENTICACION.md). Abans no es passaven i posar-les
+      # al .env no feia res. Amb el valor per defecte aquí: si arribessin buides,
+      # el backend no les sabria llegir i no arrencaria.
+      - AUTH_SESSION_DURATION=${AUTH_SESSION_DURATION:-P7D}
+      - AUTH_MAX_LOGIN_ATTEMPTS=${AUTH_MAX_LOGIN_ATTEMPTS:-5}
+      - AUTH_LOGIN_LOCK_DURATION=${AUTH_LOGIN_LOCK_DURATION:-PT1M}
+      - AUTH_LOGIN_LOCK_MAX_DURATION=${AUTH_LOGIN_LOCK_MAX_DURATION:-PT15M}
+      - AUTH_SECURE_COOKIE=${AUTH_SECURE_COOKIE:-false}
       # Des d'on es pot obrir l'aplicació. Per entrar des del mòbil (Tailscale)
       # cal afegir-hi l'adreça del PC: veure ACCESO_DESDE_EL_MOVIL.md. Sense
       # passar-la aquí, posar-la al .env no feia res.

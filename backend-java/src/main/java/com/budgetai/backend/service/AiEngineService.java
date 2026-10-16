@@ -5,10 +5,19 @@ import com.budgetai.backend.model.Transaction;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 
+import java.time.Duration;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
@@ -18,18 +27,46 @@ import java.util.HashMap;
 @Service
 public class AiEngineService {
 
+    private static final Logger LOG = LoggerFactory.getLogger(AiEngineService.class);
+
     @Value("${gemini.api.key}")
     private String apiKey;
 
-    private static final String GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=";
+    static final String GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent";
 
-    private final RestTemplate restTemplate = new RestTemplate();
+    /**
+     * La clau va a la capçalera, com recomana Google, i no a l'adreça
+     * (?key=...): una adreça s'acaba copiant a registres i missatges d'error
+     * amb més facilitat que una capçalera.
+     */
+    static final String API_KEY_HEADER = "x-goog-api-key";
+
+    // Sense límit de temps, si Gemini no responia la importació es quedava
+    // esperant per sempre. Amb el límit, falla i es continua sense classificar.
+    private static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(10);
+    private static final Duration READ_TIMEOUT = Duration.ofSeconds(120);
+
+    private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     private final CategoryHierarchyService hierarchyService;
 
+    @Autowired
     public AiEngineService(CategoryHierarchyService hierarchyService) {
+        this(hierarchyService, restTemplateWithTimeouts());
+    }
+
+    /** Per als tests, que hi posen un servidor simulat. */
+    AiEngineService(CategoryHierarchyService hierarchyService, RestTemplate restTemplate) {
         this.hierarchyService = hierarchyService;
+        this.restTemplate = restTemplate;
+    }
+
+    private static RestTemplate restTemplateWithTimeouts() {
+        SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
+        requestFactory.setConnectTimeout(CONNECT_TIMEOUT);
+        requestFactory.setReadTimeout(READ_TIMEOUT);
+        return new RestTemplate(requestFactory);
     }
 
     public List<Transaction> classifyTransactions(List<Transaction> transactions) {
@@ -40,7 +77,7 @@ public class AiEngineService {
         // Sense clau no es pot classificar, però la importació ha de continuar:
         // l'usuari sempre pot assignar les categories a mà a la pantalla de revisió.
         if (apiKey == null || apiKey.isBlank()) {
-            System.err.println("AiEngineService: falta GEMINI_API_KEY; s'omet la classificació automàtica.");
+            LOG.warn("Falta GEMINI_API_KEY; s'omet la classificació automàtica.");
             return transactions;
         }
 
@@ -48,7 +85,7 @@ public class AiEngineService {
         // faria que se les inventés.
         List<String> categories = leafCategoryNames();
         if (categories.isEmpty()) {
-            System.err.println("AiEngineService: no hi ha categories; s'omet la classificació automàtica.");
+            LOG.warn("No hi ha categories; s'omet la classificació automàtica.");
             return transactions;
         }
 
@@ -139,9 +176,11 @@ public class AiEngineService {
             Map<String, Object> requestBody = new HashMap<>();
             requestBody.put("contents", List.of(content));
 
-            // Execute request
-            String url = GEMINI_API_URL + apiKey;
-            JsonNode response = restTemplate.postForObject(url, requestBody, JsonNode.class);
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            headers.set(API_KEY_HEADER, apiKey);
+            JsonNode response = restTemplate.postForObject(GEMINI_API_URL,
+                    new HttpEntity<>(requestBody, headers), JsonNode.class);
 
             if (response != null && response.has("candidates") && response.get("candidates").isArray()) {
                 JsonNode candidate = response.get("candidates").get(0);
@@ -152,8 +191,12 @@ public class AiEngineService {
                     }
                 }
             }
-        } catch (Exception exception) {
-            exception.printStackTrace();
+        } catch (RestClientException exception) {
+            // Sense la traça sencera: només cal saber per què no s'ha classificat.
+            LOG.warn("Gemini no ha respost ({}); la importació continua sense classificar.", exception.getMessage());
+        } catch (RuntimeException exception) {
+            // Una resposta amb una forma inesperada no ha de tombar la importació.
+            LOG.warn("Resposta inesperada de Gemini; la importació continua sense classificar.", exception);
         }
         return null;
     }
@@ -172,9 +215,8 @@ public class AiEngineService {
                 // contra duplicats. Ara es descarta la classificació i es conserven
                 // els moviments originals, que són els bons.
                 if (rootNode.size() != originalTransactions.size()) {
-                    System.err.println("AiEngineService: la IA ha retornat " + rootNode.size()
-                            + " files per a " + originalTransactions.size()
-                            + " moviments; es descarta la classificació.");
+                    LOG.warn("La IA ha retornat {} files per a {} moviments; es descarta la classificació.",
+                            rootNode.size(), originalTransactions.size());
                     return originalTransactions;
                 }
 
@@ -198,7 +240,7 @@ public class AiEngineService {
                 return classifiedTransactions;
             }
         } catch (JsonProcessingException exception) {
-            exception.printStackTrace();
+            LOG.warn("La resposta de Gemini no és JSON vàlid; es descarta la classificació.", exception);
         }
         return originalTransactions;
     }
