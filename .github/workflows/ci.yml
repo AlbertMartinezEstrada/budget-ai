@@ -36,6 +36,20 @@ jobs:
         working-directory: backend-java
         run: ./gradlew test --no-daemon
 
+      # El jar per a la prova de navegador. Es fa aquí, que té la memòria cau
+      # de Gradle: compilar des de zero vol baixar-ho tot de Maven Central, que
+      # sovint respon 429 (massa peticions) a les màquines de GitHub.
+      - name: Empaquetar el backend
+        working-directory: backend-java
+        run: ./gradlew assemble --no-daemon
+
+      - name: Guardar el jar per a la prova de navegador
+        uses: actions/upload-artifact@v7
+        with:
+          name: backend-jar
+          path: backend-java/build/libs/*.jar
+          retention-days: 1
+
       - name: Publicar l'informe si han fallat
         if: failure()
         uses: actions/upload-artifact@v7
@@ -111,6 +125,8 @@ jobs:
   browser:
     name: Navegador · totes les vistes
     runs-on: ubuntu-latest
+    # Fa servir el jar que empaqueta el job dels unitaris: aquí no es compila.
+    needs: backend-unit
     services:
       postgres:
         image: postgres:17
@@ -141,15 +157,18 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Preparar Gradle
-        uses: gradle/actions/setup-gradle@v6
-
       - name: Preparar Node 22
         uses: actions/setup-node@v7
         with:
           node-version: '22'
           cache: npm
           cache-dependency-path: frontend/package-lock.json
+
+      - name: Baixar el jar del backend
+        uses: actions/download-artifact@v8
+        with:
+          name: backend-jar
+          path: backend-java/build/libs
 
       - name: Crear l'esquema amb init.sql
         env:
@@ -158,9 +177,7 @@ jobs:
 
       - name: Engegar el backend
         working-directory: backend-java
-        run: |
-          ./gradlew assemble --no-daemon -q
-          nohup java -jar build/libs/*.jar > backend.log 2>&1 &
+        run: nohup java -jar build/libs/*.jar > backend.log 2>&1 &
 
       - name: Instal·lar el frontend i Chromium
         working-directory: frontend
@@ -207,6 +224,10 @@ jobs:
     name: Dependències del backend a GitHub
     if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
+    # Resol les dependències des de zero (Maven Central, que de vegades respon
+    # 429). És informatiu per a Dependabot: si un dia falla, no ha de posar
+    # main en vermell, i el següent push ho torna a provar.
+    continue-on-error: true
     permissions:
       contents: write
     steps:
