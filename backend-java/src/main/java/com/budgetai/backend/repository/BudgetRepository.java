@@ -14,13 +14,13 @@ public interface BudgetRepository extends JpaRepository<Budget, Long> {
 
     List<Budget> findByActiveTrue();
 
-    @Query("SELECT b FROM Budget b WHERE b.active = true AND " +
-           "b.periodStart <= :date AND b.periodEnd >= :date")
+    @Query("SELECT budget FROM Budget budget WHERE budget.active = true AND " +
+           "budget.periodStart <= :date AND budget.periodEnd >= :date")
     List<Budget> findActiveBudgetsForDate(@Param("date") LocalDate date);
 
-    @Query("SELECT b FROM Budget b WHERE b.active = true AND " +
-           "b.category.id = :categoryId AND " +
-           "b.periodStart <= :date AND b.periodEnd >= :date")
+    @Query("SELECT budget FROM Budget budget WHERE budget.active = true AND " +
+           "budget.category.id = :categoryId AND " +
+           "budget.periodStart <= :date AND budget.periodEnd >= :date")
     List<Budget> findActiveBudgetByCategoryAndDate(@Param("categoryId") Long categoryId,
                                                      @Param("date") LocalDate date);
 }

@@ -48,6 +48,40 @@ class NamingConventionTest {
         assertThat(offenders).as("variables d'una lletra").isEmpty();
     }
 
+    // FROM Budget b / JOIN transfer.sourceAccount a: dins d'una consulta,
+    // l'àlies és el nom de la variable.
+    private static final Pattern SINGLE_LETTER_QUERY_ALIAS = Pattern.compile(
+            "\\b(?i:FROM|JOIN|UPDATE)\\s+[\\w.]+\\s+(?i:AS\\s+)?[a-z](?![\\w.(])");
+
+    @Test
+    @DisplayName("Cap àlies de les consultes es diu amb una sola lletra")
+    void noSingleLetterQueryAliases() throws IOException {
+        // La regla de dalt buida el text entre cometes, i és allà on viuen les
+        // consultes de @Query: "SELECT b FROM Budget b" hi passava.
+        List<String> offenders;
+        try (Stream<Path> sources = Files.walk(Path.of("src"))) {
+            offenders = sources
+                    .filter(path -> path.toString().endsWith(".java"))
+                    .flatMap(NamingConventionTest::queryAliasLines)
+                    .toList();
+        }
+        assertThat(offenders).as("àlies d'una lletra a les consultes").isEmpty();
+    }
+
+    private static Stream<String> queryAliasLines(Path path) {
+        List<String> lines;
+        try {
+            lines = Files.readAllLines(path);
+        } catch (IOException exception) {
+            throw new IllegalStateException(exception);
+        }
+        return IntStream.range(0, lines.size())
+                .filter(lineIndex -> lines.get(lineIndex).contains("\""))
+                .filter(lineIndex -> !lines.get(lineIndex).trim().startsWith("//"))
+                .filter(lineIndex -> SINGLE_LETTER_QUERY_ALIAS.matcher(lines.get(lineIndex)).find())
+                .mapToObj(lineIndex -> path + ":" + (lineIndex + 1) + ": " + lines.get(lineIndex).trim());
+    }
+
     private static Stream<String> offendingLines(Path path) {
         String code;
         try {
