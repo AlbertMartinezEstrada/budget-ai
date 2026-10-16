@@ -35,7 +35,16 @@ test/                 tests con el ejecutor integrado de Node
 npm ci                 # instalar exactamente las versiones del lockfile
 npm test               # 95 tests (hace falta npm ci antes: compilan Tailwind)
 npm run build:assets   # regenerar tailwind.css, las fuentes y Chart.js de public/vendor
+npm run test:navegador # todas las vistas en Chromium; solo contra una base de datos de prueba
 ```
+
+`npm run test:navegador` necesita el backend y el frontend en marcha y
+`E2E_BASE_DE_DADES_DE_PROVA=si E2E_USERNAME=… E2E_PASSWORD=…`: importa
+movimientos, así que nunca contra la base de datos de verdad. Con
+`CHROMIUM_PATH` usa un Chromium ya instalado. Las capturas quedan en
+`e2e/resultats/`. Espera señales reales (el login responde, la vista ha
+pintado, ninguna petición en curso) y no tiempos fijos; si una vista nueva
+carga datos de otra forma, que siga igual.
 
 `npm test` es `node --test` sin argumentos, a propósito: pasarle una ruta
 funciona en Node 18 pero falla desde Node 20.
@@ -109,6 +118,17 @@ otro dominio), no funcionará: hazlo con `addEventListener` desde el módulo.
 `test/server.test.js` comprueba las cabeceras. La imagen de Docker usa Node 22
 e instala solo `express` (`npm ci --omit=dev`): Tailwind y el resto solo hacen
 falta para generar `public/css` y `public/vendor`, que ya vienen hechos.
+
+**`npm audit` sin `--omit=dev` saca 7 avisos, y se quedan así a propósito.**
+Todos vienen de Tailwind 3 y solo corren al generar el CSS, en tu máquina o en
+el CI, nunca en la imagen. Solo dos son causa: `braces` (no hay versión
+arreglada; solo es peligroso con patrones de glob maliciosos, y aquí solo lee
+los de `tailwind.config.js`) y `postcss-selector-parser` (lento con CSS
+malicioso; solo procesa el nuestro, y la versión arreglada no es compatible
+con Tailwind 3). Arreglarlos es pasar a Tailwind 4: colores en OKLCH, otro color
+de borde por defecto y utilidades renombradas, o sea rehacer la revisión de
+contraste de los dos temas, por un riesgo prácticamente nulo. El CI vigila las
+dependencias de producción (`npm audit --omit=dev`), que están a 0.
 
 **Tailwind está compilado y guardado en el repositorio**
 (`public/css/tailwind.css`), porque el frontend se sirve desde disco tal cual,

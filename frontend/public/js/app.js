@@ -63,6 +63,12 @@ async function startApp() {
             link.classList.toggle('active', link.dataset.view === view);
         });
 
+        // El títol de la capçalera i de la pestanya, el de la vista oberta.
+        // Abans deia sempre «Resum Financer», també a Transaccions o a Anàlisi.
+        const title = viewTitle(view);
+        document.getElementById('page-title').textContent = title;
+        document.title = `${title} · Budget AI`;
+
         // Clear Content
         mainContentArea.innerHTML = '';
 
@@ -178,4 +184,14 @@ function currentView() {
 function currentSubview() {
     const [view, ...rest] = hashParts();
     return VIEWS.includes(view) ? rest.join('/') : '';
+}
+
+/**
+ * El nom de la vista tal com surt al menú (o al botó d'importar, que no hi és):
+ * així la capçalera sempre diu el mateix que l'enllaç que s'ha clicat.
+ */
+function viewTitle(view) {
+    const link = [...document.querySelectorAll('.nav-link[data-view]')].find(candidate => candidate.dataset.view === view);
+    const label = link?.querySelector('span:last-child')?.textContent.trim();
+    return label || 'Budget AI';
 }

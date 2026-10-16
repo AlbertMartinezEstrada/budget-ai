@@ -28,7 +28,7 @@ El proyecto se basa en una arquitectura moderna y robusta, diseñada para escala
 
 ### ⚙️ Backend (El "Motor")
 - **Principal**: **Java con Spring Boot 3**. Una API REST profesional que gestiona toda la lógica de negocio, validaciones y cálculos.
-- **Legacy**: Contamos con una base sólida en Python (FastAPI) de la cual hemos migrado el núcleo de inteligencia.
+- **Origen**: empezó como un backend en Python (FastAPI); el núcleo se migró a Java y el de Python se retiró en octubre de 2026 (sigue en el historial de git).
 - **Base de Datos**: PostgreSQL, con un esquema relacional optimizado para integridad y rendimiento.
 
 ### 🧠 Inteligencia Artificial

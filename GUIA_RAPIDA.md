@@ -1,3 +1,5 @@
+*** Documento histórico: describe el primer backend, en Python (FastAPI), que ya no existe. Para ponerlo en marcha, ver README.md; la arquitectura, ARQUITECTURA.md. ***
+
 # Budget AI - Sistema de Clasificación de Gastos 💰🤖
 
 ## ¿Qué hace este proyecto?

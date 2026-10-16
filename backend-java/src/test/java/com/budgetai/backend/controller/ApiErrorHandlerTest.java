@@ -3,6 +3,9 @@ package com.budgetai.backend.controller;
 import com.budgetai.backend.service.NotFoundException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.apache.catalina.connector.ClientAbortException;
+import org.springframework.web.context.request.async.AsyncRequestNotUsableException;
+import org.springframework.web.method.annotation.ExceptionHandlerMethodResolver;
 import org.springframework.http.ResponseEntity;
 import org.springframework.mock.web.MockHttpServletRequest;
 
@@ -59,5 +62,20 @@ class ApiErrorHandlerTest {
         assertThat(handler.conflict(new IllegalStateException("La categoria té moviments"),
                 request("DELETE", "/categories/3")).getBody().get("message"))
                 .isEqualTo("La categoria té moviments");
+    }
+    @Test
+    @DisplayName("Un navegador que talla la connexió no és un error inesperat")
+    void clientDisconnectionIsNotAnUnexpectedError() {
+        // Canviar de vista mentre carrega talla la resposta («Broken pipe»).
+        // Ha d'anar al seu propi gestor, no al general que ho registra com a
+        // error amb la traça sencera.
+        ExceptionHandlerMethodResolver resolver = new ExceptionHandlerMethodResolver(ApiErrorHandler.class);
+
+        assertThat(resolver.resolveMethodByThrowable(new AsyncRequestNotUsableException("Broken pipe")).getName())
+                .isEqualTo("clientDisconnected");
+        assertThat(resolver.resolveMethodByThrowable(new ClientAbortException("Broken pipe")).getName())
+                .isEqualTo("clientDisconnected");
+        assertThat(resolver.resolveMethodByThrowable(new RuntimeException("de debò")).getName())
+                .isEqualTo("unexpected");
     }
 }

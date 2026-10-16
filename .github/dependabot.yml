@@ -1,0 +1,17 @@
+# Només les accions del CI, una PR al mes amb totes juntes. Es van quedar
+# quatre versions enrere i GitHub ja avisava que corrien sobre un Node retirat.
+#
+# Les dependències de npm i de Gradle no hi són: d'aquelles se n'ocupen les
+# alertes de seguretat de Dependabot (Settings → Code security), que només
+# obren una PR quan una versió té una vulnerabilitat, i el npm audit del CI.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    groups:
+      accions:
+        patterns: ['*']
+    commit-message:
+      prefix: CI
