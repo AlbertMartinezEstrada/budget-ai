@@ -18,6 +18,11 @@ test.before(async () => {
     module = await import('../public/js/budgetReview.js');
 });
 
+/** Intl separa l'import del símbol amb un espai que no es trenca; aquí és un espai. */
+function equalText(actual, expected) {
+    assert.equal(String(actual).replace(/[\u00a0\u202f]/g, ' '), expected);
+}
+
 test('les paraules del semàfor depenen de la secció: passar-se en una despesa, quedar-se curt en l\'estalvi', () => {
     assert.equal(module.statusLabel('DESVIAT', 'VARIABLE'), 'Pasado');
     assert.equal(module.statusLabel('DESVIAT', 'SAVINGS'), 'Corto');
@@ -42,9 +47,9 @@ test('una cel·la sense res és un guionet, no un punt de color', () => {
 });
 
 test('la desviació porta sempre el signe', () => {
-    assert.equal(module.formatDeviation('40'), '+40.00 €');
-    assert.equal(module.formatDeviation(-25), '−25.00 €');
-    assert.equal(module.formatDeviation(0), '0.00 €');
+    equalText(module.formatDeviation('40'), '+40,00 €');
+    equalText(module.formatDeviation(-25), '−25,00 €');
+    equalText(module.formatDeviation(0), '0,00 €');
 });
 
 test('els mesos es compten enrere sense errors al canvi d\'any', () => {
@@ -59,18 +64,18 @@ test('els mesos es compten enrere sense errors al canvi d\'any', () => {
 });
 
 test('el resum de l\'historial només parla dels mesos tancats amb pla', () => {
-    assert.equal(module.historySummary({
+    equalText(module.historySummary({
         seccio: 'VARIABLE', mesos_tancats_amb_pla: 6, mesos_desviats: 4, mesos_avis: 1, desviacio_mitjana: '38.5'
-    }), 'Pasado 5 de 6 meses (1 por poco) · de media +38.50 €');
-    assert.equal(module.historySummary({
+    }), 'Pasado 5 de 6 meses (1 por poco) · de media +38,50 €');
+    equalText(module.historySummary({
         seccio: 'SAVINGS', mesos_tancats_amb_pla: 2, mesos_desviats: 1, mesos_avis: 0, desviacio_mitjana: '-25'
-    }), 'Corto 1 de 2 meses · de media −25.00 €');
-    assert.equal(module.historySummary({
+    }), 'Corto 1 de 2 meses · de media −25,00 €');
+    equalText(module.historySummary({
         seccio: 'FIXED', mesos_tancats_amb_pla: 3, mesos_desviats: 0, mesos_avis: 0, mesos_puntuals: 1, desviacio_mitjana: '150'
-    }), 'Dentro 2 de 3 meses · 1 cargo puntual · de media +150.00 €');
-    assert.equal(module.historySummary({
+    }), 'Dentro 2 de 3 meses · 1 cargo puntual · de media +150,00 €');
+    equalText(module.historySummary({
         seccio: 'SAVINGS', mesos_tancats_amb_pla: 4, mesos_desviats: 0, mesos_avis: 0, desviacio_mitjana: '12'
-    }), 'Cumplido los 4 meses · de media +12.00 €');
+    }), 'Cumplido los 4 meses · de media +12,00 €');
     assert.equal(module.historySummary({ seccio: 'VARIABLE', mesos_tancats_amb_pla: 0 }), 'Sin meses cerrados con plan');
 });
 
@@ -101,9 +106,9 @@ const lower = {
 };
 
 test('el perquè de cada proposta, amb les xifres', () => {
-    assert.equal(module.adviceReason(raise),
-        'Te has pasado 2 de 3 meses; de media gastas 125.00 €. El plan no es realista.');
-    assert.equal(module.adviceReason(lower), 'Te sobra todos los meses: como mucho gastaste 58.00 €.');
+    equalText(module.adviceReason(raise),
+        'Te has pasado 2 de 3 meses; de media gastas 125,00 €. El plan no es realista.');
+    equalText(module.adviceReason(lower), 'Te sobra todos los meses: como mucho gastaste 58,00 €.');
     assert.equal(module.adviceReason({ ...lower, maxim_real: '0' }), 'No lo has usado en 2 meses.');
 });
 
@@ -111,8 +116,8 @@ test('l\'efecte net compta només les propostes marcades', () => {
     assert.equal(module.netEffect([raise, lower], [7, 8]), -15);
     assert.equal(module.netEffect([raise, lower], ['7']), 25);
     assert.equal(module.netEffect([raise, lower], []), 0);
-    assert.match(module.netEffectText(-15), /liberas 15.00 € al mes/);
-    assert.match(module.netEffectText(25), /necesitas 25.00 € más al mes/);
+    assert.match(module.netEffectText(-15), /liberas 15,00\s€ al mes/);
+    assert.match(module.netEffectText(25), /necesitas 25,00\s€ más al mes/);
     assert.equal(module.netEffectText(0), 'Las marcadas no cambian el total del mes.');
 });
 
@@ -122,6 +127,6 @@ test('el que s\'envia: un pla per percentatge es queda per percentatge', () => {
         { categoria_id: 8, percentatge: 6 }
     ]);
     assert.deepEqual(module.changesFor([raise, lower], [8]), [{ categoria_id: 8, percentatge: 6 }]);
-    assert.equal(module.planLabel('100', '10'), '10 % (100.00 €)');
-    assert.equal(module.planLabel('125', null), '125.00 €');
+    equalText(module.planLabel('100', '10'), '10 % (100,00 €)');
+    equalText(module.planLabel('125', null), '125,00 €');
 });

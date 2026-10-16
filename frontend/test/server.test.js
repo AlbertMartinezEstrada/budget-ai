@@ -44,6 +44,13 @@ test('els fitxers estàtics també porten les capçaleres', async () => {
     assert.equal(headers.get('x-content-type-options'), 'nosniff');
 });
 
+test('els fitxers d\'idioma surten com a text en UTF-8', async () => {
+    const { status, headers } = await headersFor('/lang/Language_pt.properties', 'localhost:3000');
+    assert.equal(status, 200);
+    assert.equal(headers.get('content-type'), 'text/plain; charset=utf-8');
+    assert.equal(headers.get('cache-control'), 'no-cache');
+});
+
 test('la pàgina pot parlar amb el backend a la mateixa adreça, sigui quina sigui', () => {
     // api.js crida al port 8000 de l'adreça amb què s'ha obert la pàgina:
     // localhost al PC, el nom del PC des del mòbil.

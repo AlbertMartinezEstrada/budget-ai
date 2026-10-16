@@ -18,19 +18,19 @@ public class Settings {
     private String userEmail;
 
     @Column(name = "currency")
-    private String currency = "EUR";
+    private String currency;
 
     @Column(name = "theme")
-    private String theme = "light";
+    private String theme;
 
     @Column(name = "notifications_expenses")
-    private Boolean notificationsExpenses = true;
+    private Boolean notificationsExpenses;
 
     @Column(name = "notifications_budget")
-    private Boolean notificationsBudget = true;
+    private Boolean notificationsBudget;
 
     @Column(name = "notifications_monthly")
-    private Boolean notificationsMonthly = false;
+    private Boolean notificationsMonthly;
 
     /**
      * Sou mensual de referència sobre el qual s'apliquen els percentatges
@@ -40,14 +40,35 @@ public class Settings {
     @Column(name = "expected_monthly_income", precision = 15, scale = 2)
     private BigDecimal expectedMonthlyIncome;
 
+    /**
+     * L'idioma de la interfície: ca, es, pt o en. Buit vol dir el del
+     * navegador, que és com queda una instal·lació que ja existia fins que no
+     * se'n tria un. Es desa aquí, com el tema, perquè el PC i el mòbil facin
+     * servir el mateix.
+     */
+    @Column(name = "language", length = 5)
+    private String language;
+
     @Column(name = "created_at")
     private LocalDateTime createdAt;
 
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
+    /**
+     * Els valors per defecte, aquí i no a la declaració dels camps (regla 3
+     * d'AGENTS.md). Amb currency = "EUR" i theme = "light" als camps, el cos
+     * d'un PUT que només portava el nom arribava amb el tema clar i les
+     * notificacions per defecte: desar el perfil, o l'idioma, tornava el tema
+     * fosc a clar.
+     */
     @PrePersist
     protected void onCreate() {
+        if (currency == null) currency = "EUR";
+        if (theme == null) theme = "light";
+        if (notificationsExpenses == null) notificationsExpenses = true;
+        if (notificationsBudget == null) notificationsBudget = true;
+        if (notificationsMonthly == null) notificationsMonthly = false;
         createdAt = LocalDateTime.now();
         updatedAt = LocalDateTime.now();
     }
@@ -80,6 +101,9 @@ public class Settings {
 
     public Boolean getNotificationsMonthly() { return notificationsMonthly; }
     public void setNotificationsMonthly(Boolean notificationsMonthly) { this.notificationsMonthly = notificationsMonthly; }
+
+    public String getLanguage() { return language; }
+    public void setLanguage(String language) { this.language = language; }
 
     public BigDecimal getExpectedMonthlyIncome() { return expectedMonthlyIncome; }
     public void setExpectedMonthlyIncome(BigDecimal expectedMonthlyIncome) { this.expectedMonthlyIncome = expectedMonthlyIncome; }

@@ -23,6 +23,11 @@ const delivery = { categoria_id: 2, nom: 'Delivery', pla: '60', mitjana_real: '7
 const groceries = { categoria_id: 4, nom: 'Supermercat', pla: '300', mitjana_real: '290', te_pla_propi: true, percentatge: '25', base: '1200' };
 const coffee = { categoria_id: 5, nom: 'Cafè', pla: '0', mitjana_real: '40', te_pla_propi: false, percentatge: null, base: null };
 
+/** Intl separa l'import del símbol amb un espai que no es trenca; aquí és un espai. */
+function equalText(actual, expected) {
+    assert.equal(String(actual).replace(/[\u00a0\u202f]/g, ' '), expected);
+}
+
 test('retallar una partida allibera diners per estalviar; pujar-la en treu', () => {
     const result = module.simulate([delivery, groceries, coffee], { 2: '10', 4: '320' });
     assert.deepEqual(result.rows.map(row => row.diferencia), [-50, 20, 0]);
@@ -84,9 +89,9 @@ test('els recurrents per blocs, el que més costa primer', () => {
 });
 
 test('el que puja, en una frase', () => {
-    assert.equal(module.trendText({ abans: '42.33', ultim: '95', increment_percent: 124 }),
-        'de 42.33 € a 95.00 € al mes (+124 %)');
-    assert.equal(module.trendText({ abans: '0', ultim: '30', increment_percent: null }), 'de 0.00 € a 30.00 € al mes');
+    equalText(module.trendText({ abans: '42.33', ultim: '95', increment_percent: 124 }),
+        'de 42,33 € a 95,00 € al mes (+124 %)');
+    equalText(module.trendText({ abans: '0', ultim: '30', increment_percent: null }), 'de 0,00 € a 30,00 € al mes');
     assert.equal(module.monthName('2027-03'), 'marzo 2027');
     assert.equal(module.monthsAfter(new Date(2026, 10, 1), 2), '2027-01');
 });

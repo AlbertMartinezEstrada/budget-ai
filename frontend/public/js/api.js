@@ -1,8 +1,11 @@
+import { t, getLocale, getLanguage, useLanguage, rememberLanguage, supportedLanguage, translatePage } from './i18n.js';
+
 const API_URL = `${window.location.protocol}//${window.location.hostname}:8000`;
 
 export const appState = {
     currency: 'EUR',
     theme: 'light',
+    language: null,
     userName: '',
     userEmail: '',
     notifications: {
@@ -39,7 +42,7 @@ export async function loadAppState() {
         const settings = await getSettings();
         // El backend serialitza Settings en camelCase (sense @JsonProperty),
         // a diferència de la resta de models.
-        appState.userName = settings.userName || 'Usuario';
+        appState.userName = settings.userName || '';
         appState.userEmail = settings.userEmail || '';
         appState.currency = settings.currency || 'EUR';
         appState.notifications = {
@@ -50,7 +53,21 @@ export async function loadAppState() {
         
         applyTheme(settings.theme || 'light');
         applyCurrency(settings.currency || 'EUR');
-        
+
+        // Sense idioma desat se segueix el del navegador (o el triat a la
+        // pantalla d'entrada): una instal·lació que ja existia no canvia
+        // d'idioma fins que no se'n tria un a Configuració.
+        appState.language = supportedLanguage(settings.language);
+        if (appState.language && appState.language !== getLanguage()) {
+            try {
+                await applyLanguage(appState.language);
+            } catch (error) {
+                // Sense el fitxer de l'idioma desat, millor seguir en el d'ara
+                // que no pas quedar-se sense ajustos.
+                console.error('No s\'ha pogut canviar d\'idioma:', error);
+            }
+        }
+
         return settings;
     } catch (error) {
         console.error('Error loading app state:', error);
@@ -66,12 +83,42 @@ export function setCurrency(currency) {
     applyCurrency(currency);
 }
 
+/**
+ * Canvia l'idioma de tota l'aplicació: el baixa, tradueix l'HTML fix i avisa
+ * app.js perquè torni a pintar la vista oberta. Es recorda en aquest navegador
+ * perquè la pantalla d'entrada, que encara no pot llegir els ajustos, ja surti
+ * en aquest idioma.
+ */
+async function applyLanguage(language) {
+    const applied = await useLanguage(language);
+    rememberLanguage(applied);
+    translatePage();
+    document.dispatchEvent(new CustomEvent('languageChanged', { detail: { language: applied } }));
+}
+
+export async function setLanguage(language) {
+    appState.language = supportedLanguage(language);
+    await applyLanguage(language);
+}
+
+/**
+ * Un import amb el format de l'idioma i el símbol de la moneda dels ajustos:
+ * «1.234,57 €» en català, «€1,234.57» en anglès. Abans sortia «1234.57 €» en
+ * tots els idiomes, amb punt decimal i sense separador de milers.
+ */
 export function formatCurrency(amount) {
-    const symbols = { EUR: '€', USD: '$', GBP: '£' };
-    const symbol = symbols[appState.currency] || '€';
     const numericAmount = Number.parseFloat(amount);
     const safeAmount = Number.isFinite(numericAmount) ? numericAmount : 0;
-    return `${safeAmount.toFixed(2)} ${symbol}`;
+    const format = (currency) => new Intl.NumberFormat(getLocale(), {
+        style: 'currency', currency, useGrouping: 'always'
+    }).format(safeAmount);
+    try {
+        return format(appState.currency || 'EUR');
+    } catch {
+        // Intl llança amb un codi de moneda que no existeix: abans un de
+        // desconegut sortia amb €, i no pot tombar totes les vistes.
+        return format('EUR');
+    }
 }
 
 // Escapa text abans d'interpolar-lo dins d'HTML.
@@ -96,8 +143,7 @@ export async function apiFetch(path, options = {}) {
     } catch (error) {
         // fetch només falla així quan no arriba a parlar amb el servidor. El
         // navegador ho diu com "Failed to fetch", que no diu res a ningú.
-        throw new Error(`No es pot connectar amb el backend (${API_URL}). `
-            + 'Comprova que està en marxa amb «docker compose ps».');
+        throw new Error(t('errors.backend-unreachable', { url: API_URL }));
     }
 }
 
@@ -113,7 +159,7 @@ export function onUnauthorized(listener) {
 async function handleResponse(response) {
     if (response.status === 401) {
         unauthorizedListeners.forEach(listener => listener());
-        throw new Error('Sessió caducada');
+        throw new Error(t('session.expired'));
     }
     if (!response.ok) {
         throw new Error(await extractErrorMessage(response));
@@ -208,29 +254,28 @@ export function describeError(status, body, path = '') {
 
 function explainStatus(status, path) {
     const route = path ? ` (${path})` : '';
-    const rebuild = 'Si acabes d\'actualitzar l\'aplicació, reconstrueix el backend amb '
-        + '«docker compose up -d --build backend».';
+    const rebuildHint = t('errors.rebuild-hint');
     switch (status) {
         case 400:
-            return `El backend ha rebutjat la petició${route} sense dir per què.`;
+            return t('errors.status-400', { route });
         case 403:
-            return 'No tens permís per fer això.';
+            return t('errors.status-403');
         case 404:
-            return `El backend no troba el que s'ha demanat${route}. ${rebuild}`;
+            return t('errors.status-404', { route, rebuildHint });
         case 405:
-            return `El backend no accepta aquesta operació${route}. ${rebuild}`;
+            return t('errors.status-405', { route, rebuildHint });
         case 409:
-            return 'No es pot fer: hi ha dades que en depenen.';
+            return t('errors.status-409');
         case 413:
-            return 'El fitxer és massa gran.';
+            return t('errors.status-413');
         case 500:
-            return 'Error intern del backend. El detall és al log: «docker compose logs backend».';
+            return t('errors.status-500');
         case 502:
         case 503:
         case 504:
-            return 'El backend no respon. Comprova que està en marxa amb «docker compose ps».';
+            return t('errors.status-unavailable');
         default:
-            return `Error ${status}${route}.`;
+            return t('errors.status-other', { status, route });
     }
 }
 

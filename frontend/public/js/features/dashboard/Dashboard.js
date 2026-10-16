@@ -1,4 +1,5 @@
 import { getTransactions, getOverallSummary, formatCurrency, escapeHtml } from '../../api.js';
+import { t, formatDate, formatPercent } from '../../i18n.js';
 
 /**
  * El tauler: el resum de tot el que hi ha i els últims moviments.
@@ -14,65 +15,65 @@ export async function initDashboard(container) {
         <div class="dashboard-grid">
             <div class="card">
                 <div class="card-header">
-                    <h3 class="card-title">Ingressos</h3>
+                    <h3 class="card-title">${t('dashboard.income')}</h3>
                     <span class="material-symbols-outlined" style="font-size: 1.5rem; color: var(--secondary-color);">arrow_circle_down</span>
                 </div>
                 <div class="stat-value text-success" id="total-ingressos">${formatCurrency(0)}</div>
-                <div class="stat-label">Total rebut</div>
+                <div class="stat-label">${t('dashboard.income-hint')}</div>
             </div>
             <div class="card">
                 <div class="card-header">
-                    <h3 class="card-title">Despeses</h3>
+                    <h3 class="card-title">${t('dashboard.expenses')}</h3>
                     <span class="material-symbols-outlined" style="font-size: 1.5rem; color: #ef4444;">arrow_circle_up</span>
                 </div>
                 <div class="stat-value text-error" id="total-despeses">${formatCurrency(0)}</div>
-                <div class="stat-label">Total gastat</div>
+                <div class="stat-label">${t('dashboard.expenses-hint')}</div>
             </div>
             <div class="card">
                 <div class="card-header">
-                    <h3 class="card-title">Estalviat</h3>
+                    <h3 class="card-title">${t('dashboard.saved')}</h3>
                     <span class="material-symbols-outlined" style="font-size: 1.5rem; color: #0d9488;">savings</span>
                 </div>
                 <div class="stat-value text-teal-700 dark:text-teal-400" id="total-estalviat">${formatCurrency(0)}</div>
-                <div class="stat-label" id="taxa-estalvi">A Estalvi i inversió</div>
+                <div class="stat-label" id="taxa-estalvi">${t('dashboard.saved-hint')}</div>
             </div>
             <div class="card">
                 <div class="card-header">
-                    <h3 class="card-title">Sense destinar</h3>
+                    <h3 class="card-title">${t('dashboard.unassigned')}</h3>
                     <span class="material-symbols-outlined" style="font-size: 1.5rem; color: var(--primary-color);">balance</span>
                 </div>
                 <div class="stat-value" id="sense-destinar">${formatCurrency(0)}</div>
-                <div class="stat-label">Ingressos menys despeses i estalvi</div>
+                <div class="stat-label">${t('dashboard.unassigned-hint')}</div>
             </div>
         </div>
         
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
              <div class="card">
                 <div class="card-header">
-                    <h3 class="card-title">Top Categories</h3>
+                    <h3 class="card-title">${t('dashboard.top-categories')}</h3>
                     <span class="material-symbols-outlined" style="font-size: 1.5rem; color: #f59e0b;">pie_chart</span>
                 </div>
                 <div id="top-categories-list" class="space-y-3">
-                    <div class="text-center text-sm text-gray-500">Carregant...</div>
+                    <div class="text-center text-sm text-gray-500">${t('common.loading')}</div>
                 </div>
             </div>
 
             <div class="card">
                 <div class="card-header">
-                    <h3 class="card-title">Últimes Transaccions</h3>
-                    <button class="btn btn-sm btn-outline" data-view="transactions">Veure tot</button>
+                    <h3 class="card-title">${t('dashboard.recent')}</h3>
+                    <button class="btn btn-sm btn-outline" data-view="transactions">${t('dashboard.see-all')}</button>
                 </div>
                 <div class="table-responsive">
                     <table class="table">
                         <thead>
                             <tr>
-                                <th>Data</th>
-                                <th>Empresa</th>
-                                <th>Import</th>
+                                <th>${t('table.date')}</th>
+                                <th>${t('table.company')}</th>
+                                <th>${t('table.amount')}</th>
                             </tr>
                         </thead>
                         <tbody id="recent-transactions">
-                            <tr><td colspan="3" class="text-center">Carregant...</td></tr>
+                            <tr><td colspan="3" class="text-center">${t('common.loading')}</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -87,7 +88,7 @@ export async function initDashboard(container) {
         renderTopCategories(summary.top_categories || []);
     } catch (error) {
         console.error('Error loading dashboard:', error);
-        container.innerHTML += `<div class="alert alert-error mt-4">Error carregant dades: ${escapeHtml(error.message)}</div>`;
+        container.innerHTML += `<div class="alert alert-error mt-4">${escapeHtml(t('dashboard.load-failed', { message: error.message }))}</div>`;
     }
 }
 
@@ -107,7 +108,7 @@ function updateStats(summary) {
     document.getElementById('total-estalviat').textContent = formatCurrency(saved);
     if (summary.savings_rate != null) {
         document.getElementById('taxa-estalvi').textContent =
-            `${Number(summary.savings_rate).toFixed(1)}% dels ingressos`;
+            t('dashboard.savings-rate', { rate: formatPercent(summary.savings_rate) });
     }
 
     const unassignedElement = document.getElementById('sense-destinar');
@@ -123,7 +124,7 @@ function renderTopCategories(topCategories) {
     const container = document.getElementById('top-categories-list');
     
     if (sortedCategories.length === 0) {
-        container.innerHTML = '<div class="text-center text-sm text-gray-500">No hi ha dades de despeses.</div>';
+        container.innerHTML = `<div class="text-center text-sm text-gray-500">${t('dashboard.no-expenses')}</div>`;
         return;
     }
 
@@ -145,7 +146,7 @@ function renderRecentTransactions(transactions) {
     const recent = transactions.slice(0, 5);
 
     if (recent.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="3" class="text-center">No hi ha transaccions recents.</td></tr>';
+        tbody.innerHTML = `<tr><td colspan="3" class="text-center">${t('dashboard.no-recent')}</td></tr>`;
         return;
     }
 
@@ -156,8 +157,8 @@ function renderRecentTransactions(transactions) {
         
         return `
         <tr>
-            <td class="text-sm text-gray-500">${new Date(transaction.data).toLocaleDateString()}</td>
-            <td class="font-medium text-gray-900">${escapeHtml(transaction.empresa || 'Desconegut')}</td>
+            <td class="text-sm text-gray-500">${formatDate(transaction.data)}</td>
+            <td class="font-medium text-gray-900">${escapeHtml(transaction.empresa || t('common.unknown'))}</td>
             <td class="text-right font-bold ${amountClass}">${sign}${formatCurrency(parseFloat(transaction.cost))}</td>
         </tr>
     `}).join('');

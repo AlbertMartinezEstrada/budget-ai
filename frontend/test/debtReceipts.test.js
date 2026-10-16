@@ -78,7 +78,7 @@ test('el desplegable comença pel que toca i no ofereix els rebuts trets', () =>
     assert.equal(options[0].value, '');
     assert.match(options[0].text, /El que toca/);
     assert.deepEqual(options.slice(1).map(option => option.value), ['2026-10-08', '2026-11-08', '2026-12-08']);
-    assert.match(options[1].text, /octubre 2026 · 97\.38 € · pagat/);
+    assert.match(options[1].text, /octubre 2026 · 97,38\s€ · pagat/);
     assert.ok(options.every(option => !option.selected));
 });
 

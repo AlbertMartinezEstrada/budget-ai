@@ -66,8 +66,11 @@ export function createApp() {
     // hagut cap canvi, així que no es descarrega res de més).
     app.use(express.static(path.join(__dirname, 'public'), {
         etag: true,
-        setHeaders: (response) => {
+        setHeaders: (response, filePath) => {
             response.setHeader('Cache-Control', 'no-cache');
+            // Els fitxers d'idioma (lang/Language_xx.properties) són text en
+            // UTF-8; Express no coneix l'extensió i els enviava com a binari.
+            if (filePath.endsWith('.properties')) response.setHeader('Content-Type', 'text/plain; charset=utf-8');
         }
     }));
 

@@ -1,9 +1,10 @@
 // Prova de navegador: el que fins ara es comprovava a mà a cada PR.
 //
 // Entra, importa l'extracte d'exemple per la pantalla fins a desar-lo, i
-// recorre totes les vistes i els seus formularis en tema clar i fosc. Falla si
-// hi ha errors de JavaScript, peticions que fallen, violacions de la política
-// de seguretat, una capçalera que no diu la vista o textos amb poc contrast.
+// recorre totes les vistes i els seus formularis en tema clar i fosc, i després
+// en cada idioma. Falla si hi ha errors de JavaScript, peticions que fallen,
+// violacions de la política de seguretat, una capçalera que no diu la vista,
+// textos amb poc contrast, una traducció que falta o un text que no hi cap.
 //
 // Necessita el backend (8000) i el frontend (3000) en marxa, contra una base
 // de dades DE PROVA: importa moviments de debò. Per això no arrenca sense
@@ -15,6 +16,7 @@ import { chromium } from 'playwright';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { LANGUAGES, parseProperties } from '../public/js/i18n.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const FRONTEND_URL = process.env.E2E_FRONTEND_URL || 'http://localhost:3000';
@@ -290,6 +292,51 @@ for (const theme of ['light', 'dark']) {
     for (const entry of VIEWS) await checkView(entry, theme);
 }
 
+// ---- Cada idioma ----
+
+/** Tria l'idioma a Configuració, com ho faria qualsevol, i espera la vista ja traduïda. */
+async function chooseLanguage(code) {
+    await openView('settings', 'light');
+    await page.waitForSelector('#settings-content', { state: 'visible' });
+    await page.selectOption('#setting-language', code);
+    await page.waitForFunction(language => document.documentElement.lang === language
+        && document.getElementById('settings-content')?.offsetParent !== null, code, { timeout: 15000 });
+    await waitForQuietNetwork();
+}
+
+/**
+ * Un text que no hi cap: la pàgina s'eixampla més que la finestra, o un enllaç
+ * del menú talla el seu nom. El portuguès i l'anglès tenen textos més llargs
+ * que el català.
+ */
+function overflowingTexts() {
+    const problems = [];
+    const root = document.documentElement;
+    if (root.scrollWidth > root.clientWidth + 1) problems.push(`la pàgina fa ${root.scrollWidth}px i la finestra ${root.clientWidth}px`);
+    for (const link of document.querySelectorAll('.sidebar .nav-link')) {
+        if (link.scrollWidth > link.clientWidth + 1) problems.push(`el menú talla «${link.textContent.trim()}»`);
+    }
+    return problems;
+}
+
+for (const { code } of [...LANGUAGES].reverse()) {
+    const messages = parseProperties(fs.readFileSync(path.join(HERE, '..', 'public', 'lang', `Language_${code}.properties`), 'utf8'));
+    currentStep = `idioma ${code}`;
+    await chooseLanguage(code);
+    const menu = await page.$$eval('.sidebar .nav-link[data-view]', links => links.map(link =>
+        [link.dataset.view, link.querySelector('span:last-child').textContent.trim()]));
+    for (const [view, label] of menu) {
+        if (label !== messages.get(`nav.${view}`)) fail(`el menú diu «${label}» a ${view} i en ${code} és «${messages.get(`nav.${view}`)}»`);
+    }
+    for (const { view } of VIEWS) {
+        currentStep = `${view} · ${code}`;
+        await openView(view, 'light');
+        if (await page.evaluate(() => document.documentElement.lang) !== code) fail('la pàgina no és en aquest idioma');
+        for (const problem of await page.evaluate(overflowingTexts)) fail(problem);
+        await page.screenshot({ path: path.join(RESULTS_DIR, `${view.replace('/', '-')}-${code}.png`), fullPage: true });
+    }
+}
+
 await browser.close();
 
 if (failures.length) {
@@ -297,4 +344,5 @@ if (failures.length) {
     for (const failure of failures) console.error(`  · ${failure}`);
     process.exit(1);
 }
-console.log(`✓ Importació i ${VIEWS.length} vistes en clar i en fosc, sense errors ni textos amb poc contrast.`);
+console.log(`✓ Importació i ${VIEWS.length} vistes en clar i en fosc i en ${LANGUAGES.length} idiomes, `
+    + 'sense errors, textos amb poc contrast ni traduccions que faltin.');
