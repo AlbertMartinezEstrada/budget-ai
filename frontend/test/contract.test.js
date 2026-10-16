@@ -168,8 +168,8 @@ test('els missatges d\'error es pinten escapats a l\'HTML', () => {
 });
 
 /**
- * Tot el JavaScript del frontend, no només el de la pàgina: els tests, el
- * servidor i els scripts també es llegeixen. Abans la regla només mirava
+ * Tot el JavaScript del frontend, no només el de la pàgina: els tests (també el
+ * de navegador), el servidor i els scripts també es llegeixen. Abans la regla només mirava
  * public/js, i un `(a, b) => b - a` va entrar per un test.
  */
 function allJavaScript() {
@@ -178,6 +178,8 @@ function allJavaScript() {
         ...fs.readdirSync(__dirname).filter(name => name.endsWith('.js')).map(name => path.join(__dirname, name)),
         ...fs.readdirSync(path.join(root, 'scripts')).filter(name => /\.m?js$/.test(name))
             .map(name => path.join(root, 'scripts', name)),
+        ...fs.readdirSync(path.join(root, 'e2e')).filter(name => /\.m?js$/.test(name))
+            .map(name => path.join(root, 'e2e', name)),
         path.join(root, 'index.js')
     ];
     return [...jsFiles(), ...extra].map(file => ({

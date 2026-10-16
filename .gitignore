@@ -31,6 +31,8 @@ __pycache__/
 node_modules/
 # package-lock.json també es versiona: és el que fa que "npm ci" instal·li
 # exactament les mateixes versions a la integració contínua que en local.
+# Captures de la prova de navegador (frontend/e2e/navegador.mjs)
+frontend/e2e/resultats/
 
 # Logs
 *.log

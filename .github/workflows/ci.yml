@@ -21,16 +21,16 @@ jobs:
     name: Backend · tests unitaris
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Preparar Java 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: '17'
 
       - name: Preparar Gradle
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@v6
 
       - name: Executar els tests unitaris
         working-directory: backend-java
@@ -38,7 +38,7 @@ jobs:
 
       - name: Publicar l'informe si han fallat
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: informe-tests-unitaris
           path: backend-java/build/reports/tests/test/
@@ -48,16 +48,16 @@ jobs:
     name: Backend · tests d'integració
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Preparar Java 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: '17'
 
       - name: Preparar Gradle
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@v6
 
       # Els runners d'ubuntu porten Docker, que és el que necessita
       # Testcontainers per aixecar el PostgreSQL de debò.
@@ -67,7 +67,7 @@ jobs:
 
       - name: Publicar l'informe si han fallat
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: informe-tests-integracio
           path: backend-java/build/reports/tests/integrationTest/
@@ -77,14 +77,14 @@ jobs:
     name: Frontend · tests
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # La mateixa versió que fa servir el contenidor. El script de tests ja
       # es va haver de corregir un cop perquè no era portable entre versions
       # de Node, així que val la pena que la integració contínua fixi la del
       # contenidor i el desenvolupament faci servir la de la màquina.
       - name: Preparar Node 22
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: '22'
           cache: npm
@@ -105,11 +105,129 @@ jobs:
         working-directory: frontend
         run: npm audit --omit=dev --audit-level=high
 
+  # L'aplicació sencera en un navegador, contra una base de dades nova: entrar,
+  # importar l'extracte d'exemple i recórrer totes les vistes i formularis en
+  # clar i en fosc (frontend/e2e/navegador.mjs). Abans això només es feia a mà.
+  browser:
+    name: Navegador · totes les vistes
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: budget
+          POSTGRES_PASSWORD: budget
+          POSTGRES_DB: budget
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U budget"
+          --health-interval 2s --health-timeout 5s --health-retries 30
+    # Credencials d'aquesta base de dades de prova, que només existeix durant el job.
+    env:
+      DB_HOST: localhost
+      DB_NAME: budget
+      DB_USER: budget
+      DB_PASSWORD: budget
+      AUTH_USERNAME: prova
+      AUTH_PASSWORD: contrasenya-de-prova-del-ci
+      JWT_SECRET: clau-de-prova-del-ci-prou-llarga-per-a-hmac-sha256
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Preparar Java 17
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Preparar Gradle
+        uses: gradle/actions/setup-gradle@v6
+
+      - name: Preparar Node 22
+        uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Crear l'esquema amb init.sql
+        env:
+          PGPASSWORD: budget
+        run: psql -h localhost -U budget -d budget -v ON_ERROR_STOP=1 -q -f backend-java/init.sql
+
+      - name: Engegar el backend
+        working-directory: backend-java
+        run: |
+          ./gradlew assemble --no-daemon -q
+          nohup java -jar build/libs/*.jar > backend.log 2>&1 &
+
+      - name: Instal·lar el frontend i Chromium
+        working-directory: frontend
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+
+      - name: Engegar el frontend
+        working-directory: frontend
+        run: nohup node index.js > frontend.log 2>&1 &
+
+      - name: Esperar que responguin
+        run: |
+          for attempt in $(seq 1 60); do
+            curl -s -o /dev/null http://localhost:8000/auth/me && curl -fs -o /dev/null http://localhost:3000/ && exit 0
+            sleep 2
+          done
+          echo "No han arrencat:"; tail -40 backend-java/backend.log; exit 1
+
+      - name: Recórrer l'aplicació
+        working-directory: frontend
+        env:
+          E2E_BASE_DE_DADES_DE_PROVA: si
+          E2E_USERNAME: prova
+          E2E_PASSWORD: contrasenya-de-prova-del-ci
+        run: npm run test:navegador
+
+      - name: Publicar captures i registres si ha fallat
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: navegador
+          path: |
+            frontend/e2e/resultats/
+            backend-java/backend.log
+            frontend/frontend.log
+          retention-days: 7
+
+  # Les dependències de Gradle a GitHub, perquè Dependabot avisi si una té
+  # una vulnerabilitat. De build.gradle no les sap llegir sol: les de npm sí,
+  # del package-lock.json. A main, que és el que corre de debò, i quan es
+  # llança a mà. No a les PR: les de Dependabot no tenen permís d'escriptura.
+  dependency-graph:
+    name: Dependències del backend a GitHub
+    if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Preparar Java 17
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Enviar les dependències
+        uses: gradle/actions/dependency-submission@v6
+        with:
+          build-root-directory: backend-java
+
   build-images:
     name: Construir les imatges de Docker
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # No es publiquen enlloc: només es comprova que els Dockerfile
       # segueixin construint, que és com es desplega l'aplicació.
