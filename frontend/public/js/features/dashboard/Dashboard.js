@@ -87,7 +87,7 @@ export async function initDashboard(container) {
         renderTopCategories(summary.top_categories || []);
     } catch (error) {
         console.error('Error loading dashboard:', error);
-        container.innerHTML += `<div class="alert alert-error mt-4">Error carregant dades: ${error.message}</div>`;
+        container.innerHTML += `<div class="alert alert-error mt-4">Error carregant dades: ${escapeHtml(error.message)}</div>`;
     }
 }
 

@@ -857,10 +857,11 @@ function buildPartRow(part, style) {
     `;
 }
 
+/** @param message text pla: pot dur el missatge d'error del backend, que repeteix el que se li ha enviat. */
 function renderMessageRow(message, isError = false) {
     document.getElementById('transactions-body').innerHTML = `
         <tr>
-            <td colspan="8" class="text-center ${isError ? 'text-error' : ''}">${message}</td>
+            <td colspan="8" class="text-center ${isError ? 'text-error' : ''}">${escapeHtml(message)}</td>
         </tr>
     `;
 }

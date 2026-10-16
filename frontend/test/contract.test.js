@@ -150,6 +150,23 @@ test('pressupostos compara el pla amb els moviments, no amb el cost de vida', ()
     assert.ok(!/cost_vida_real/.test(budgets.source), 'Budgets.js llegeix cost_vida_real');
 });
 
+test('els missatges d\'error es pinten escapats a l\'HTML', () => {
+    // Els missatges del backend repeteixen el que se li ha enviat («El valor
+    // «…» no és vàlid»). Posats a innerHTML sense escapar, un valor amb
+    // etiquetes seria HTML de la pàgina: dos llocs ho feien.
+    const unescaped = [];
+    for (const file of files) {
+        for (const [template] of file.source.matchAll(/`[^`]*<[a-zA-Z][^`]*`/g)) {
+            for (const [, expression] of template.matchAll(/\$\{([^{}]*)\}/g)) {
+                if (/\bmessage\b/.test(expression) && !/^\s*escapeHtml\(/.test(expression)) {
+                    unescaped.push(`${file.path}: \${${expression.trim()}}`);
+                }
+            }
+        }
+    }
+    assert.deepEqual(unescaped, [], 'feu servir escapeHtml(...) o textContent');
+});
+
 /**
  * Tot el JavaScript del frontend, no només el de la pàgina: els tests, el
  * servidor i els scripts també es llegeixen. Abans la regla només mirava
