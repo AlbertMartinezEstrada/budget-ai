@@ -277,6 +277,15 @@ export async function initUpload(container) {
 
         try {
             const result = await uploadCsv(file, document.getElementById('upload-account').value);
+            if (result.status === 'info') {
+                // Tot el fitxer ja era a la base de dades: no és cap error. Abans
+                // sortia «Resposta inesperada del servidor» en tornar a pujar un
+                // extracte ja importat.
+                reviewSection.classList.add('hidden');
+                statusDiv.textContent = `ℹ️ ${result.message}`;
+                uploadButton.disabled = false;
+                return;
+            }
             if (result.status === 'review') {
                 // Tot entra marcat: el cas normal és importar-ho sencer i
                 // descartar-ne quatre, no al revés. Menys l'altra pota d'un

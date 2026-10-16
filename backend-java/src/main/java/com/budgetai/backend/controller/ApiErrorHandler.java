@@ -2,6 +2,9 @@ package com.budgetai.backend.controller;
 
 import com.budgetai.backend.service.NotFoundException;
 import jakarta.servlet.http.HttpServletRequest;
+import org.apache.catalina.connector.ClientAbortException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
@@ -12,6 +15,7 @@ import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.context.request.async.AsyncRequestNotUsableException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.server.ResponseStatusException;
@@ -40,6 +44,8 @@ import java.util.Map;
  */
 @RestControllerAdvice
 public class ApiErrorHandler {
+
+    private static final Logger LOG = LoggerFactory.getLogger(ApiErrorHandler.class);
 
     /** El que s'ha demanat no existeix. El missatge ja diu què. */
     @ExceptionHandler(NotFoundException.class)
@@ -140,6 +146,17 @@ public class ApiErrorHandler {
     }
 
     /** Qualsevol altra cosa és nostra: el detall va al log, amb una referència per trobar-lo. */
+    /**
+     * El navegador ha tallat la connexió a mitja resposta: s'ha canviat de
+     * vista o s'ha tancat la pestanya mentre carregava. No és cap error del
+     * backend i no hi ha a qui respondre. Abans queia a «unexpected» i sortia
+     * al registre com a error inesperat amb la traça sencera, cada vegada.
+     */
+    @ExceptionHandler({AsyncRequestNotUsableException.class, ClientAbortException.class})
+    public void clientDisconnected(Exception exception) {
+        LOG.debug("El client ha tallat la connexió: {}", exception.getMessage());
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Map<String, Object>> unexpected(Exception exception, HttpServletRequest request) {
         return error(HttpStatus.INTERNAL_SERVER_ERROR, ClientErrors.messageFor(exception, request.getRequestURI()),
