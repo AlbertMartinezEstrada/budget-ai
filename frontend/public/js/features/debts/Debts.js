@@ -4,6 +4,7 @@ import {
 } from '../../api.js';
 import { categoryOptions, leafCategories, EXPENSE_SECTIONS } from '../../categoryOptions.js';
 import { isActiveReceipt, receiptLabel, receiptStatusLabel, samePeriod } from '../../debtReceipts.js';
+import { t, formatDate } from '../../i18n.js';
 
 /**
  * Deutes i préstecs, en els dos sentits.
@@ -14,25 +15,30 @@ import { isActiveReceipt, receiptLabel, receiptStatusLabel, samePeriod } from '.
  * puguin deixar de quadrar.
  */
 
+/** Les claus dels textos que canvien segons qui deu a qui. */
 const DIRECTIONS = {
     DEC: {
-        titol: 'Jo dec',
-        buit: 'No deus res a ningú.',
-        retorn: 'retornat',
-        verb: 'Tornar'
+        titol: 'debts.direction-owe',
+        buit: 'debts.empty-owe',
+        pendent: 'debts.pending-owe',
+        retornat: 'debts.repaid-owe',
+        endarrerit: 'debts.next-overdue-owe',
+        ara: 'debts.next-now-owe'
     },
     EM_DEUEN: {
-        titol: 'Em deuen',
-        buit: 'Ningú et deu res.',
-        retorn: 'cobrat',
-        verb: 'Cobrar'
+        titol: 'debts.direction-owed',
+        buit: 'debts.empty-owed',
+        pendent: 'debts.pending-owed',
+        retornat: 'debts.repaid-owed',
+        endarrerit: 'debts.next-overdue-owed',
+        ara: 'debts.next-now-owed'
     }
 };
 
 const FREQUENCIES = {
-    SETMANAL: { etiqueta: 'a la setmana', mesos: 0, setmanes: 1 },
-    MENSUAL: { etiqueta: 'al mes', mesos: 1, setmanes: 0 },
-    TRIMESTRAL: { etiqueta: 'al trimestre', mesos: 3, setmanes: 0 }
+    SETMANAL: { etiqueta: 'debts.per-week', mesos: 0, setmanes: 1 },
+    MENSUAL: { etiqueta: 'debts.per-month', mesos: 1, setmanes: 0 },
+    TRIMESTRAL: { etiqueta: 'debts.per-quarter', mesos: 3, setmanes: 0 }
 };
 
 const RECEIPT_STATUS_CLASSES = {
@@ -46,9 +52,15 @@ const RECEIPT_STATUS_CLASSES = {
 };
 
 const THIS_PERIOD = {
-    SETMANAL: 'aquesta setmana',
-    MENSUAL: 'aquest mes',
-    TRIMESTRAL: 'aquest trimestre'
+    SETMANAL: 'debts.this-week',
+    MENSUAL: 'debts.this-month',
+    TRIMESTRAL: 'debts.this-quarter'
+};
+
+const THAT_PERIOD = {
+    SETMANAL: 'debts.that-week',
+    MENSUAL: 'debts.that-month',
+    TRIMESTRAL: 'debts.that-quarter'
 };
 
 /** On es reserva per defecte la quota d'un deute nou que dec. */
@@ -63,99 +75,92 @@ let pendingRemoval = null;
 export async function initDebts(container) {
     container.innerHTML = `
         <div class="page-header flex flex-wrap justify-between items-center gap-3 mb-2">
-            <h2 class="text-2xl font-bold text-slate-800 dark:text-slate-100">Deutes i préstecs</h2>
+            <h2 class="text-2xl font-bold text-slate-800 dark:text-slate-100">${t('debts.title')}</h2>
             <button id="add-debt-btn" class="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/90 flex items-center gap-2">
                 <span class="material-symbols-outlined">add</span>
-                Nou deute
+                ${t('debts.add')}
             </button>
         </div>
-        <p class="text-sm text-slate-500 dark:text-slate-400 mb-6 max-w-3xl">
-            Un préstec no és ni un ingrés ni una despesa: és el mateix diner que entra i torna a sortir.
-            Al pressupost, el que et deixen entra a <strong>Préstecs rebuts</strong> i el que tornes surt de
-            <strong>Pagament de deutes</strong>. Vincula cada moviment al seu deute des de Transaccions i aquí
-            veuràs quant queda.
-        </p>
+        <p class="text-sm text-slate-500 dark:text-slate-400 mb-6 max-w-3xl">${t('debts.intro')}</p>
 
         <div id="debt-totals" class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6"></div>
         <div id="debts-list" class="space-y-8">
-            <div class="text-center py-8 text-slate-500 dark:text-slate-400">Carregant...</div>
+            <div class="text-center py-8 text-slate-500 dark:text-slate-400">${t('common.loading')}</div>
         </div>
 
         <div id="debt-modal" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-50 p-4">
             <div class="bg-white dark:bg-slate-800 rounded-xl p-6 w-full max-w-md max-h-full overflow-y-auto">
-                <h3 class="text-xl font-bold mb-4" id="debt-modal-title">Nou deute</h3>
+                <h3 class="text-xl font-bold mb-4" id="debt-modal-title">${t('debts.add')}</h3>
                 <form id="debt-form" class="space-y-4">
                     <input type="hidden" id="debt-id">
                     <div>
-                        <label class="block text-sm font-medium mb-1" for="debt-direction">Qui el deu</label>
+                        <label class="block text-sm font-medium mb-1" for="debt-direction">${t('debts.who')}</label>
                         <select id="debt-direction" class="form-control">
-                            <option value="DEC">Me'ls han deixat: els he de tornar</option>
-                            <option value="EM_DEUEN">Els he deixat jo: me'ls han de tornar</option>
+                            <option value="DEC">${t('debts.direction-owe-option')}</option>
+                            <option value="EM_DEUEN">${t('debts.direction-owed-option')}</option>
                         </select>
                     </div>
                     <div>
-                        <label class="block text-sm font-medium mb-1" for="debt-name">A qui, o per a què</label>
+                        <label class="block text-sm font-medium mb-1" for="debt-name">${t('debts.name')}</label>
                         <input type="text" id="debt-name" class="form-control" required
-                               placeholder="Pares, entrada del pis">
+                               placeholder="${t('debts.name-placeholder')}">
                     </div>
                     <div class="grid grid-cols-2 gap-3">
                         <div>
-                            <label class="block text-sm font-medium mb-1" for="debt-amount">Import</label>
+                            <label class="block text-sm font-medium mb-1" for="debt-amount">${t('common.amount')}</label>
                             <input type="number" id="debt-amount" class="form-control" step="0.01" min="0.01" required>
                         </div>
                         <div>
-                            <label class="block text-sm font-medium mb-1" for="debt-date">Data del préstec</label>
+                            <label class="block text-sm font-medium mb-1" for="debt-date">${t('debts.date')}</label>
                             <input type="date" id="debt-date" class="form-control" required>
                         </div>
                     </div>
                     <div>
-                        <label class="block text-sm font-medium mb-1" for="debt-plan">Com es torna</label>
+                        <label class="block text-sm font-medium mb-1" for="debt-plan">${t('debts.plan')}</label>
                         <select id="debt-plan" class="form-control">
-                            <option value="LLIURE">Sense calendari: quan es pugui</option>
-                            <option value="UNIC">Tot de cop, un dia concret</option>
-                            <option value="QUOTES">A quotes</option>
+                            <option value="LLIURE">${t('debts.plan-free-option')}</option>
+                            <option value="UNIC">${t('debts.plan-single-option')}</option>
+                            <option value="QUOTES">${t('debts.plan-installments-option')}</option>
                         </select>
                     </div>
                     <div id="debt-single-fields" class="hidden">
-                        <label class="block text-sm font-medium mb-1" for="debt-single-date">Dia que es torna</label>
+                        <label class="block text-sm font-medium mb-1" for="debt-single-date">${t('debts.single-date')}</label>
                         <input type="date" id="debt-single-date" class="form-control">
                     </div>
                     <div id="debt-installment-fields" class="hidden space-y-3">
                         <div class="grid grid-cols-2 gap-3">
                             <div>
-                                <label class="block text-sm font-medium mb-1" for="debt-installment">Quota</label>
+                                <label class="block text-sm font-medium mb-1" for="debt-installment">${t('debts.installment')}</label>
                                 <input type="number" id="debt-installment" class="form-control" step="0.01" min="0.01">
                             </div>
                             <div>
-                                <label class="block text-sm font-medium mb-1" for="debt-frequency">Cada</label>
+                                <label class="block text-sm font-medium mb-1" for="debt-frequency">${t('debts.every')}</label>
                                 <select id="debt-frequency" class="form-control">
-                                    <option value="MENSUAL">Mes</option>
-                                    <option value="SETMANAL">Setmana</option>
-                                    <option value="TRIMESTRAL">Trimestre</option>
+                                    <option value="MENSUAL">${t('debts.every-month')}</option>
+                                    <option value="SETMANAL">${t('debts.every-week')}</option>
+                                    <option value="TRIMESTRAL">${t('debts.every-quarter')}</option>
                                 </select>
                             </div>
                         </div>
                         <div>
-                            <label class="block text-sm font-medium mb-1" for="debt-first-date">Primera quota</label>
+                            <label class="block text-sm font-medium mb-1" for="debt-first-date">${t('debts.first-installment')}</label>
                             <input type="date" id="debt-first-date" class="form-control">
                         </div>
                     </div>
                     <p id="debt-plan-preview" class="text-sm text-slate-500 dark:text-slate-400 hidden"></p>
                     <div id="debt-category-field">
-                        <label class="block text-sm font-medium mb-1" for="debt-category">On es reserva la quota al pressupost</label>
+                        <label class="block text-sm font-medium mb-1" for="debt-category">${t('debts.reserve-in')}</label>
                         <select id="debt-category" class="form-control"></select>
-                        <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                            Cada mes, la quota que toca es reserva sola en aquesta categoria: són diners compromesos.
-                        </p>
+                        <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">${t('debts.reserve-hint')}</p>
                     </div>
                     <div>
-                        <label class="block text-sm font-medium mb-1" for="debt-notes">Notes</label>
-                        <input type="text" id="debt-notes" class="form-control" placeholder="Opcional">
+                        <label class="block text-sm font-medium mb-1" for="debt-notes">${t('common.notes')}</label>
+                        <input type="text" id="debt-notes" class="form-control" placeholder="${t('common.optional')}">
                     </div>
                     <p id="debt-form-error" class="text-error text-sm hidden"></p>
                     <div class="flex gap-2 justify-end">
-                        <button type="button" id="debt-cancel" class="btn btn-outline">Cancel·lar</button>
-                        <button type="submit" class="btn btn-primary">Desar</button>
+                        <button type="button" id="debt-cancel" class="btn btn-outline">${t('common.cancel')}</button>
+                        <button type="submit" class="btn btn-primary">${t('common.save')}</button>
                     </div>
                 </form>
             </div>
@@ -163,23 +168,23 @@ export async function initDebts(container) {
 
         <div id="receipt-modal" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-50 p-4">
             <div class="bg-white dark:bg-slate-800 rounded-xl p-6 w-full max-w-md max-h-full overflow-y-auto">
-                <h3 class="text-xl font-bold mb-1" id="receipt-modal-title">Treure el rebut</h3>
+                <h3 class="text-xl font-bold mb-1" id="receipt-modal-title">${t('debts.remove-receipt-title')}</h3>
                 <p class="text-sm text-slate-500 dark:text-slate-400 mb-4" id="receipt-modal-hint"></p>
                 <div class="space-y-3">
                     <button type="button" data-receipt-choice="skip"
                             class="w-full text-left p-3 rounded-lg border hover:bg-gray-50 dark:hover:bg-slate-700">
-                        <span class="font-medium block">Saltar-lo</span>
+                        <span class="font-medium block">${t('debts.skip')}</span>
                         <span class="text-sm text-slate-500 dark:text-slate-400 block" id="receipt-skip-hint"></span>
                     </button>
                     <button type="button" data-receipt-choice="discount"
                             class="w-full text-left p-3 rounded-lg border hover:bg-gray-50 dark:hover:bg-slate-700">
-                        <span class="font-medium block">Descomptar-lo del deute</span>
+                        <span class="font-medium block">${t('debts.discount')}</span>
                         <span class="text-sm text-slate-500 dark:text-slate-400 block" id="receipt-discount-hint"></span>
                     </button>
                 </div>
                 <p id="receipt-modal-error" class="text-error text-sm hidden mt-3"></p>
                 <div class="flex justify-end mt-4">
-                    <button type="button" id="receipt-cancel" class="btn btn-outline">Cancel·lar</button>
+                    <button type="button" id="receipt-cancel" class="btn btn-outline">${t('common.cancel')}</button>
                 </div>
             </div>
         </div>
@@ -222,7 +227,7 @@ async function loadDebts() {
     } catch (error) {
         console.error('Error carregant deutes:', error);
         document.getElementById('debts-list').innerHTML = `
-            <div class="text-center py-8 text-red-600">Error carregant deutes: ${escapeHtml(error.message)}</div>
+            <div class="text-center py-8 text-red-600">${escapeHtml(t('debts.load-failed', { message: error.message }))}</div>
         `;
     }
 }
@@ -234,7 +239,7 @@ async function loadDebts() {
  * grup es tornaria a sumar pels seus fills, així que cap dels dos s'ofereix.
  */
 function fillCategorySelect() {
-    document.getElementById('debt-category').innerHTML = '<option value="-1">No reservar-la</option>'
+    document.getElementById('debt-category').innerHTML = `<option value="-1">${t('debts.no-reserve')}</option>`
         + categoryOptions(categories, { sections: EXPENSE_SECTIONS });
 }
 
@@ -248,9 +253,9 @@ function render() {
         const ofDirection = debts.filter(debt => debt.direccio === direction);
         return `
             <section>
-                <h3 class="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-3">${labels.titol}</h3>
+                <h3 class="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-3">${t(labels.titol)}</h3>
                 ${ofDirection.length === 0
-                    ? `<p class="text-sm text-slate-500 dark:text-slate-400">${labels.buit}</p>`
+                    ? `<p class="text-sm text-slate-500 dark:text-slate-400">${t(labels.buit)}</p>`
                     : `<div class="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
                            ${ofDirection.map(renderCard).join('')}
                        </div>`}
@@ -269,12 +274,12 @@ function renderTotals() {
         const overdue = totalOf(direction, 'endarrerit');
         return `
             <div class="bg-white dark:bg-slate-800 rounded-xl p-4 shadow-sm border">
-                <div class="text-sm text-slate-500 dark:text-slate-400">${labels.titol}</div>
+                <div class="text-sm text-slate-500 dark:text-slate-400">${t(labels.titol)}</div>
                 <div class="text-2xl font-bold ${direction === 'DEC' ? 'text-red-600' : 'text-green-700'}">
                     ${formatCurrency(pending)}
                 </div>
                 <div class="text-xs ${overdue > 0 ? 'text-red-600' : 'text-slate-500 dark:text-slate-400'}">
-                    ${overdue > 0 ? `${formatCurrency(overdue)} endarrerits` : 'al dia'}
+                    ${overdue > 0 ? escapeHtml(t('debts.overdue-amount', { amount: formatCurrency(overdue) })) : t('debts.up-to-date')}
                 </div>
             </div>
         `;
@@ -299,15 +304,15 @@ function renderCard(debt) {
                 <div class="min-w-0">
                     <h4 class="font-semibold truncate">${escapeHtml(debt.nom)}</h4>
                     <div class="text-xs text-slate-500 dark:text-slate-400">
-                        ${formatCurrency(amount)} el ${escapeHtml(formatDate(debt.data))}
+                        ${escapeHtml(t('debts.lent-on', { amount: formatCurrency(amount), date: formatDate(debt.data) }))}
                     </div>
                 </div>
                 <div class="flex items-center gap-1 shrink-0">
                     ${statusBadge(debt, overdue)}
-                    <button data-action="edit" data-id="${debt.id}" class="p-1 hover:bg-gray-100 dark:hover:bg-slate-700 rounded" title="Editar">
+                    <button data-action="edit" data-id="${debt.id}" class="p-1 hover:bg-gray-100 dark:hover:bg-slate-700 rounded" title="${t('common.edit')}">
                         <span class="material-symbols-outlined text-sm">edit</span>
                     </button>
-                    <button data-action="delete" data-id="${debt.id}" class="p-1 hover:bg-red-50 dark:hover:bg-red-500/10 text-red-600 rounded" title="Esborrar">
+                    <button data-action="delete" data-id="${debt.id}" class="p-1 hover:bg-red-50 dark:hover:bg-red-500/10 text-red-600 rounded" title="${t('common.delete')}">
                         <span class="material-symbols-outlined text-sm">delete</span>
                     </button>
                 </div>
@@ -315,14 +320,14 @@ function renderCard(debt) {
 
             <div class="text-xl font-bold mb-1">
                 ${formatCurrency(pending)}
-                <span class="text-sm font-normal text-slate-500 dark:text-slate-400">per ${labels.verb.toLowerCase()}</span>
+                <span class="text-sm font-normal text-slate-500 dark:text-slate-400">${t(labels.pendent)}</span>
             </div>
             <div class="w-full bg-gray-200 dark:bg-slate-700 rounded-full h-2 mb-1">
                 <div class="bg-primary h-2 rounded-full" style="width: ${progress}%"></div>
             </div>
             <div class="text-xs text-slate-500 dark:text-slate-400 mb-3">
-                ${formatCurrency(repaid)} ${labels.retorn} de ${formatCurrency(amount)}
-                ${discounted > 0 ? ` · ${formatCurrency(discounted)} descomptats` : ''}
+                ${escapeHtml(t(labels.retornat, { repaid: formatCurrency(repaid), amount: formatCurrency(amount) }))}
+                ${discounted > 0 ? ` · ${escapeHtml(t('debts.discounted', { amount: formatCurrency(discounted) }))}` : ''}
             </div>
 
             <div class="text-sm space-y-1">
@@ -330,7 +335,7 @@ function renderCard(debt) {
                 ${nextPaymentLine(debt, labels)}
                 ${debt.direccio === 'DEC' && debt.category && debt.forma_retorn !== 'LLIURE'
                     ? `<div class="text-xs text-slate-500 dark:text-slate-400">
-                           Es reserva a «${escapeHtml(debt.category.nom)}» al pressupost.
+                           ${escapeHtml(t('debts.reserved-in', { category: debt.category.nom }))}
                        </div>`
                     : ''}
                 ${debt.notes ? `<div class="text-xs text-slate-500 dark:text-slate-400">${escapeHtml(debt.notes)}</div>` : ''}
@@ -338,7 +343,7 @@ function renderCard(debt) {
 
             <button data-action="toggle" data-id="${debt.id}" class="mt-3 text-sm text-primary hover:underline flex items-center gap-1">
                 <span class="material-symbols-outlined text-base">${expanded ? 'expand_less' : 'expand_more'}</span>
-                ${expanded ? 'Amagar' : 'Calendari i moviments'}
+                ${t(expanded ? 'debts.hide' : 'debts.show-details')}
             </button>
             ${expanded ? renderDetails(debt) : ''}
         </div>
@@ -347,11 +352,11 @@ function renderCard(debt) {
 
 function statusBadge(debt, overdue) {
     if (debt.saldat) {
-        return '<span class="text-xs px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-300">saldat</span>';
+        return `<span class="text-xs px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-300">${t('debts.settled')}</span>`;
     }
     if (overdue > 0) {
         return `<span class="text-xs px-2 py-0.5 rounded-full bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-300">
-                    ${formatCurrency(overdue)} endarrerits
+                    ${escapeHtml(t('debts.overdue-amount', { amount: formatCurrency(overdue) }))}
                 </span>`;
     }
     return '';
@@ -359,7 +364,7 @@ function statusBadge(debt, overdue) {
 
 function describePlan(debt) {
     if (debt.forma_retorn === 'UNIC') {
-        return `Tot de cop el ${formatDate(debt.data_primer_pagament)}`;
+        return t('debts.plan-single-on', { date: formatDate(debt.data_primer_pagament) });
     }
     if (debt.forma_retorn === 'QUOTES') {
         const frequency = FREQUENCIES[debt.frequencia] || FREQUENCIES.MENSUAL;
@@ -367,10 +372,13 @@ function describePlan(debt) {
         // Des del primer rebut que queda al calendari: si s'ha saltat el
         // primer, el pla comença el següent.
         const first = receipts[0]?.data || debt.data_primer_pagament;
-        return `${formatCurrency(debt.quota)} ${frequency.etiqueta} des ${ofReceipt(receiptLabel(first, debt.frequencia))}`
-            + ` · ${receipts.length} ${receipts.length === 1 ? 'rebut' : 'rebuts'}`;
+        return t('debts.plan-installments', {
+            amount: formatCurrency(debt.quota),
+            frequency: t(frequency.etiqueta),
+            from: fromReceipt(receiptLabel(first, debt.frequencia))
+        }) + ' · ' + t('debts.receipt-count', { count: receipts.length });
     }
-    return 'Sense calendari';
+    return t('debts.plan-free');
 }
 
 /**
@@ -382,21 +390,25 @@ function nextPaymentLine(debt, labels) {
     if (!next || debt.saldat) return '';
     const frequency = debt.frequencia;
     const amount = formatCurrency(next.import);
-    const receipt = escapeHtml(ofReceipt(receiptLabel(next.data, frequency)));
+    const label = receiptLabel(next.data, frequency);
 
     if (next.estat === 'ENDARRERIT') {
-        return `<div class="text-red-600">${labels.verb} ${amount}: el rebut ${receipt} va endarrerit</div>`;
+        return `<div class="text-red-600">${escapeHtml(t(labels.endarrerit, { amount, of: ofReceipt(label) }))}</div>`;
     }
     if (samePeriod(next.data, todayInputValue(), frequency)) {
-        return `<div>${labels.verb} ${amount} ${THIS_PERIOD[frequency] || THIS_PERIOD.MENSUAL}</div>`;
+        return `<div>${escapeHtml(t(labels.ara, { amount, period: t(THIS_PERIOD[frequency] || THIS_PERIOD.MENSUAL) }))}</div>`;
     }
-    return `<div>Pròxim rebut: ${escapeHtml(receiptLabel(next.data, frequency))}, ${amount}</div>`;
+    return `<div>${escapeHtml(t('debts.next-receipt', { receipt: label, amount }))}</div>`;
 }
 
-/** "d'octubre 2026", "de setembre 2026": la preposició com toca en català. */
-function ofReceipt(label) {
-    return /^[aeiouàèéíòóú]/i.test(label) ? `d'${label}` : `de ${label}`;
-}
+/**
+ * "d'octubre del 2026", "de setembre del 2026": en català la preposició
+ * s'apostrofa davant de vocal. Els altres idiomes tenen la mateixa frase a
+ * les dues claus.
+ */
+const startsWithVowel = (label) => /^[aeiouàèéíòóú]/i.test(label);
+const ofReceipt = (label) => t(startsWithVowel(label) ? 'debts.of-receipt-vowel' : 'debts.of-receipt', { receipt: label });
+const fromReceipt = (label) => t(startsWithVowel(label) ? 'debts.from-receipt-vowel' : 'debts.from-receipt', { receipt: label });
 
 /** L'estat d'un rebut, amb el que en falta o el que hi sobra si cal dir-ho. */
 function receiptStatusText(receipt, frequency) {
@@ -404,11 +416,11 @@ function receiptStatusText(receipt, frequency) {
     const paid = Number.parseFloat(receipt.pagat) || 0;
     const text = receiptStatusLabel(receipt.estat, frequency);
     if ((receipt.estat === 'PARCIAL' || receipt.estat === 'ENDARRERIT') && paid > 0) {
-        return `${text} · falten ${formatCurrency(amount - paid)}`;
+        return t('debts.status-missing', { status: text, amount: formatCurrency(amount - paid) });
     }
     // El que sobra no avança els rebuts següents: en treu del final.
     if (receipt.estat === 'PAGAT' && paid - amount >= 0.01) {
-        return `${text} · +${formatCurrency(paid - amount)} al final`;
+        return t('debts.status-extra', { status: text, amount: formatCurrency(paid - amount) });
     }
     return text;
 }
@@ -417,14 +429,14 @@ function receiptAction(debt, receipt, label) {
     if (receipt.eliminable) {
         return `<button data-action="remove-receipt" data-id="${debt.id}" data-date="${escapeHtml(receipt.data)}"
                         class="flex rounded text-slate-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10"
-                        title="Treure el rebut ${escapeHtml(ofReceipt(label))}" aria-label="Treure el rebut ${escapeHtml(ofReceipt(label))}">
+                        title="${escapeHtml(t('debts.remove-receipt', { of: ofReceipt(label) }))}" aria-label="${escapeHtml(t('debts.remove-receipt', { of: ofReceipt(label) }))}">
                     <span class="material-symbols-outlined text-base leading-none">close</span>
                 </button>`;
     }
     if (!isActiveReceipt(receipt)) {
         return `<button data-action="restore-receipt" data-id="${debt.id}" data-date="${escapeHtml(receipt.data)}"
                         class="flex rounded text-slate-500 hover:text-primary hover:bg-gray-100 dark:hover:bg-slate-700"
-                        title="Tornar-lo al calendari" aria-label="Tornar el rebut ${escapeHtml(ofReceipt(label))} al calendari">
+                        title="${t('debts.restore-title')}" aria-label="${escapeHtml(t('debts.restore-receipt', { of: ofReceipt(label) }))}">
                     <span class="material-symbols-outlined text-base leading-none">undo</span>
                 </button>`;
     }
@@ -457,24 +469,18 @@ function renderDetails(debt) {
         <div class="mt-3 pt-3 border-t border-slate-200 dark:border-slate-700 space-y-4">
             ${schedule.length > 0 ? `
                 <div>
-                    <div class="text-xs font-semibold uppercase text-slate-500 dark:text-slate-400 mb-1">Calendari</div>
+                    <div class="text-xs font-semibold uppercase text-slate-500 dark:text-slate-400 mb-1">${t('debts.schedule')}</div>
                     ${debt.forma_retorn === 'QUOTES'
-                        ? `<p class="text-xs text-slate-500 dark:text-slate-400 mb-1">
-                               Cada pagament paga el rebut que toca —el primer sense pagar— o el que triïs a
-                               Transaccions. El que sobra treu rebuts del final. Un rebut es pot saltar o
-                               descomptar amb la creu.
-                           </p>`
+                        ? `<p class="text-xs text-slate-500 dark:text-slate-400 mb-1">${t('debts.schedule-hint')}</p>`
                         : ''}
                     <div class="max-h-96 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-700/50">
                         ${schedule.map(receipt => renderReceipt(debt, receipt)).join('')}
                     </div>
                 </div>` : ''}
             <div>
-                <div class="text-xs font-semibold uppercase text-slate-500 dark:text-slate-400 mb-1">Moviments vinculats</div>
+                <div class="text-xs font-semibold uppercase text-slate-500 dark:text-slate-400 mb-1">${t('debts.linked')}</div>
                 ${movements.length === 0
-                    ? `<p class="text-sm text-slate-500 dark:text-slate-400">
-                           Encara cap. Des de Transaccions, edita un moviment i tria aquest deute.
-                       </p>`
+                    ? `<p class="text-sm text-slate-500 dark:text-slate-400">${t('debts.linked-empty')}</p>`
                     : `<div class="divide-y divide-slate-100 dark:divide-slate-700/50">
                            ${movements.map(movement => renderMovement(movement, debt)).join('')}
                        </div>`}
@@ -487,8 +493,9 @@ function renderMovement(movement, debt) {
     const isIncome = movement.type === 'INCOME';
     // A sota i no al costat: la descripció es retalla i se l'enduria.
     const receipt = movement.rebut && debt.forma_retorn === 'QUOTES'
-        ? `<span class="block text-xs" title="${movement.rebut_triat ? 'El rebut que vas triar' : 'El que tocava: el primer sense pagar'}">
-               Rebut ${escapeHtml(ofReceipt(receiptLabel(movement.rebut, debt.frequencia)))}${movement.rebut_triat ? ' (triat)' : ''}
+        ? `<span class="block text-xs" title="${t(movement.rebut_triat ? 'debts.receipt-chosen-title' : 'debts.receipt-due-title')}">
+               ${escapeHtml(t(movement.rebut_triat ? 'debts.movement-receipt-chosen' : 'debts.movement-receipt',
+                   { of: ofReceipt(receiptLabel(movement.rebut, debt.frequencia)) }))}
            </span>`
         : '';
     return `
@@ -498,7 +505,7 @@ function renderMovement(movement, debt) {
                 <span class="block truncate">
                     ${escapeHtml(movement.descripcio_curta || movement.empresa || '')}
                     ${movement.es_part
-                        ? '<span class="text-xs" title="Només una part del moviment: la resta compta per a altres coses">· part</span>'
+                        ? `<span class="text-xs" title="${t('debts.part-title')}">${t('debts.part')}</span>`
                         : ''}
                 </span>
                 ${receipt}
@@ -541,21 +548,21 @@ async function handleListClick(event) {
             await restoreDebtReceipt(id, button.dataset.date);
             await loadDebts();
         } catch (error) {
-            alert(error.message || 'No s\'ha pogut tornar el rebut al calendari.');
+            alert(error.message || t('debts.restore-failed'));
             button.disabled = false;
         }
         return;
     }
 
     if (button.dataset.action === 'delete') {
-        if (!confirm('Esborrar aquest deute? Els moviments vinculats es queden, només perden el vincle.')) return;
+        if (!confirm(t('debts.delete-confirm'))) return;
         button.disabled = true;
         try {
             await deleteDebt(id);
             expandedDebts.delete(id);
             await loadDebts();
         } catch (error) {
-            alert(error.message || 'No s\'ha pogut esborrar el deute.');
+            alert(error.message || t('debts.delete-failed'));
             button.disabled = false;
         }
     }
@@ -572,18 +579,16 @@ function openReceiptModal(debt, date) {
     if (!receipt) return;
     const frequency = debt.frequencia;
     const label = ofReceipt(receiptLabel(date, frequency));
-    const period = { SETMANAL: 'Aquella setmana', TRIMESTRAL: 'Aquell trimestre' }[frequency] || 'Aquell mes';
+    const period = t(THAT_PERIOD[frequency] || THAT_PERIOD.MENSUAL);
 
     pendingRemoval = { id: debt.id, date };
-    document.getElementById('receipt-modal-title').textContent = `Treure el rebut ${label}`;
+    document.getElementById('receipt-modal-title').textContent = t('debts.remove-receipt', { of: label });
     document.getElementById('receipt-modal-hint').textContent = receipt.estat === 'PAGAT' || Number.parseFloat(receipt.pagat) > 0
-        ? 'Els pagaments que hi anaven passaran al rebut següent.'
-        : `${debt.nom}: ${formatCurrency(receipt.import)}.`;
-    document.getElementById('receipt-skip-hint').textContent =
-        `${period} no toca pagar. El que deus no canvia: el pla s'allarga un rebut pel final.`;
+        ? t('debts.removal-moves-payments')
+        : t('debts.removal-summary', { name: debt.nom, amount: formatCurrency(receipt.import) });
+    document.getElementById('receipt-skip-hint').textContent = t('debts.skip-hint', { period });
     document.getElementById('receipt-discount-hint').textContent =
-        `El rebut desapareix i els ${formatCurrency(receipt.import)} es resten del que deus: `
-        + 'una rebaixa, o una part de la compra que t\'han tornat.';
+        t('debts.discount-hint', { amount: formatCurrency(receipt.import) });
     document.getElementById('receipt-modal-error').classList.add('hidden');
 
     const modal = document.getElementById('receipt-modal');
@@ -608,7 +613,7 @@ async function removeReceipt(discount, button) {
         closeReceiptModal();
         await loadDebts();
     } catch (failure) {
-        error.textContent = failure.message || 'No s\'ha pogut treure el rebut.';
+        error.textContent = failure.message || t('debts.remove-failed');
         error.classList.remove('hidden');
     } finally {
         button.disabled = false;
@@ -621,7 +626,7 @@ function openModal(debt = null) {
     const form = document.getElementById('debt-form');
     form.reset();
     document.getElementById('debt-form-error').classList.add('hidden');
-    document.getElementById('debt-modal-title').textContent = debt ? 'Editar deute' : 'Nou deute';
+    document.getElementById('debt-modal-title').textContent = t(debt ? 'debts.edit-title' : 'debts.add');
 
     document.getElementById('debt-id').value = debt?.id || '';
     document.getElementById('debt-direction').value = debt?.direccio || 'DEC';
@@ -688,14 +693,14 @@ function previewInstallments() {
     if (!(amount > 0) || !(installment > 0) || !firstDate) return '';
 
     const count = Math.ceil(amount / installment - 1e-9);
-    if (count > 600) return 'Massa pagaments: posa una quota més gran.';
+    if (count > 600) return t('debts.too-many');
     const last = Math.round((amount - installment * (count - 1)) * 100) / 100;
     const frequency = FREQUENCIES[document.getElementById('debt-frequency').value] || FREQUENCIES.MENSUAL;
     const lastDate = addPeriods(firstDate, frequency, count - 1);
 
     return count === 1
-        ? `Un sol pagament, el ${formatDate(lastDate)}.`
-        : `${count} pagaments; l'últim, de ${formatCurrency(last)}, el ${formatDate(lastDate)}.`;
+        ? t('debts.preview-single', { date: formatDate(lastDate) })
+        : t('debts.preview-many', { count, amount: formatCurrency(last), date: formatDate(lastDate) });
 }
 
 /**
@@ -761,7 +766,7 @@ async function handleSubmit(event) {
         closeModal();
         await loadDebts();
     } catch (failure) {
-        error.textContent = failure.message || 'No s\'ha pogut desar el deute.';
+        error.textContent = failure.message || t('debts.save-failed');
         error.classList.remove('hidden');
     } finally {
         submitButton.disabled = false;
@@ -781,8 +786,3 @@ function todayInputValue() {
     return toIsoDate(new Date());
 }
 
-function formatDate(isoDate) {
-    if (!isoDate || !/^\d{4}-\d{2}-\d{2}$/.test(isoDate)) return isoDate || '-';
-    const [year, month, day] = isoDate.split('-').map(Number);
-    return new Date(year, month - 1, day).toLocaleDateString('ca-ES');
-}

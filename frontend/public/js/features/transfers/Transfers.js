@@ -1,12 +1,13 @@
 import { getTransfers, createTransfer, deleteTransfer, getAccounts, formatCurrency, escapeHtml } from '../../api.js';
+import { t, formatDate } from '../../i18n.js';
 
 export async function initTransfers(container) {
     container.innerHTML = `
         <div class="page-header flex justify-between items-center mb-6">
-            <h2 class="text-2xl font-bold text-slate-800 dark:text-slate-100">Transferencias</h2>
+            <h2 class="text-2xl font-bold text-slate-800 dark:text-slate-100">${t('nav.transfers')}</h2>
             <button id="add-transfer-btn" class="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/90 flex items-center gap-2">
                 <span class="material-symbols-outlined">add</span>
-                Nueva Transferencia
+                ${t('transfers.add')}
             </button>
         </div>
         <div id="transfers-list" class="space-y-4"></div>
@@ -14,31 +15,31 @@ export async function initTransfers(container) {
         <!-- Modal -->
         <div id="transfer-modal" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-50">
             <div class="bg-white dark:bg-slate-800 rounded-xl p-6 w-full max-w-md">
-                <h3 class="text-xl font-bold mb-4">Nueva Transferencia</h3>
+                <h3 class="text-xl font-bold mb-4">${t('transfers.add')}</h3>
                 <form id="transfer-form" class="space-y-4">
                     <div>
-                        <label class="block text-sm font-medium mb-1">Cuenta Origen</label>
+                        <label class="block text-sm font-medium mb-1" for="transfer-source">${t('transfers.source')}</label>
                         <select id="transfer-source" required class="w-full px-3 py-2 border rounded-lg"></select>
                     </div>
                     <div>
-                        <label class="block text-sm font-medium mb-1">Cuenta Destino</label>
+                        <label class="block text-sm font-medium mb-1" for="transfer-destination">${t('transfers.destination')}</label>
                         <select id="transfer-destination" required class="w-full px-3 py-2 border rounded-lg"></select>
                     </div>
                     <div>
-                        <label class="block text-sm font-medium mb-1">Cantidad</label>
+                        <label class="block text-sm font-medium mb-1" for="transfer-amount">${t('common.amount')}</label>
                         <input type="number" id="transfer-amount" step="0.01" required class="w-full px-3 py-2 border rounded-lg">
                     </div>
                     <div>
-                        <label class="block text-sm font-medium mb-1">Fecha</label>
+                        <label class="block text-sm font-medium mb-1" for="transfer-date">${t('common.date')}</label>
                         <input type="date" id="transfer-date" required class="w-full px-3 py-2 border rounded-lg">
                     </div>
                     <div>
-                        <label class="block text-sm font-medium mb-1">Descripción</label>
+                        <label class="block text-sm font-medium mb-1" for="transfer-description">${t('common.description')}</label>
                         <input type="text" id="transfer-description" class="w-full px-3 py-2 border rounded-lg">
                     </div>
                     <div class="flex gap-2 justify-end">
-                        <button type="button" id="cancel-btn" class="px-4 py-2 border rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700">Cancelar</button>
-                        <button type="submit" class="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/90">Guardar</button>
+                        <button type="button" id="cancel-btn" class="px-4 py-2 border rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700">${t('common.cancel')}</button>
+                        <button type="submit" class="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/90">${t('common.save')}</button>
                     </div>
                 </form>
             </div>
@@ -78,14 +79,14 @@ async function loadTransfers() {
         renderTransfers(transfers);
     } catch (error) {
         console.error('Error loading transfers:', error);
-        document.getElementById('transfers-list').innerHTML = '<p class="text-red-600">Error al cargar transferencias</p>';
+        document.getElementById('transfers-list').innerHTML = `<p class="text-red-600">${t('transfers.load-failed')}</p>`;
     }
 }
 
 function renderTransfers(transfers) {
     const container = document.getElementById('transfers-list');
     if (!transfers || transfers.length === 0) {
-        container.innerHTML = '<p class="text-gray-500 dark:text-slate-400 text-center py-8">No hay transferencias</p>';
+        container.innerHTML = `<p class="text-gray-500 dark:text-slate-400 text-center py-8">${t('transfers.empty')}</p>`;
         return;
     }
 
@@ -96,13 +97,13 @@ function renderTransfers(transfers) {
                     <span class="material-symbols-outlined text-blue-600">swap_horiz</span>
                 </div>
                 <div>
-                    <div class="font-medium">${escapeHtml(transfer.sourceAccount?.nom || 'Origen')} → ${escapeHtml(transfer.destinationAccount?.nom || 'Destino')}</div>
-                    <div class="text-sm text-gray-500 dark:text-slate-400">${escapeHtml(transfer.data)} ${transfer.descripcio ? '- ' + escapeHtml(transfer.descripcio) : ''}</div>
+                    <div class="font-medium">${escapeHtml(transfer.sourceAccount?.nom || t('transfers.source-fallback'))} → ${escapeHtml(transfer.destinationAccount?.nom || t('transfers.destination-fallback'))}</div>
+                    <div class="text-sm text-gray-500 dark:text-slate-400">${formatDate(transfer.data)} ${transfer.descripcio ? '- ' + escapeHtml(transfer.descripcio) : ''}</div>
                 </div>
             </div>
             <div class="flex items-center gap-3">
                 <span class="text-lg font-bold text-slate-800 dark:text-slate-100">${formatCurrency(transfer.import)}</span>
-                <button data-action="delete" data-id="${transfer.id}" class="p-1 hover:bg-red-50 text-red-600 rounded" title="Eliminar">
+                <button data-action="delete" data-id="${transfer.id}" class="p-1 hover:bg-red-50 text-red-600 rounded" title="${t('common.delete')}">
                     <span class="material-symbols-outlined text-sm">delete</span>
                 </button>
             </div>
@@ -130,14 +131,14 @@ async function handleListClick(event) {
 
     const id = Number.parseInt(button.dataset.id, 10);
     if (!Number.isInteger(id)) return;
-    if (!confirm('¿Eliminar esta transferencia? Se devolverán los saldos.')) return;
+    if (!confirm(t('transfers.delete-confirm'))) return;
 
     try {
         await deleteTransfer(id);
         await loadTransfers();
         await loadAccountsSelect();
     } catch (error) {
-        alert(error.message || 'Error al eliminar transferencia');
+        alert(error.message || t('transfers.delete-failed'));
     }
 }
 
@@ -162,6 +163,6 @@ async function handleSubmit(event) {
         await loadTransfers();
         await loadAccountsSelect();
     } catch (error) {
-        alert(error.message || 'Error al crear transferencia');
+        alert(error.message || t('transfers.save-failed'));
     }
 }

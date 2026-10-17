@@ -1,4 +1,18 @@
 import { getAccounts, createAccount, updateAccount, deleteAccount, adjustBalance, formatCurrency, escapeHtml } from '../../api.js';
+import { t } from '../../i18n.js';
+
+/** El nom de cada tipus de compte; el codi és el que desa el backend. */
+const ACCOUNT_TYPE_LABELS = {
+    CORRIENTE: 'accounts.type-current',
+    AHORRO: 'accounts.type-savings',
+    EFECTIVO: 'accounts.type-cash',
+    TARJETA: 'accounts.type-card',
+    INVERSIONES: 'accounts.type-investments'
+};
+
+export function accountTypeLabel(type) {
+    return ACCOUNT_TYPE_LABELS[type] ? t(ACCOUNT_TYPE_LABELS[type]) : (type || '');
+}
 
 // Guardem els comptes carregats per no haver de passar-ne les dades pel DOM.
 let loadedAccounts = [];
@@ -6,10 +20,10 @@ let loadedAccounts = [];
 export async function initAccounts(container) {
     container.innerHTML = `
         <div class="page-header flex justify-between items-center mb-6">
-            <h2 class="text-2xl font-bold text-slate-800 dark:text-slate-100">Cuentas</h2>
+            <h2 class="text-2xl font-bold text-slate-800 dark:text-slate-100">${t('nav.accounts')}</h2>
             <button id="add-account-btn" class="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/90 flex items-center gap-2">
                 <span class="material-symbols-outlined">add</span>
-                Nueva Cuenta
+                ${t('accounts.add')}
             </button>
         </div>
         <div id="accounts-list" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
@@ -17,34 +31,30 @@ export async function initAccounts(container) {
         <!-- Modal -->
         <div id="account-modal" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-50">
             <div class="bg-white dark:bg-slate-800 rounded-xl p-6 w-full max-w-md">
-                <h3 class="text-xl font-bold mb-4" id="modal-title">Nueva Cuenta</h3>
+                <h3 class="text-xl font-bold mb-4" id="modal-title">${t('accounts.add')}</h3>
                 <form id="account-form" class="space-y-4">
                     <input type="hidden" id="account-id">
                     <div>
-                        <label class="block text-sm font-medium mb-1">Nombre</label>
+                        <label class="block text-sm font-medium mb-1" for="account-name">${t('common.name')}</label>
                         <input type="text" id="account-name" required class="w-full px-3 py-2 border rounded-lg">
                     </div>
                     <div>
-                        <label class="block text-sm font-medium mb-1">Tipo</label>
+                        <label class="block text-sm font-medium mb-1" for="account-type">${t('common.type')}</label>
                         <select id="account-type" class="w-full px-3 py-2 border rounded-lg">
-                            <option value="CORRIENTE">Cuenta Corriente</option>
-                            <option value="AHORRO">Cuenta de Ahorro</option>
-                            <option value="EFECTIVO">Efectivo</option>
-                            <option value="TARJETA">Tarjeta</option>
-                            <option value="INVERSIONES">Inversiones</option>
+                            ${Object.keys(ACCOUNT_TYPE_LABELS).map(type => `<option value="${type}">${accountTypeLabel(type)}</option>`).join('')}
                         </select>
                     </div>
                     <div>
-                        <label class="block text-sm font-medium mb-1">Saldo Inicial</label>
+                        <label class="block text-sm font-medium mb-1" for="account-balance">${t('accounts.initial-balance')}</label>
                         <input type="number" id="account-balance" step="0.01" value="0" class="w-full px-3 py-2 border rounded-lg">
                     </div>
                     <div>
-                        <label class="block text-sm font-medium mb-1">Color</label>
+                        <label class="block text-sm font-medium mb-1" for="account-color">${t('common.color')}</label>
                         <input type="color" id="account-color" value="#4f46e5" class="w-full h-10 border rounded-lg">
                     </div>
                     <div class="flex gap-2 justify-end">
-                        <button type="button" id="cancel-btn" class="px-4 py-2 border rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700">Cancelar</button>
-                        <button type="submit" class="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/90">Guardar</button>
+                        <button type="button" id="cancel-btn" class="px-4 py-2 border rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700">${t('common.cancel')}</button>
+                        <button type="submit" class="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/90">${t('common.save')}</button>
                     </div>
                 </form>
             </div>
@@ -53,17 +63,17 @@ export async function initAccounts(container) {
         <!-- Adjust Balance Modal -->
         <div id="adjust-modal" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-50">
             <div class="bg-white dark:bg-slate-800 rounded-xl p-6 w-full max-w-md">
-                <h3 class="text-xl font-bold mb-4">Ajustar Saldo</h3>
+                <h3 class="text-xl font-bold mb-4">${t('accounts.adjust-title')}</h3>
                 <form id="adjust-form" class="space-y-4">
                     <input type="hidden" id="adjust-account-id">
                     <div>
-                        <label class="block text-sm font-medium mb-1">Cantidad</label>
+                        <label class="block text-sm font-medium mb-1" for="adjust-amount">${t('accounts.adjust-amount')}</label>
                         <input type="number" id="adjust-amount" step="0.01" class="w-full px-3 py-2 border rounded-lg">
                     </div>
-                    <p class="text-sm text-gray-500 dark:text-slate-400">Usa valores positivos para aumentar o negativos para reducir.</p>
+                    <p class="text-sm text-gray-500 dark:text-slate-400">${t('accounts.adjust-hint')}</p>
                     <div class="flex gap-2 justify-end">
-                        <button type="button" id="cancel-adjust-btn" class="px-4 py-2 border rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700">Cancelar</button>
-                        <button type="submit" class="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/90">Ajustar</button>
+                        <button type="button" id="cancel-adjust-btn" class="px-4 py-2 border rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700">${t('common.cancel')}</button>
+                        <button type="submit" class="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/90">${t('accounts.adjust')}</button>
                     </div>
                 </form>
             </div>
@@ -95,14 +105,14 @@ async function loadAccounts() {
         renderAccounts(accounts);
     } catch (error) {
         console.error('Error loading accounts:', error);
-        document.getElementById('accounts-list').innerHTML = '<p class="text-red-600">Error al cargar cuentas</p>';
+        document.getElementById('accounts-list').innerHTML = `<p class="text-red-600">${t('accounts.load-failed')}</p>`;
     }
 }
 
 function renderAccounts(accounts) {
     const container = document.getElementById('accounts-list');
     if (!accounts || accounts.length === 0) {
-        container.innerHTML = '<p class="text-gray-500 dark:text-slate-400 col-span-3 text-center py-8">No hay cuentas</p>';
+        container.innerHTML = `<p class="text-gray-500 dark:text-slate-400 col-span-3 text-center py-8">${t('accounts.empty')}</p>`;
         return;
     }
 
@@ -117,17 +127,17 @@ function renderAccounts(accounts) {
                     </div>
                     <div>
                         <h3 class="font-semibold">${escapeHtml(account.nom)}</h3>
-                        <span class="text-xs text-gray-500 dark:text-slate-400">${escapeHtml(account.tipus)}</span>
+                        <span class="text-xs text-gray-500 dark:text-slate-400">${escapeHtml(accountTypeLabel(account.tipus))}</span>
                     </div>
                 </div>
                 <div class="flex gap-1">
-                    <button data-action="adjust" data-id="${account.id}" class="p-1 hover:bg-gray-100 dark:hover:bg-slate-700 rounded" title="Ajustar saldo">
+                    <button data-action="adjust" data-id="${account.id}" class="p-1 hover:bg-gray-100 dark:hover:bg-slate-700 rounded" title="${t('accounts.adjust-title')}">
                         <span class="material-symbols-outlined text-sm">edit</span>
                     </button>
-                    <button data-action="edit" data-id="${account.id}" class="p-1 hover:bg-gray-100 dark:hover:bg-slate-700 rounded" title="Editar">
+                    <button data-action="edit" data-id="${account.id}" class="p-1 hover:bg-gray-100 dark:hover:bg-slate-700 rounded" title="${t('common.edit')}">
                         <span class="material-symbols-outlined text-sm">settings</span>
                     </button>
-                    <button data-action="delete" data-id="${account.id}" class="p-1 hover:bg-red-50 text-red-600 rounded" title="Eliminar">
+                    <button data-action="delete" data-id="${account.id}" class="p-1 hover:bg-red-50 text-red-600 rounded" title="${t('common.delete')}">
                         <span class="material-symbols-outlined text-sm">delete</span>
                     </button>
                 </div>
@@ -153,14 +163,14 @@ function openModal(account = null) {
     const form = document.getElementById('account-form');
 
     if (account) {
-        title.textContent = 'Editar Cuenta';
+        title.textContent = t('accounts.edit-title');
         document.getElementById('account-id').value = account.id;
         document.getElementById('account-name').value = account.nom;
         document.getElementById('account-type').value = account.tipus;
         document.getElementById('account-balance').value = account.saldo_actual || 0;
         document.getElementById('account-color').value = account.color || '#4f46e5';
     } else {
-        title.textContent = 'Nueva Cuenta';
+        title.textContent = t('accounts.add');
         form.reset();
         document.getElementById('account-id').value = '';
     }
@@ -216,13 +226,13 @@ async function handleListClick(event) {
 }
 
 async function removeAccount(id) {
-    if (!confirm('¿Eliminar esta cuenta?')) return;
+    if (!confirm(t('accounts.delete-confirm'))) return;
     try {
         await deleteAccount(id);
         await loadAccounts();
     } catch (error) {
         // El backend explica per què no es pot esborrar (moviments associats).
-        alert(error.message || 'Error al eliminar cuenta');
+        alert(error.message || t('accounts.delete-failed'));
     }
 }
 
@@ -245,7 +255,7 @@ async function handleSubmit(event) {
         closeModal();
         await loadAccounts();
     } catch (error) {
-        alert(error.message || 'Error al guardar cuenta');
+        alert(error.message || t('accounts.save-failed'));
     }
 }
 
@@ -259,6 +269,6 @@ async function handleAdjustSubmit(event) {
         closeAdjustModal();
         await loadAccounts();
     } catch (error) {
-        alert(error.message || 'Error al ajustar saldo');
+        alert(error.message || t('accounts.adjust-failed'));
     }
 }

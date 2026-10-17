@@ -1,5 +1,6 @@
 import { formatCurrency, escapeHtml } from '../../api.js';
 import { categoryOptions, leafCategories } from '../../categoryOptions.js';
+import { t, formatDate } from '../../i18n.js';
 
 /**
  * Dividir un moviment en parts.
@@ -33,21 +34,18 @@ export function setUpSplitEditor(container, { categories, debts, save, remove })
     container.insertAdjacentHTML('beforeend', `
         <div id="split-modal" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-50 p-4">
             <div class="bg-white dark:bg-slate-800 rounded-xl p-6 w-full max-w-3xl max-h-full overflow-y-auto">
-                <h3 class="text-xl font-bold mb-1">Dividir moviment</h3>
+                <h3 class="text-xl font-bold mb-1">${t('split.title')}</h3>
                 <p id="split-summary" class="text-sm font-medium mb-1"></p>
-                <p class="text-xs text-gray-500 dark:text-slate-400 mb-4">
-                    Cada part compta pel seu compte: la seva categoria, si compta al pressupost i el seu deute.
-                    Han de sumar el total. El saldo del compte no canvia.
-                </p>
+                <p class="text-xs text-gray-500 dark:text-slate-400 mb-4">${t('split.hint')}</p>
                 <div id="split-rows" class="space-y-3"></div>
-                <button type="button" id="split-add" class="btn btn-sm btn-outline mt-3">+ Afegir part</button>
+                <button type="button" id="split-add" class="btn btn-sm btn-outline mt-3">${t('split.add-part')}</button>
                 <p id="split-balance" class="text-sm font-medium mt-4"></p>
                 <p id="split-error" class="text-error text-sm hidden mt-2"></p>
                 <div class="flex flex-wrap gap-2 justify-between mt-4">
-                    <button type="button" id="split-remove" class="btn btn-outline">Treure la divisió</button>
+                    <button type="button" id="split-remove" class="btn btn-outline">${t('split.remove')}</button>
                     <div class="flex gap-2 ml-auto">
-                        <button type="button" id="split-cancel" class="btn btn-outline">Cancel·lar</button>
-                        <button type="button" id="split-save" class="btn btn-primary">Desar</button>
+                        <button type="button" id="split-cancel" class="btn btn-outline">${t('common.cancel')}</button>
+                        <button type="button" id="split-save" class="btn btn-primary">${t('common.save')}</button>
                     </div>
                 </div>
             </div>
@@ -63,9 +61,9 @@ export function setUpSplitEditor(container, { categories, debts, save, remove })
 
     const categoryChoices = categoryOptions(categories);
     const debtOptions = [
-        '<option value="">Sense deute</option>',
+        `<option value="">${t('split.no-debt')}</option>`,
         ...debts.map(debt => `<option value="${debt.id}">
-            ${escapeHtml(debt.nom)} (${debt.direccio === 'DEC' ? 'dec' : 'em deuen'})
+            ${escapeHtml(t(debt.direccio === 'DEC' ? 'transactions.debt-option-owe' : 'transactions.debt-option-owed', { name: debt.nom }))}
         </option>`)
     ].join('');
 
@@ -79,26 +77,26 @@ export function setUpSplitEditor(container, { categories, debts, save, remove })
         rows.insertAdjacentHTML('beforeend', `
             <div class="border border-slate-200 dark:border-slate-700 rounded-lg p-3 grid grid-cols-12 gap-2 items-center" data-part-row>
                 <input type="number" step="0.01" min="0.01" class="form-control col-span-6 md:col-span-2"
-                       data-field="amount" placeholder="Import" aria-label="Import de la part">
-                <select class="form-control col-span-6 md:col-span-4" data-field="category" aria-label="Categoria de la part">
+                       data-field="amount" placeholder="${t('common.amount')}" aria-label="${t('split.amount-label')}">
+                <select class="form-control col-span-6 md:col-span-4" data-field="category" aria-label="${t('split.category-label')}">
                     ${categoryChoices}
                 </select>
-                <select class="form-control col-span-10 md:col-span-5" data-field="debt" aria-label="Deute de la part">
+                <select class="form-control col-span-10 md:col-span-5" data-field="debt" aria-label="${t('split.debt-label')}">
                     ${debtOptions}
                 </select>
                 <button type="button" class="col-span-2 md:col-span-1 p-1 hover:bg-red-50 dark:hover:bg-red-500/10 text-red-600 rounded justify-self-end"
-                        data-action="remove-part" title="Treure aquesta part">
+                        data-action="remove-part" title="${t('split.remove-part')}">
                     <span class="material-symbols-outlined text-sm">close</span>
                 </button>
                 <input type="text" class="form-control col-span-12 md:col-span-6" data-field="description"
-                       placeholder="Descripció (opcional)" aria-label="Descripció de la part">
+                       placeholder="${t('split.description-placeholder')}" aria-label="${t('split.description-label')}">
                 <label class="col-span-8 md:col-span-4 flex items-center gap-2 text-sm">
                     <input type="checkbox" data-field="excluded">
-                    No comptar al pressupost
+                    ${t('split.excluded')}
                 </label>
                 <button type="button" class="col-span-4 md:col-span-2 text-xs text-primary hover:underline justify-self-end"
-                        data-action="fill-rest" title="Posa a aquesta part el que falta per arribar al total">
-                    el que falta
+                        data-action="fill-rest" title="${t('split.fill-rest-title')}">
+                    ${t('split.fill-rest')}
                 </button>
             </div>
         `);
@@ -131,10 +129,10 @@ export function setUpSplitEditor(container, { categories, debts, save, remove })
             && parts.every(part => toCents(part.amount) > 0 && Number.isInteger(part.categoryId));
 
         const balance = document.getElementById('split-balance');
-        balance.textContent = `Repartit ${formatCurrency(assigned / 100)} de ${formatCurrency(total / 100)}`
-            + (missing === 0 ? ' · quadra' : missing > 0
-                ? ` · en falten ${formatCurrency(missing / 100)}`
-                : ` · en sobren ${formatCurrency(-missing / 100)}`);
+        balance.textContent = t('split.assigned', { assigned: formatCurrency(assigned / 100), total: formatCurrency(total / 100) })
+            + ' · ' + (missing === 0 ? t('split.balanced') : missing > 0
+                ? t('split.missing', { amount: formatCurrency(missing / 100) })
+                : t('split.extra', { amount: formatCurrency(-missing / 100) }));
         balance.classList.toggle('text-error', missing !== 0);
         balance.classList.toggle('text-success', missing === 0);
         saveButton.disabled = missing !== 0 || !complete;
@@ -183,19 +181,19 @@ export function setUpSplitEditor(container, { categories, debts, save, remove })
             await save(current, payload);
             close();
         } catch (failure) {
-            error.textContent = failure.message || 'No s\'han pogut desar les parts.';
+            error.textContent = failure.message || t('split.save-failed');
             error.classList.remove('hidden');
             refreshBalance();
         }
     });
 
     document.getElementById('split-remove').addEventListener('click', async () => {
-        if (!confirm('Treure la divisió? El moviment tornarà a comptar sencer amb la seva categoria.')) return;
+        if (!confirm(t('split.remove-confirm'))) return;
         try {
             await remove(current);
             close();
         } catch (failure) {
-            error.textContent = failure.message || 'No s\'ha pogut treure la divisió.';
+            error.textContent = failure.message || t('split.remove-failed');
             error.classList.remove('hidden');
         }
     });
@@ -206,7 +204,7 @@ export function setUpSplitEditor(container, { categories, debts, save, remove })
         rows.innerHTML = '';
 
         document.getElementById('split-summary').textContent =
-            `${transaction.empresa || 'Desconegut'} · ${transaction.data || ''} · ${formatCurrency(transaction.cost)}`;
+            `${transaction.empresa || t('common.unknown')} · ${formatDate(transaction.data)} · ${formatCurrency(transaction.cost)}`;
 
         const parts = transaction.parts || [];
         if (parts.length > 0) {
