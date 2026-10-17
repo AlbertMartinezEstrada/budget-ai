@@ -33,7 +33,7 @@ scripts/migrate.sh                    # aplica las migraciones pendientes (copia
 
 cd backend-java && ./gradlew test              # 266 unitarios, sin Docker
 cd backend-java && ./gradlew integrationTest   # 170, requieren Docker
-cd frontend && npm test                        # 112
+cd frontend && npm test                        # 113
 cd frontend && npm run test:navegador          # todas las vistas en un navegador (ver abajo)
 ```
 
@@ -444,8 +444,8 @@ un fichero con un token y hubo que deshacerlo.
 - **Interfaz**: en catalán, castellano, portugués o inglés, a elegir en
   Configuración. Cada texto es una clave de `frontend/public/lang/`
   (`Language_ca.properties`…, como en Liferay): **un texto nuevo va a los
-  cuatro ficheros**, nunca escrito en la vista. Se está pasando vista a vista;
-  las que aún no lo están siguen con su mezcla de catalán y castellano. Ver
+  cuatro ficheros**, nunca escrito en la vista. Está todo pasado menos Análisis
+  y los mensajes del backend, que siguen en catalán y castellano. Ver
   `frontend/AGENTS.md`.
 - Los comentarios explican **por qué**, no qué. Especialmente si algo parece
   raro: casi siempre lo parece porque arregla un fallo concreto.

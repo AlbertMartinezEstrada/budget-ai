@@ -1,4 +1,5 @@
 import { escapeHtml } from './api.js';
+import { t } from './i18n.js';
 
 /**
  * Els desplegables de categoria, agrupats com el pressupost.
@@ -17,11 +18,14 @@ import { escapeHtml } from './api.js';
  */
 
 const SECTION_LABELS = {
-    FIXED: 'Gastos fijos',
-    VARIABLE: 'Gastos variables',
-    SAVINGS: 'Estalvi i inversió',
-    INCOME: 'Ingresos'
+    FIXED: 'section.fixed',
+    VARIABLE: 'section.variable',
+    SAVINGS: 'section.savings',
+    INCOME: 'section.income'
 };
+
+/** El nom d'una secció del pressupost (FIXED, VARIABLE, SAVINGS, INCOME) en l'idioma actual. */
+export const sectionLabel = (section) => SECTION_LABELS[section] ? t(SECTION_LABELS[section]) : (section || '');
 
 // Les despeses primer: són la gran majoria dels moviments que es classifiquen.
 // L'estalvi va amb elles perquè els diners també surten del compte: el que
@@ -151,7 +155,7 @@ export function categoryOptions(categories, {
             visited.add(child.id);
             const path = prefix ? `${prefix} › ${child.nom}` : child.nom;
             if (isGroup(child)) {
-                if (groups && offered(child)) options.push(option(child, `${path} (grupo)`));
+                if (groups && offered(child)) options.push(option(child, t('categories.option-group', { name: path })));
                 options.push(...branchOptions(child, path, visited));
             } else if (offered(child) && only(child)) {
                 options.push(option(child, path));
@@ -170,11 +174,11 @@ export function categoryOptions(categories, {
                 // ordre alfabètic, igual que al pressupost.
                 if (offered(root) && only(root)) options.push(option(root, root.nom));
             } else {
-                if (groups && offered(root)) options.push(option(root, `${root.nom} (bloque)`));
+                if (groups && offered(root)) options.push(option(root, t('categories.option-block', { name: root.nom })));
                 options.push(...branchOptions(root, '', new Set([root.id])));
             }
             // Un bloc sense res per triar només faria soroll.
-            if (options.length > 0) html.push(optgroup(`${SECTION_LABELS[section]} · ${root.nom}`, options));
+            if (options.length > 0) html.push(optgroup(`${sectionLabel(section)} · ${root.nom}`, options));
         }
     }
     return html.join('');

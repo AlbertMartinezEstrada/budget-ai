@@ -31,7 +31,21 @@ const TRANSLATED_FILES = [
     'js/api.js',
     'js/features/auth/Login.js',
     'js/features/settings/Settings.js',
-    'js/features/dashboard/Dashboard.js'
+    'js/features/dashboard/Dashboard.js',
+    'js/features/accounts/Accounts.js',
+    'js/features/transfers/Transfers.js',
+    'js/transfers.js',
+    'js/features/goals/FinancialGoals.js',
+    'js/features/recurring/RecurringTransactions.js',
+    'js/features/categories/Categories.js',
+    'js/categoryOptions.js',
+    'js/features/debts/Debts.js',
+    'js/debtReceipts.js',
+    'js/features/transactions/TransactionList.js',
+    'js/features/transactions/SplitEditor.js',
+    'js/features/transactions/UnmarkedTransfers.js',
+    'js/features/upload/FileUploader.js',
+    'js/features/budgets/Budgets.js'
 ];
 
 const PLURAL_SUFFIX = /\.(zero|one|two|few|many|other)$/;
@@ -153,6 +167,26 @@ test('cap clau dels fitxers queda sense fer servir', () => {
     assert.deepEqual(unused, [], 'traieu-les dels quatre fitxers o feu-les servir');
 });
 
+test('cada crida passa els {valors} que el seu text necessita', () => {
+    // Un valor que no es passa surt tal qual a la pantalla: «{name}». Es miren
+    // les crides amb la clau i l'objecte escrits sencers, t('clau', { a, b: … }).
+    const problems = [];
+    let checked = 0;
+    for (const file of codeFiles) {
+        for (const [, key, body] of file.source.matchAll(/\bt\(\s*'([a-z0-9.-]+)'\s*,\s*\{([^{}]*(?:\([^()]*\)[^{}]*)*)\}\s*\)/g)) {
+            const text = reference.get(key) ?? reference.get(`${key}.other`);
+            if (text === undefined) continue;
+            checked++;
+            const given = new Set([...body.matchAll(/(?:^|,)\s*([a-zA-Z]\w*)\s*(?=[:,]|$)/g)].map(match => match[1]));
+            const missing = placeholders(text).filter(name => !given.has(name));
+            if (missing.length) problems.push(`${file.path}: t('${key}') sense {${missing.join('}, {')}}`);
+        }
+    }
+    assert.deepEqual(problems, []);
+    // Si el patró deixés de trobar les crides, el test passaria sense mirar res.
+    assert.ok(checked > 50, `només s'han comprovat ${checked} crides`);
+});
+
 test('un text amb valors no s\'interpola dins de l\'HTML sense escapar', () => {
     // Els valors (el nom d'un compte, un concepte del banc) no són de confiança:
     // ${t('clau', { name })} dins d'un innerHTML seria HTML de la pàgina.
@@ -198,6 +232,7 @@ function handwrittenTexts(source) {
     for (const [, , text] of code.matchAll(/\.textContent\s*=\s*(['`])((?:(?!\1).)*)\1/g)) if (isText(text)) found.push(text);
     for (const [, , text] of code.matchAll(/new Error\(\s*(['`])((?:(?!\1).)*)\1/g)) if (isText(text)) found.push(text);
     for (const [, text] of code.matchAll(/\|\|\s*'([^']*)'/g)) if (isText(text)) found.push(text);
+    for (const [, , text] of code.matchAll(/\b(?:confirm|alert|prompt)\(\s*(['`])((?:(?!\1).)*)\1/g)) if (isText(text)) found.push(text);
     return found;
 }
 
@@ -214,6 +249,7 @@ test('el detector de textos escrits a mà troba els casos que vigila', () => {
     assert.deepEqual(handwrittenTexts("element.textContent = 'Desat';"), ['Desat']);
     assert.deepEqual(handwrittenTexts("throw new Error('No hi és');"), ['No hi és']);
     assert.deepEqual(handwrittenTexts("transaction.empresa || 'Desconegut'"), ['Desconegut']);
+    assert.deepEqual(handwrittenTexts("if (!confirm('¿Eliminar esta cuenta?')) return;"), ['¿Eliminar esta cuenta?']);
     assert.deepEqual(handwrittenTexts("<h3>${t('nav.debts')}</h3><span class=\"icon\">savings</span><b>Budget AI</b>"), []);
     assert.deepEqual(handwrittenTexts("<p>${escapeHtml(t('dashboard.load-failed', { message: error.message }))}</p>"), []);
     assert.deepEqual(handwrittenTexts('<span data-i18n="nav.debts">Deutes</span>'), []);

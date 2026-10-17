@@ -200,6 +200,23 @@ export function formatDate(value, options = { day: '2-digit', month: '2-digit', 
     return date ? new Intl.DateTimeFormat(getLocale(), options).format(date) : '';
 }
 
+/** Un mes amb l'any: «octubre del 2026», «octubre de 2026», «October 2026». month va d'1 a 12. */
+export function formatMonth(year, month) {
+    return new Intl.DateTimeFormat(getLocale(), { month: 'long', year: 'numeric' }).format(new Date(year, month - 1, 1));
+}
+
+/** El nom d'un mes sol, en majúscula com en un desplegable: «Octubre», «October». month va d'1 a 12. */
+export function formatMonthName(month) {
+    const name = new Intl.DateTimeFormat(getLocale(), { month: 'long' }).format(new Date(2000, month - 1, 1));
+    return name.charAt(0).toLocaleUpperCase(getLocale()) + name.slice(1);
+}
+
+/** De quin mes a quin: «octubre–diciembre de 2026», «October – December 2026». */
+export function formatMonthRange(startYear, startMonth, endYear, endMonth) {
+    return new Intl.DateTimeFormat(getLocale(), { month: 'long', year: 'numeric' })
+        .formatRange(new Date(startYear, startMonth - 1, 1), new Date(endYear, endMonth - 1, 1));
+}
+
 function toDate(value) {
     if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value;
     if (!value) return null;

@@ -1,4 +1,5 @@
 import { escapeHtml, formatCurrency } from './api.js';
+import { t, formatDate, formatMonth, formatMonthRange } from './i18n.js';
 
 /**
  * Els rebuts d'un deute a quotes, vistos des del navegador.
@@ -10,22 +11,19 @@ import { escapeHtml, formatCurrency } from './api.js';
  * en vincular un pagament.
  */
 
-const MONTHS = ['gener', 'febrer', 'març', 'abril', 'maig', 'juny',
-    'juliol', 'agost', 'setembre', 'octubre', 'novembre', 'desembre'];
-
 const CURRENT_PERIOD = {
-    SETMANAL: 'toca aquesta setmana',
-    MENSUAL: 'toca aquest mes',
-    TRIMESTRAL: 'toca aquest trimestre'
+    SETMANAL: 'debts.due-this-week',
+    MENSUAL: 'debts.due-this-month',
+    TRIMESTRAL: 'debts.due-this-quarter'
 };
 
 const STATUS_LABELS = {
-    PAGAT: 'pagat',
-    PARCIAL: 'a mitges',
-    PENDENT: 'pendent',
-    ENDARRERIT: 'endarrerit',
-    SALTAT: 'saltat: passa al final',
-    DESCOMPTAT: 'descomptat del deute'
+    PAGAT: 'debts.status-paid',
+    PARCIAL: 'debts.status-partial',
+    PENDENT: 'debts.status-pending',
+    ENDARRERIT: 'debts.status-overdue',
+    SALTAT: 'debts.status-skipped',
+    DESCOMPTAT: 'debts.status-discounted'
 };
 
 const REMOVED = new Set(['SALTAT', 'DESCOMPTAT']);
@@ -38,8 +36,6 @@ const parse = (isoDate) => {
     return { year, month, day };
 };
 
-const monthName = (year, month) => `${MONTHS[month - 1]} ${year}`;
-
 /** El dilluns de la setmana d'una data "AAAA-MM-DD". */
 function mondayOf(isoDate) {
     const { year, month, day } = parse(isoDate);
@@ -50,8 +46,8 @@ function mondayOf(isoDate) {
 }
 
 /**
- * El nom del rebut pel seu període: "octubre 2026", "setmana del 5/10/2026",
- * "octubre–desembre 2026".
+ * El nom del rebut pel seu període, en l'idioma actual: "octubre del 2026",
+ * "setmana del 05/10/2026", "octubre del 2026 – desembre del 2026".
  *
  * @param frequency la del deute; sense (tot de cop), el mes
  */
@@ -59,22 +55,20 @@ export function receiptLabel(isoDate, frequency) {
     if (!isoDate || !/^\d{4}-\d{2}-\d{2}$/.test(isoDate)) return isoDate || '-';
     const { year, month } = parse(isoDate);
     if (frequency === 'SETMANAL') {
-        return `setmana del ${mondayOf(isoDate).toLocaleDateString('ca-ES')}`;
+        return t('debts.receipt-week', { date: formatDate(mondayOf(isoDate)) });
     }
     if (frequency === 'TRIMESTRAL') {
         const lastMonth = ((month + 1) % 12) + 1;
         const lastYear = month + 2 > 12 ? year + 1 : year;
-        return lastYear === year
-            ? `${MONTHS[month - 1]}–${monthName(lastYear, lastMonth)}`
-            : `${monthName(year, month)}–${monthName(lastYear, lastMonth)}`;
+        return formatMonthRange(year, month, lastYear, lastMonth);
     }
-    return monthName(year, month);
+    return formatMonth(year, month);
 }
 
 /** L'estat en paraules: "toca aquest mes", "a mitges", "saltat: passa al final". */
 export function receiptStatusLabel(status, frequency) {
-    if (status === 'TOCA') return CURRENT_PERIOD[frequency] || CURRENT_PERIOD.MENSUAL;
-    return STATUS_LABELS[status] || STATUS_LABELS.PENDENT;
+    if (status === 'TOCA') return t(CURRENT_PERIOD[frequency] || CURRENT_PERIOD.MENSUAL);
+    return t(STATUS_LABELS[status] || STATUS_LABELS.PENDENT);
 }
 
 /**
@@ -112,10 +106,10 @@ export function receiptOptions(debt, selected = null) {
     const receipts = (debt?.calendari || []).filter(isActiveReceipt);
     const match = selected ? receipts.find(receipt => samePeriod(receipt.data, selected, frequency)) : null;
 
-    const options = ['<option value="">El que toca (el primer sense pagar)</option>'];
+    const options = [`<option value="">${t('debts.receipt-default')}</option>`];
     if (selected && !match) {
         options.push(`<option value="${escapeHtml(selected)}" selected>
-            ${escapeHtml(receiptLabel(selected, frequency))} · ja no és al calendari
+            ${escapeHtml(t('debts.receipt-not-in-schedule', { receipt: receiptLabel(selected, frequency) }))}
         </option>`);
     }
     for (const receipt of receipts) {

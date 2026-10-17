@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 
 // categoryOptions.js fa servir escapeHtml d'api.js, que llegeix window en
 // carregar-se: cal el mateix mínim de navegador que a api.test.js.
@@ -16,6 +17,10 @@ let module;
 
 test.before(async () => {
     module = await import('../public/js/categoryOptions.js');
+    // Els noms de les seccions surten en castellà: el test es va escriure així.
+    const i18n = await import('../public/js/i18n.js');
+    const spanish = fs.readFileSync(new URL('../public/lang/Language_es.properties', import.meta.url), 'utf8');
+    i18n.setMessages('es', i18n.parseProperties(spanish));
 });
 
 let nextId = 1;
@@ -190,12 +195,12 @@ test('Estalvi i inversió és una secció pròpia, entre els variables i els ing
 
     assert.deepEqual(labels(module.categoryOptions(tree)), [
         'Gastos variables · Gast mensual',
-        'Estalvi i inversió · Estalvis',
-        'Estalvi i inversió · Inversió',
+        'Ahorro e inversión · Estalvis',
+        'Ahorro e inversión · Inversió',
         'Ingresos · Ingressos'
     ]);
     // Dins d'Inversió, el camí diu de quin grup és cada fulla.
-    assert.deepEqual(texts(module.categoryOptions(tree), 'Estalvi i inversió · Inversió'),
+    assert.deepEqual(texts(module.categoryOptions(tree), 'Ahorro e inversión · Inversió'),
         ['Fons d&#39;inversió › Inversions', 'Inversió de risc']);
     // Els diners que s'aparten també surten del compte: és a les seccions de despesa.
     assert.ok(module.EXPENSE_SECTIONS.includes('SAVINGS'));

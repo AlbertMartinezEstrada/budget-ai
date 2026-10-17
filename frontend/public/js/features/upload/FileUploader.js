@@ -5,6 +5,7 @@ import {
 import { categoryOptions, leafCategories } from '../../categoryOptions.js';
 import { counterpartOptions, transferCounts } from '../../transfers.js';
 import { setUpSplitEditor } from '../transactions/SplitEditor.js';
+import { t, formatDate } from '../../i18n.js';
 
 /**
  * Ingrés o despesa.
@@ -15,8 +16,8 @@ import { setUpSplitEditor } from '../transactions/SplitEditor.js';
  * si el saldo del compte puja o baixa en confirmar.
  */
 const TYPES = {
-    EXPENSE: { etiqueta: 'Despesa', signe: '−', classe: 'text-error' },
-    INCOME:  { etiqueta: 'Ingrés',  signe: '+', classe: 'text-success' }
+    EXPENSE: { etiqueta: 'common.expense', signe: '−', classe: 'text-error' },
+    INCOME:  { etiqueta: 'common.income',  signe: '+', classe: 'text-success' }
 };
 
 const typeOf = (transaction) => TYPES[transaction.type] ? transaction.type : 'EXPENSE';
@@ -25,54 +26,44 @@ export async function initUpload(container) {
     container.innerHTML = `
         <div class="card mb-4">
             <div class="card-header">
-                <h3 class="card-title">Pujar Extracte Bancari</h3>
+                <h3 class="card-title">${t('upload.title')}</h3>
                 <span class="material-symbols-outlined" style="font-size: 1.5rem; color: var(--primary-color);">cloud_upload</span>
             </div>
             <div class="upload-area" id="drop-zone">
                 <input type="file" id="file-input" accept=".csv" class="file-input">
                 <label for="file-input" class="file-label">
                     <span class="material-symbols-outlined" style="font-size: 3rem; color: var(--text-secondary);">csv</span>
-                    <span class="mt-2 text-sm text-gray-500">Arrossega un fitxer CSV o fes clic per seleccionar-lo</span>
+                    <span class="mt-2 text-sm text-gray-500">${t('upload.drop')}</span>
                 </label>
-                <button id="upload-btn" class="btn btn-primary mt-4" disabled>Pujar i Analitzar</button>
+                <button id="upload-btn" class="btn btn-primary mt-4" disabled>${t('upload.analyse')}</button>
             </div>
             <div class="form-group mt-3">
-                <label for="upload-account">Compte d'aquest extracte</label>
+                <label for="upload-account">${t('upload.account')}</label>
                 <select id="upload-account" class="form-control"></select>
-                <p class="text-sm text-muted mt-1">
-                    Tots els moviments del fitxer s'assignaran a aquest compte.
-                </p>
+                <p class="text-sm text-muted mt-1">${t('upload.account-hint')}</p>
             </div>
             <div id="upload-status" class="mt-4 text-center hidden"></div>
         </div>
 
         <details class="card mb-4">
-            <summary style="cursor: pointer; padding: 1rem; font-weight: 600;">
-                Regles d'importació
-            </summary>
+            <summary style="cursor: pointer; padding: 1rem; font-weight: 600;">${t('upload.rules')}</summary>
             <div class="p-3">
-                <p class="text-sm text-muted mb-3">
-                    Si el concepte del moviment conté el text de la regla, s'hi aplica sola. Pot dir que
-                    és un <strong>traspàs</strong> a un altre compte teu («REVOLUT» → Revolut): entre comptes
-                    del dia a dia no compta, i cap a un compte d'estalvi compta a la seva categoria. Si no és cap
-                    traspàs, el marca com a <strong>no comptar</strong>.
-                    Sempre pots canviar-ho a la revisió abans de confirmar.
-                </p>
+                <p class="text-sm text-muted mb-3">${t('upload.rules-hint')}</p>
                 <form id="rule-form" class="flex flex-wrap items-end gap-2 mb-3">
                     <div class="form-group" style="flex: 1; min-width: 12rem; margin: 0;">
-                        <label for="rule-pattern">El concepte conté</label>
+                        <label for="rule-pattern">${t('upload.rule-pattern')}</label>
                         <input type="text" id="rule-pattern" class="form-control"
-                               placeholder="p. ex. *9469" required>
+                               placeholder="${t('upload.rule-pattern-placeholder')}" required>
                     </div>
                     <div class="form-group" style="min-width: 12rem; margin: 0;">
-                        <label for="rule-transfer">És un traspàs al compte</label>
+                        <label for="rule-transfer">${t('upload.rule-transfer')}</label>
                         <select id="rule-transfer" class="form-control"></select>
                     </div>
                     <div class="form-group" style="min-width: 12rem; margin: 0;">
-                        <label for="rule-category">Categoria (opcional)</label>
+                        <label for="rule-category">${t('upload.rule-category')}</label>
                         <select id="rule-category" class="form-control"></select>
                     </div>
-                    <button type="submit" class="btn btn-primary">Afegir regla</button>
+                    <button type="submit" class="btn btn-primary">${t('upload.add-rule')}</button>
                 </form>
                 <div id="rules-list"></div>
             </div>
@@ -80,20 +71,20 @@ export async function initUpload(container) {
 
         <div id="review-section" class="card hidden">
             <div class="card-header bg-warning-light">
-                <h3 class="card-title text-warning-dark">Revisió de Transaccions</h3>
+                <h3 class="card-title text-warning-dark">${t('upload.review-title')}</h3>
                 <div class="flex gap-2">
-                    <button id="cancel-review" class="btn btn-outline btn-sm">Cancel·lar</button>
-                    <button id="confirm-review" class="btn btn-success btn-sm">Confirmar</button>
+                    <button id="cancel-review" class="btn btn-outline btn-sm">${t('common.cancel')}</button>
+                    <button id="confirm-review" class="btn btn-success btn-sm">${t('upload.confirm')}</button>
                 </div>
             </div>
 
             <div class="flex flex-wrap items-center justify-between gap-3 p-3">
                 <input type="search" id="review-search" class="input input-sm"
                        style="min-width: 16rem;"
-                       placeholder="Buscar per empresa, concepte, categoria o import…">
+                       placeholder="${t('upload.search-placeholder')}">
                 <div class="flex items-center gap-2">
-                    <button id="select-all" class="btn btn-outline btn-sm" type="button">Marcar-ho tot</button>
-                    <button id="select-none" class="btn btn-outline btn-sm" type="button">Desmarcar-ho tot</button>
+                    <button id="select-all" class="btn btn-outline btn-sm" type="button">${t('upload.select-all')}</button>
+                    <button id="select-none" class="btn btn-outline btn-sm" type="button">${t('upload.select-none')}</button>
                 </div>
             </div>
             <p id="review-summary" class="px-3 pb-2 text-sm text-gray-500"></p>
@@ -103,21 +94,19 @@ export async function initUpload(container) {
                     <thead>
                         <tr>
                             <th style="width: 2.5rem;"></th>
-                            <th>Data</th>
-                            <th>Tipus</th>
-                            <th>Empresa (Editable)</th>
-                            <th>Categoria (Seleccionar)</th>
-                            <th class="text-right">Import</th>
-                            <th title="Diners que no compten ni al pressupost ni a l'anàlisi: només mouen el saldo. Un traspàs entre comptes del dia a dia es marca sol.">No comptar</th>
+                            <th>${t('table.date')}</th>
+                            <th>${t('common.type')}</th>
+                            <th>${t('upload.company-editable')}</th>
+                            <th>${t('upload.category-select')}</th>
+                            <th class="text-right">${t('table.amount')}</th>
+                            <th title="${t('upload.excluded-title')}">${t('transactions.excluded')}</th>
                             <th style="width: 3rem;"></th>
                         </tr>
                     </thead>
                     <tbody id="review-body"></tbody>
                 </table>
             </div>
-            <p id="review-empty" class="p-4 text-center text-gray-500 hidden">
-                Cap moviment coincideix amb la cerca.
-            </p>
+            <p id="review-empty" class="p-4 text-center text-gray-500 hidden">${t('upload.no-match')}</p>
         </div>
     `;
 
@@ -191,18 +180,20 @@ export async function initUpload(container) {
         try {
             const rules = await getImportRules();
             rulesList.innerHTML = rules.length === 0
-                ? '<p class="text-sm text-muted">Cap regla encara.</p>'
+                ? `<p class="text-sm text-muted">${t('upload.no-rules')}</p>`
                 : rules.map(rule => `
                     <div class="flex items-center justify-between gap-2 py-1 text-sm">
                         <span>
                             <code>${escapeHtml(rule.patro)}</code>
                             ${rule.compte_traspas_id
-                                ? `→ traspàs a ${escapeHtml(accountsById.get(rule.compte_traspas_id)?.nom || 'un altre compte')}`
-                                : rule.marca_exclos ? '→ no comptar' : ''}
+                                ? escapeHtml(t('upload.rule-to-transfer', {
+                                    account: accountsById.get(rule.compte_traspas_id)?.nom || t('transfers.another-account')
+                                }))
+                                : rule.marca_exclos ? t('upload.rule-excluded') : ''}
                             ${rule.categoria ? `→ ${escapeHtml(rule.categoria)}` : ''}
                         </span>
                         <button class="btn btn-sm btn-outline" data-action="delete-rule"
-                                data-id="${rule.id}" type="button">Esborrar</button>
+                                data-id="${rule.id}" type="button">${t('common.delete')}</button>
                     </div>`).join('');
         } catch (error) {
             rulesList.innerHTML = `<p class="text-error text-sm">${escapeHtml(error.message)}</p>`;
@@ -212,13 +203,13 @@ export async function initUpload(container) {
     // Només fulles: una regla que assignés un grup faria que el moviment es
     // rebutgés en confirmar.
     const ruleCategorySelect = document.getElementById('rule-category');
-    ruleCategorySelect.innerHTML = '<option value="">— No la toquis —</option>'
+    ruleCategorySelect.innerHTML = `<option value="">${t('upload.rule-keep-category')}</option>`
         + categoryOptions(categoriesList, { value: (category) => category.nom });
 
     // Qualsevol compte: la regla s'aplica a tots els extractes, i al del
     // mateix compte el backend no la fa servir.
     const ruleTransferSelect = document.getElementById('rule-transfer');
-    ruleTransferSelect.innerHTML = counterpartOptions(accounts, null, null, '— No, no és un traspàs —');
+    ruleTransferSelect.innerHTML = counterpartOptions(accounts, null, null, t('upload.rule-not-transfer'));
 
     document.getElementById('rule-form').addEventListener('submit', async (event) => {
         event.preventDefault();
@@ -238,7 +229,7 @@ export async function initUpload(container) {
             ruleTransferSelect.value = '';
             await renderRules();
         } catch (error) {
-            alert(error.message || 'No s\'ha pogut desar la regla.');
+            alert(error.message || t('upload.rule-save-failed'));
         }
     });
 
@@ -250,7 +241,7 @@ export async function initUpload(container) {
             await deleteImportRule(Number.parseInt(button.dataset.id, 10));
             await renderRules();
         } catch (error) {
-            alert(error.message || 'No s\'ha pogut esborrar la regla.');
+            alert(error.message || t('upload.rule-delete-failed'));
         }
     });
 
@@ -259,7 +250,7 @@ export async function initUpload(container) {
     fileInput.addEventListener('change', () => {
         if (fileInput.files.length > 0) {
             uploadButton.disabled = false;
-            statusDiv.textContent = `Fitxer seleccionat: ${fileInput.files[0].name}`;
+            statusDiv.textContent = t('upload.file-selected', { name: fileInput.files[0].name });
             statusDiv.classList.remove('hidden');
         } else {
             uploadButton.disabled = true;
@@ -272,7 +263,7 @@ export async function initUpload(container) {
         if (!file) return;
 
         uploadButton.disabled = true;
-        statusDiv.innerHTML = '<div class="spinner"></div> Analitzant amb IA...';
+        statusDiv.innerHTML = `<div class="spinner"></div> ${t('upload.analysing')}`;
         statusDiv.classList.remove('hidden', 'text-error', 'text-success');
 
         try {
@@ -282,7 +273,7 @@ export async function initUpload(container) {
                 // sortia «Resposta inesperada del servidor» en tornar a pujar un
                 // extracte ja importat.
                 reviewSection.classList.add('hidden');
-                statusDiv.textContent = `ℹ️ ${result.message}`;
+                statusDiv.textContent = t('upload.info', { message: result.message });
                 uploadButton.disabled = false;
                 return;
             }
@@ -297,13 +288,13 @@ export async function initUpload(container) {
                 document.getElementById('review-search').value = '';
                 renderReviewTable();
                 reviewSection.classList.remove('hidden');
-                statusDiv.textContent = '✅ Anàlisi completada. Si us plau, revisa les dades.';
+                statusDiv.textContent = t('upload.analysis-done');
                 statusDiv.classList.add('text-success');
             } else {
-                throw new Error('Resposta inesperada del servidor');
+                throw new Error(t('upload.unexpected-response'));
             }
         } catch (error) {
-            statusDiv.textContent = `❌ Error: ${error.message}`;
+            statusDiv.textContent = t('upload.failed', { message: error.message });
             statusDiv.classList.add('text-error');
             uploadButton.disabled = false;
         }
@@ -324,7 +315,7 @@ export async function initUpload(container) {
         return rows.filter(({ transaction }) => [
             transaction.empresa, transaction.concepte_original, transaction.categoria, transaction.cost,
             // També pel tipus, per poder aïllar d'un cop tot el que entra.
-            TYPES[typeOf(transaction)].etiqueta
+            t(TYPES[typeOf(transaction)].etiqueta)
         ].some(field => String(field ?? '').toLowerCase().includes(query)));
     }
 
@@ -347,7 +338,7 @@ export async function initUpload(container) {
 
             const unknownOption = known
                 ? ''
-                : `<option value="" selected>— Tria una categoria —</option>`;
+                : `<option value="" selected>${t('common.choose-category')}</option>`;
 
             // Un moviment descartat no s'ha de revisar: ni cal categoria ni ha
             // de cridar l'atenció com si li faltés alguna cosa. Un de dividit
@@ -363,14 +354,14 @@ export async function initUpload(container) {
                 style="${transaction.inclos ? '' : 'opacity: 0.45;'}">
                 <td>
                     <input type="checkbox" name="inclos" ${transaction.inclos ? 'checked' : ''}
-                           title="Desmarca'l per no importar aquest moviment">
+                           title="${t('upload.include-title')}">
                 </td>
-                <td>${escapeHtml(transaction.data)}</td>
+                <td>${escapeHtml(formatDate(transaction.data) || transaction.data)}</td>
                 <td>
                     <select class="input input-sm" name="type"
-                            title="El CSV el dedueix del signe de l'import. Si el banc el porta al revés, corregeix-lo aquí.">
-                        <option value="EXPENSE" ${type === 'EXPENSE' ? 'selected' : ''}>Despesa</option>
-                        <option value="INCOME" ${type === 'INCOME' ? 'selected' : ''}>Ingrés</option>
+                            title="${t('upload.type-title')}">
+                        <option value="EXPENSE" ${type === 'EXPENSE' ? 'selected' : ''}>${t('common.expense')}</option>
+                        <option value="INCOME" ${type === 'INCOME' ? 'selected' : ''}>${t('common.income')}</option>
                     </select>
                 </td>
                 <td>
@@ -379,7 +370,7 @@ export async function initUpload(container) {
                 </td>
                 <td>
                     ${split
-                        ? `<span class="badge badge-secondary" title="Cada part compta a la seva categoria">dividit en ${transaction.parts.length}</span>`
+                        ? `<span class="badge badge-secondary" title="${t('upload.split-title')}">${escapeHtml(t('transactions.split-in', { count: transaction.parts.length }))}</span>`
                         : `<select class="input input-sm w-full" name="categoria" ${needsReview ? 'required' : ''}>
                                ${unknownOption}${options}
                            </select>`}
@@ -389,16 +380,16 @@ export async function initUpload(container) {
                 </td>
                 <td class="text-center">
                     ${split
-                        ? '<span class="text-muted" title="Cada part diu si compta">—</span>'
+                        ? `<span class="text-muted" title="${t('upload.split-excluded-title')}">—</span>`
                         : isNeutralTransfer(transaction)
                             ? `<input type="checkbox" name="exclos" checked disabled
-                                      title="Un traspàs entre comptes del dia a dia no compta: comptarà el que es pagui des d'allà.">`
+                                      title="${t('upload.neutral-title')}">`
                             : `<input type="checkbox" name="exclos" ${transaction.exclos_pressupost ? 'checked' : ''}
-                                      title="Marca'l si aquests diners no compten al pressupost: no són ni despesa ni ingrés teus.">`}
+                                      title="${t('upload.exclude-title')}">`}
                 </td>
                 <td class="text-right">
                     <button type="button" class="btn btn-sm btn-outline" data-action="split-row" data-index="${index}"
-                            title="Dividir en parts amb categories diferents">
+                            title="${t('transactions.split-title')}">
                         <span class="material-symbols-outlined text-sm">call_split</span>
                     </button>
                 </td>
@@ -422,14 +413,14 @@ export async function initUpload(container) {
      */
     function transferCell(transaction) {
         if (transaction.traspas_registrat) {
-            const from = accountsById.get(transaction.compte_contrapart_id)?.nom || 'un altre compte';
-            return `<div class="text-sm text-muted mt-1" title="Ja es va desar en importar l'altre extracte, i ja va moure aquest saldo">
-                        ⇄ Ja desat com a traspàs amb ${escapeHtml(from)}: no cal importar-lo
+            const from = accountsById.get(transaction.compte_contrapart_id)?.nom || t('transfers.another-account');
+            return `<div class="text-sm text-muted mt-1" title="${t('upload.registered-title')}">
+                        ${escapeHtml(t('upload.registered', { account: from }))}
                     </div>`;
         }
         return `<select class="input input-sm w-full mt-1" name="traspas"
-                        title="Si els diners van a un altre compte teu, o en vénen">
-                    ${counterpartOptions(accounts, importAccount()?.id, transaction.compte_contrapart_id, 'No és un traspàs')}
+                        title="${t('upload.transfer-title')}">
+                    ${counterpartOptions(accounts, importAccount()?.id, transaction.compte_contrapart_id)}
                 </select>`;
     }
 
@@ -444,8 +435,8 @@ export async function initUpload(container) {
                 <td class="text-muted">
                     <span class="material-symbols-outlined text-sm align-middle">subdirectory_arrow_right</span>
                     ${escapeHtml(part.descripcio || '')}
-                    ${part.exclos_pressupost ? '<span class="badge badge-outline text-sm">no compta</span>' : ''}
-                    ${debtName ? `<span class="badge badge-outline text-sm">deute: ${escapeHtml(debtName)}</span>` : ''}
+                    ${part.exclos_pressupost ? `<span class="badge badge-outline text-sm">${t('transactions.excluded-badge')}</span>` : ''}
+                    ${debtName ? `<span class="badge badge-outline text-sm">${escapeHtml(t('transactions.debt-badge', { name: debtName }))}</span>` : ''}
                 </td>
                 <td><span class="badge badge-outline">${escapeHtml(leafNameById.get(part.category?.id) || '-')}</span></td>
                 <td class="text-right ${style.classe}" style="white-space: nowrap;">
@@ -477,15 +468,16 @@ export async function initUpload(container) {
         const spent = sumOf('EXPENSE');
         const earned = sumOf('INCOME');
 
-        document.getElementById('review-summary').textContent =
-            `${chosen.length} de ${currentReviewData.length} moviments seleccionats`
-            + ` · −${formatCurrency(spent)} de despesa`
-            + (earned > 0 ? ` · +${formatCurrency(earned)} d'ingrés` : '')
-            + (hidden > 0 ? ` · ${hidden} amagats per la cerca` : '');
+        document.getElementById('review-summary').textContent = [
+            t('upload.summary-selected', { chosen: chosen.length, total: currentReviewData.length }),
+            t('upload.summary-spent', { amount: formatCurrency(spent) }),
+            ...(earned > 0 ? [t('upload.summary-earned', { amount: formatCurrency(earned) })] : []),
+            ...(hidden > 0 ? [t('upload.summary-hidden', { count: hidden })] : [])
+        ].join(' · ');
 
         confirmButton.textContent = chosen.length === currentReviewData.length
-            ? 'Confirmar tot'
-            : `Confirmar ${chosen.length}`;
+            ? t('upload.confirm-all')
+            : t('upload.confirm-count', { count: chosen.length });
         confirmButton.disabled = chosen.length === 0;
     }
 
@@ -593,7 +585,7 @@ export async function initUpload(container) {
             }));
 
         if (confirmedData.length === 0) {
-            statusDiv.textContent = '⚠️ No hi ha cap moviment seleccionat.';
+            statusDiv.textContent = t('upload.nothing-selected');
             statusDiv.classList.remove('hidden');
             return;
         }
@@ -609,21 +601,21 @@ export async function initUpload(container) {
                 search.value = '';
                 renderReviewTable();
             }
-            statusDiv.textContent = '⚠️ Hi ha moviments sense categoria. Revisa les files marcades o desmarca\'ls.';
+            statusDiv.textContent = t('upload.missing-category');
             statusDiv.classList.remove('hidden');
             return;
         }
 
         confirmButton.disabled = true;
-        statusDiv.textContent = 'Guardant...';
+        statusDiv.textContent = t('common.saving');
 
         try {
             const discarded = currentReviewData.length - confirmedData.length;
             const result = await confirmTransactions(confirmedData);
             // Els descartats es diuen explícitament: si no, veure menys
             // moviments dels que tenia el fitxer sembla que se n'hagin perdut.
-            statusDiv.textContent = `✅ ${result.message || 'Transaccions guardades correctament!'}`
-                + (discarded > 0 ? ` ${discarded} moviments descartats.` : '');
+            statusDiv.textContent = t('upload.saved', { message: result.message || t('upload.saved-default') })
+                + (discarded > 0 ? ' ' + t('upload.discarded', { count: discarded }) : '');
             reviewSection.classList.add('hidden');
             currentReviewData = [];
             reviewBody.innerHTML = '';
@@ -634,7 +626,7 @@ export async function initUpload(container) {
                 statusDiv.classList.add('hidden');
             }, 4000);
         } catch (error) {
-            statusDiv.textContent = `❌ Error guardant: ${error.message}`;
+            statusDiv.textContent = t('upload.save-failed', { message: error.message });
         } finally {
             // Es rehabilita sempre: si fallava, el botó quedava bloquejat.
             confirmButton.disabled = false;
@@ -646,7 +638,7 @@ export async function initUpload(container) {
         currentReviewData = [];
         reviewBody.innerHTML = '';
         document.getElementById('review-search').value = '';
-        statusDiv.textContent = 'Operació cancel·lada.';
+        statusDiv.textContent = t('upload.cancelled');
         statusDiv.classList.remove('hidden');
         confirmButton.disabled = false;
         uploadButton.disabled = !fileInput.files.length;
@@ -673,7 +665,7 @@ export async function initUpload(container) {
         if (!file) return;
 
         if (!file.name.toLowerCase().endsWith('.csv')) {
-            statusDiv.textContent = '❌ Només s\'accepten fitxers CSV.';
+            statusDiv.textContent = t('upload.csv-only');
             statusDiv.classList.remove('hidden');
             return;
         }

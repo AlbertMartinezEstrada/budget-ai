@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 
 // transfers.js fa servir escapeHtml d'api.js, que llegeix window en carregar-se.
 global.window = {
@@ -15,6 +16,10 @@ let module;
 
 test.before(async () => {
     module = await import('../public/js/transfers.js');
+    // Els textos es comproven en català, l'idioma de referència.
+    const i18n = await import('../public/js/i18n.js');
+    const catalan = fs.readFileSync(new URL('../public/lang/Language_ca.properties', import.meta.url), 'utf8');
+    i18n.setMessages('ca', i18n.parseProperties(catalan));
 });
 
 const principal = { id: 1, nom: 'Compte Principal', tipus: 'CORRIENTE' };

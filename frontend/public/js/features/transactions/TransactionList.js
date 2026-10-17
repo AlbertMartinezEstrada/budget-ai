@@ -7,6 +7,7 @@ import { counterpartOptions, savingsCategoryHint, transferCounts, transferLabel 
 import { hasReceiptsToChoose, receiptOptions } from '../../debtReceipts.js';
 import { setUpUnmarkedTransfers } from './UnmarkedTransfers.js';
 import { setUpSplitEditor } from './SplitEditor.js';
+import { t, formatDate, formatMonth as monthAndYear } from '../../i18n.js';
 
 /**
  * Ingrés o despesa.
@@ -15,8 +16,8 @@ import { setUpSplitEditor } from './SplitEditor.js';
  * sense ensenyar-lo un ingrés i una despesa del mateix import es veien iguals.
  */
 const TYPES = {
-    EXPENSE: { etiqueta: 'Despesa', signe: '−', classe: 'text-error' },
-    INCOME:  { etiqueta: 'Ingrés',  signe: '+', classe: 'text-success' }
+    EXPENSE: { etiqueta: 'common.expense', signe: '−', classe: 'text-error' },
+    INCOME:  { etiqueta: 'common.income',  signe: '+', classe: 'text-success' }
 };
 
 const typeOf = (transaction) => TYPES[transaction.type] ? transaction.type : 'EXPENSE';
@@ -33,11 +34,6 @@ const DEBT_CATEGORIES = {
     DEC: { INCOME: 'Préstecs rebuts', EXPENSE: 'Pagament de deutes' },
     EM_DEUEN: { EXPENSE: 'Préstecs fets', INCOME: 'Cobrament de préstecs' }
 };
-
-const MONTH_FORMATTER = new Intl.DateTimeFormat('ca-ES', {
-    month: 'long',
-    year: 'numeric'
-});
 
 let currentSortMode = 'month-desc';
 let currentTransactions = [];
@@ -66,40 +62,40 @@ export async function initTransactions(container) {
     container.innerHTML = `
         <div class="card mb-4">
             <div class="card-header">
-                <h3 class="card-title">Filtres</h3>
-                <button class="btn btn-sm btn-outline" id="clear-filters">Netejar</button>
+                <h3 class="card-title">${t('transactions.filters')}</h3>
+                <button class="btn btn-sm btn-outline" id="clear-filters">${t('transactions.clear')}</button>
             </div>
             <div class="filter-grid">
                 <div class="form-group">
-                    <label for="filter-category">Categoria</label>
+                    <label for="filter-category">${t('common.category')}</label>
                     <select id="filter-category" class="form-control">
-                        <option value="">Totes</option>
+                        <option value="">${t('transactions.all-categories')}</option>
                     </select>
                 </div>
                 <div class="form-group">
-                    <label for="filter-company">Empresa</label>
+                    <label for="filter-company">${t('table.company')}</label>
                     <select id="filter-company" class="form-control">
-                        <option value="">Totes</option>
+                        <option value="">${t('transactions.all-companies')}</option>
                     </select>
                 </div>
                 <div class="form-group">
-                    <label for="filter-account">Compte</label>
+                    <label for="filter-account">${t('common.account')}</label>
                     <select id="filter-account" class="form-control">
-                        <option value="">Tots</option>
+                        <option value="">${t('transactions.all-accounts')}</option>
                     </select>
                 </div>
                 <div class="form-group">
-                    <label for="filter-type">Tipus</label>
+                    <label for="filter-type">${t('common.type')}</label>
                     <select id="filter-type" class="form-control">
-                        <option value="">Tots</option>
-                        <option value="EXPENSE">Despeses</option>
-                        <option value="INCOME">Ingressos</option>
+                        <option value="">${t('transactions.all-types')}</option>
+                        <option value="EXPENSE">${t('transactions.filter-expenses')}</option>
+                        <option value="INCOME">${t('transactions.filter-income')}</option>
                     </select>
                 </div>
                 <div class="form-group">
-                    <label for="filter-month">Mes</label>
+                    <label for="filter-month">${t('common.month')}</label>
                     <select id="filter-month" class="form-control">
-                        <option value="">Tots els mesos</option>
+                        <option value="">${t('transactions.all-months')}</option>
                     </select>
                 </div>
             </div>
@@ -109,10 +105,10 @@ export async function initTransactions(container) {
 
         <div class="card">
             <div class="card-header">
-                <h3 class="card-title">Llistat de Transaccions</h3>
+                <h3 class="card-title">${t('transactions.list-title')}</h3>
                 <div class="card-header-actions">
                     <button class="btn btn-sm btn-primary" id="add-transaction-btn" type="button">
-                        + Afegir moviment
+                        ${t('transactions.add-button')}
                     </button>
                     <button class="btn btn-sm btn-outline" id="toggle-transaction-sort" type="button"></button>
                     <button class="btn btn-sm btn-outline hidden" id="toggle-all-parts" type="button"></button>
@@ -123,18 +119,18 @@ export async function initTransactions(container) {
                 <table class="table table-hover">
                     <thead>
                         <tr>
-                            <th>Data</th>
-                            <th>Compte</th>
-                            <th>Tipus</th>
-                            <th>Empresa</th>
-                            <th>Categoria</th>
-                            <th>Descripció</th>
-                            <th class="text-right">Import</th>
+                            <th>${t('table.date')}</th>
+                            <th>${t('common.account')}</th>
+                            <th>${t('common.type')}</th>
+                            <th>${t('table.company')}</th>
+                            <th>${t('common.category')}</th>
+                            <th>${t('common.description')}</th>
+                            <th class="text-right">${t('table.amount')}</th>
                             <th style="width: 3rem;"></th>
                         </tr>
                     </thead>
                     <tbody id="transactions-body">
-                        <tr><td colspan="8" class="text-center">Carregant...</td></tr>
+                        <tr><td colspan="8" class="text-center">${t('common.loading')}</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -143,86 +139,71 @@ export async function initTransactions(container) {
         <!-- Modal d'alta manual -->
         <div id="transaction-modal" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-50 p-4">
             <div class="bg-white dark:bg-slate-800 rounded-xl p-6 w-full max-w-md max-h-full overflow-y-auto">
-                <h3 class="text-xl font-bold mb-1" id="transaction-modal-title">Afegir moviment</h3>
-                <p class="text-sm text-gray-500 dark:text-slate-400 mb-4" id="transaction-modal-hint">
-                    Per al que no surt de l'extracte: efectiu, un préstec, una devolució.
-                </p>
+                <h3 class="text-xl font-bold mb-1" id="transaction-modal-title">${t('transactions.add-title')}</h3>
+                <p class="text-sm text-gray-500 dark:text-slate-400 mb-4" id="transaction-modal-hint">${t('transactions.add-hint')}</p>
                 <form id="transaction-form" class="space-y-4">
                     <input type="hidden" id="edit-id">
                     <div>
-                        <label class="block text-sm font-medium mb-1" for="new-type">Tipus</label>
+                        <label class="block text-sm font-medium mb-1" for="new-type">${t('common.type')}</label>
                         <select id="new-type" class="form-control">
-                            <option value="EXPENSE">Despesa — resta del saldo</option>
-                            <option value="INCOME">Ingrés — suma al saldo</option>
+                            <option value="EXPENSE">${t('transactions.type-expense-option')}</option>
+                            <option value="INCOME">${t('transactions.type-income-option')}</option>
                         </select>
                     </div>
                     <div>
-                        <label class="block text-sm font-medium mb-1" for="new-amount">Import</label>
+                        <label class="block text-sm font-medium mb-1" for="new-amount">${t('common.amount')}</label>
                         <input type="number" id="new-amount" class="form-control" step="0.01" min="0.01" required>
                     </div>
                     <div>
-                        <label class="block text-sm font-medium mb-1" for="new-date">Data</label>
+                        <label class="block text-sm font-medium mb-1" for="new-date">${t('common.date')}</label>
                         <input type="date" id="new-date" class="form-control" required>
                     </div>
                     <div data-unsplit-only>
-                        <label class="block text-sm font-medium mb-1" for="new-category">Categoria</label>
+                        <label class="block text-sm font-medium mb-1" for="new-category">${t('common.category')}</label>
                         <select id="new-category" class="form-control" required></select>
                         <p id="new-category-hint" class="text-xs text-teal-700 dark:text-teal-300 mt-1 hidden"></p>
                     </div>
                     <div>
-                        <label class="block text-sm font-medium mb-1" for="new-company">Empresa</label>
+                        <label class="block text-sm font-medium mb-1" for="new-company">${t('table.company')}</label>
                         <input type="text" id="new-company" class="form-control" list="company-suggestions"
-                               placeholder="Desconegut">
+                               placeholder="${t('common.unknown')}">
                         <datalist id="company-suggestions"></datalist>
                     </div>
                     <div>
-                        <label class="block text-sm font-medium mb-1" for="new-account">Compte</label>
+                        <label class="block text-sm font-medium mb-1" for="new-account">${t('common.account')}</label>
                         <select id="new-account" class="form-control"></select>
                     </div>
                     <div>
-                        <label class="block text-sm font-medium mb-1" for="new-counterpart">Traspàs amb un altre compte teu</label>
+                        <label class="block text-sm font-medium mb-1" for="new-counterpart">${t('transactions.counterpart')}</label>
                         <select id="new-counterpart" class="form-control"></select>
-                        <p class="text-xs text-gray-500 dark:text-slate-400 mt-1" id="new-counterpart-hint">
-                            Si els diners van a un altre compte teu, o en vénen. Mou el saldo dels dos.
-                        </p>
+                        <p class="text-xs text-gray-500 dark:text-slate-400 mt-1" id="new-counterpart-hint">${t('transactions.counterpart-hint')}</p>
                     </div>
                     <div data-unsplit-only>
-                        <label class="block text-sm font-medium mb-1" for="new-debt">Deute</label>
+                        <label class="block text-sm font-medium mb-1" for="new-debt">${t('transactions.debt')}</label>
                         <select id="new-debt" class="form-control"></select>
-                        <p class="text-xs text-gray-500 dark:text-slate-400 mt-1">
-                            Si és un préstec o la seva devolució. El que queda per tornar surt d'aquí.
-                        </p>
+                        <p class="text-xs text-gray-500 dark:text-slate-400 mt-1">${t('transactions.debt-hint')}</p>
                     </div>
                     <div id="new-debt-receipt-field" class="hidden">
-                        <label class="block text-sm font-medium mb-1" for="new-debt-receipt">Rebut que paga</label>
+                        <label class="block text-sm font-medium mb-1" for="new-debt-receipt">${t('transactions.debt-receipt')}</label>
                         <select id="new-debt-receipt" class="form-control"></select>
-                        <p class="text-xs text-gray-500 dark:text-slate-400 mt-1">
-                            Si el pagament és d'un altre rebut que el que toca. El que sobri treu rebuts del final.
-                        </p>
+                        <p class="text-xs text-gray-500 dark:text-slate-400 mt-1">${t('transactions.debt-receipt-hint')}</p>
                     </div>
                     <div>
-                        <label class="block text-sm font-medium mb-1" for="new-description">Descripció</label>
-                        <input type="text" id="new-description" class="form-control" placeholder="Opcional">
+                        <label class="block text-sm font-medium mb-1" for="new-description">${t('common.description')}</label>
+                        <input type="text" id="new-description" class="form-control" placeholder="${t('common.optional')}">
                     </div>
                     <label class="flex items-start gap-2 text-sm" data-unsplit-only>
                         <input type="checkbox" id="new-excluded" class="mt-1">
                         <span>
-                            No comptar
-                            <span class="block text-xs text-gray-500 dark:text-slate-400">
-                                Ni al pressupost ni a l'anàlisi: per a diners que no són ni despesa ni ingrés
-                                teus. Només mou el saldo del compte. Un traspàs entre els teus comptes del dia a
-                                dia es marca sol.
-                            </span>
+                            ${t('transactions.excluded')}
+                            <span class="block text-xs text-gray-500 dark:text-slate-400">${t('transactions.excluded-hint')}</span>
                         </span>
                     </label>
-                    <p id="transaction-split-note" class="text-sm text-gray-500 dark:text-slate-400 hidden">
-                        Aquest moviment està dividit: la categoria, el deute i si compta es decideixen a
-                        cada part. Per canviar-les, fes servir el botó de dividir.
-                    </p>
+                    <p id="transaction-split-note" class="text-sm text-gray-500 dark:text-slate-400 hidden">${t('transactions.split-note')}</p>
                     <p id="transaction-form-error" class="text-error text-sm hidden"></p>
                     <div class="flex gap-2 justify-end">
-                        <button type="button" id="transaction-cancel" class="btn btn-outline">Cancel·lar</button>
-                        <button type="submit" class="btn btn-primary">Afegir</button>
+                        <button type="button" id="transaction-cancel" class="btn btn-outline">${t('common.cancel')}</button>
+                        <button type="submit" class="btn btn-primary">${t('transactions.add')}</button>
                     </div>
                 </form>
             </div>
@@ -272,7 +253,7 @@ export async function initTransactions(container) {
         console.error('Error loading initial transactions:', error);
         document.getElementById('transaction-count').textContent = '0';
         updateSortButton();
-        renderMessageRow(`Error: ${error.message}`, true);
+        renderMessageRow(t('transactions.load-failed', { message: error.message }), true);
     }
 
     // Event Listeners
@@ -346,14 +327,14 @@ async function handleRowAction(event) {
     if (button.dataset.action !== 'delete-transaction') return;
 
     // Esborrar mou el saldo del compte cap enrere, així que es pregunta.
-    if (!confirm('Esborrar aquest moviment? El saldo del compte es desfarà.')) return;
+    if (!confirm(t('transactions.delete-confirm'))) return;
 
     button.disabled = true;
     try {
         await deleteTransaction(id);
         await loadData();
     } catch (error) {
-        alert(error.message || 'No s\'ha pogut esborrar el moviment.');
+        alert(error.message || t('transactions.delete-failed'));
         button.disabled = false;
     }
 }
@@ -397,15 +378,14 @@ function setUpManualEntry(categories, companies, debts) {
         if (counterpart && !transferCounts(own, counterpart)) {
             excludedBox.checked = true;
             excludedBox.disabled = true;
-            counterpartHint.textContent = 'Entre comptes del dia a dia no compta al pressupost: '
-                + 'comptarà el que paguis des d\'allà, a la seva categoria.';
+            counterpartHint.textContent = t('transactions.hint-everyday-transfer');
             return;
         }
         // Si l'havia marcat el traspàs, en deixar de ser-ho torna a comptar.
         if (wasForced) excludedBox.checked = false;
         excludedBox.disabled = false;
         counterpartHint.textContent = counterpart
-            ? `${counterpart.nom} és un compte d'estalvi: el traspàs compta al pressupost, a la categoria que triïs (Estalvis).`
+            ? t('transactions.hint-savings-transfer', { account: counterpart.nom })
             : defaultCounterpartHint;
     };
     ownSelect.addEventListener('change', refreshCounterpart);
@@ -446,10 +426,8 @@ function setUpManualEntry(categories, companies, debts) {
     // Els saldats també hi són: un moviment antic pot ser d'un deute ja
     // tornat, i editar-lo no l'ha de desvincular.
     document.getElementById('new-debt').innerHTML = [
-        '<option value="">Cap</option>',
-        ...debts.map(debt => `<option value="${debt.id}">
-            ${escapeHtml(debt.nom)} (${debt.direccio === 'DEC' ? 'dec' : 'em deuen'}${debt.saldat ? ', saldat' : ''})
-        </option>`)
+        `<option value="">${t('transactions.no-debt')}</option>`,
+        ...debts.map(debt => `<option value="${debt.id}">${escapeHtml(debtOptionLabel(debt))}</option>`)
     ].join('');
 
     /**
@@ -496,9 +474,8 @@ function setUpManualEntry(categories, companies, debts) {
         form.reset();
         error.classList.add('hidden');
         document.getElementById('edit-id').value = '';
-        document.getElementById('transaction-modal-title').textContent = 'Afegir moviment';
-        document.getElementById('transaction-modal-hint').textContent =
-            "Per al que no surt de l'extracte: efectiu, un préstec, una devolució.";
+        document.getElementById('transaction-modal-title').textContent = t('transactions.add-title');
+        document.getElementById('transaction-modal-hint').textContent = t('transactions.add-hint');
         // Per defecte, avui: el cas normal és apuntar una cosa que acaba de passar.
         document.getElementById('new-date').value = todayInputValue();
         counterpartSelect.value = '';
@@ -521,9 +498,8 @@ function setUpManualEntry(categories, companies, debts) {
         error.classList.add('hidden');
 
         document.getElementById('edit-id').value = transaction.id;
-        document.getElementById('transaction-modal-title').textContent = 'Editar moviment';
-        document.getElementById('transaction-modal-hint').textContent =
-            'El saldo del compte s\'ajusta sol: es desfà l\'efecte anterior i s\'aplica el nou.';
+        document.getElementById('transaction-modal-title').textContent = t('transactions.edit-title');
+        document.getElementById('transaction-modal-hint').textContent = t('transactions.edit-hint');
 
         document.getElementById('new-type').value = typeOf(transaction);
         document.getElementById('new-amount').value = Number.parseFloat(transaction.cost) || '';
@@ -561,7 +537,7 @@ function setUpManualEntry(categories, companies, debts) {
 
         const amount = Number.parseFloat(document.getElementById('new-amount').value);
         if (!Number.isFinite(amount) || amount <= 0) {
-            error.textContent = 'L\'import ha de ser més gran que zero.';
+            error.textContent = t('transactions.amount-positive');
             error.classList.remove('hidden');
             return;
         }
@@ -575,7 +551,7 @@ function setUpManualEntry(categories, companies, debts) {
             cost: amount,
             type: document.getElementById('new-type').value,
             categoria: document.getElementById('new-category').value,
-            empresa: document.getElementById('new-company').value.trim() || 'Desconegut',
+            empresa: document.getElementById('new-company').value.trim() || t('common.unknown'),
             descripcio_curta: document.getElementById('new-description').value.trim(),
             exclos_pressupost: document.getElementById('new-excluded').checked,
             // -1 desvincula: en una edició, no enviar-lo deixaria el vincle
@@ -603,7 +579,7 @@ function setUpManualEntry(categories, companies, debts) {
             // Marcar un traspàs pot haver resolt un parell, o desar-ne un de nou.
             await refreshUnmarkedTransfers();
         } catch (failure) {
-            error.textContent = failure.message || 'No s\'ha pogut afegir el moviment.';
+            error.textContent = failure.message || t('transactions.save-failed');
             error.classList.remove('hidden');
         } finally {
             // Es rehabilita sempre: si fallava, el botó quedava bloquejat i
@@ -611,6 +587,14 @@ function setUpManualEntry(categories, companies, debts) {
             submitButton.disabled = false;
         }
     });
+}
+
+/** «Pares (dec)», «Steam Deck (dec, saldat)»: el deute i en quin sentit va. */
+function debtOptionLabel(debt) {
+    const key = debt.direccio === 'DEC'
+        ? (debt.saldat ? 'transactions.debt-option-owe-settled' : 'transactions.debt-option-owe')
+        : (debt.saldat ? 'transactions.debt-option-owed-settled' : 'transactions.debt-option-owed');
+    return t(key, { name: debt.nom });
 }
 
 /** Torna a llegir els deutes: el calendari de cadascun depèn dels pagaments. */
@@ -658,7 +642,7 @@ async function loadData() {
         console.error('Error loading transactions:', error);
         currentTransactions = [];
         document.getElementById('transaction-count').textContent = '0';
-        renderMessageRow(`Error: ${error.message}`, true);
+        renderMessageRow(t('transactions.load-failed', { message: error.message }), true);
     }
 }
 
@@ -676,9 +660,9 @@ function updatePartsButton(transactions) {
     if (!button) return;
     const splitIds = transactions.filter(isSplit).map(transaction => transaction.id);
     button.classList.toggle('hidden', splitIds.length === 0);
-    button.textContent = splitIds.length > 0 && splitIds.every(id => expandedSplits.has(id))
-        ? 'Plegar les parts'
-        : 'Desplegar les parts';
+    button.textContent = t(splitIds.length > 0 && splitIds.every(id => expandedSplits.has(id))
+        ? 'transactions.collapse-parts'
+        : 'transactions.expand-parts');
 }
 
 function toggleSortMode() {
@@ -694,10 +678,8 @@ function updateSortButton() {
         return;
     }
 
-    sortButton.textContent = currentSortMode === 'month-desc'
-        ? 'Mesos: nous primer'
-        : 'Mesos: antics primer';
-    sortButton.setAttribute('aria-label', `Canviar ordre. Actual: ${sortButton.textContent}`);
+    sortButton.textContent = t(currentSortMode === 'month-desc' ? 'transactions.sort-newest' : 'transactions.sort-oldest');
+    sortButton.setAttribute('aria-label', t('transactions.sort-aria', { order: sortButton.textContent }));
 }
 
 function renderTable(transactions, sortBy = 'month-desc') {
@@ -706,7 +688,7 @@ function renderTable(transactions, sortBy = 'month-desc') {
     updatePartsButton(transactions);
 
     if (transactions.length === 0) {
-        renderMessageRow('No s\'han trobat resultats.');
+        renderMessageRow(t('transactions.no-results'));
         return;
     }
 
@@ -756,11 +738,11 @@ function buildMonthRow(date) {
 function budgetBadges(excluded, debtId) {
     return `
         ${excluded
-            ? '<span class="badge badge-outline text-sm" title="No compta ni al pressupost ni a l\'anàlisi: només mou el saldo">no compta</span>'
+            ? `<span class="badge badge-outline text-sm" title="${t('transactions.excluded-badge-title')}">${t('transactions.excluded-badge')}</span>`
             : ''}
         ${debtId
-            ? `<span class="badge badge-outline text-sm" title="Vinculat a un deute: compta per saber quant queda per tornar">
-                   deute: ${escapeHtml(debtsById.get(debtId)?.nom || '?')}
+            ? `<span class="badge badge-outline text-sm" title="${t('transactions.debt-badge-title')}">
+                   ${escapeHtml(t('transactions.debt-badge', { name: debtsById.get(debtId)?.nom || '?' }))}
                </span>`
             : ''}
     `;
@@ -770,7 +752,7 @@ function budgetBadges(excluded, debtId) {
 function transferBadge(transaction) {
     if (!transaction.compte_contrapart_id) return '';
     const counterpart = accountsById.get(transaction.compte_contrapart_id);
-    return `<span class="badge badge-outline text-sm" title="Traspàs entre comptes teus: ha mogut el saldo dels dos">
+    return `<span class="badge badge-outline text-sm" title="${t('transactions.transfer-badge-title')}">
                 ${escapeHtml(transferLabel(transaction.type, counterpart?.nom))}
             </span>`;
 }
@@ -784,9 +766,9 @@ function buildTransactionRow(transaction) {
     // deute del moviment ja no compten, i ensenyar-los confondria.
     return `
         <tr>
-            <td>${escapeHtml(formatTransactionDate(transaction.data))}</td>
+            <td>${escapeHtml(formatDate(transaction.data) || '-')}</td>
             <td class="text-sm">${escapeHtml(transaction.account?.nom || '-')}</td>
-            <td class="text-sm ${style.classe}">${style.etiqueta}</td>
+            <td class="text-sm ${style.classe}">${t(style.etiqueta)}</td>
             <td>
                 ${escapeHtml(transaction.empresa || '-')}
                 ${transferBadge(transaction)}
@@ -803,15 +785,15 @@ function buildTransactionRow(transaction) {
             </td>
             <td class="text-right" style="white-space: nowrap;">
                 <button class="btn btn-sm btn-outline" data-action="split-transaction"
-                        data-id="${transaction.id}" title="Dividir en parts amb categories diferents">
+                        data-id="${transaction.id}" title="${t('transactions.split-title')}">
                     <span class="material-symbols-outlined text-sm">call_split</span>
                 </button>
                 <button class="btn btn-sm btn-outline" data-action="edit-transaction"
-                        data-id="${transaction.id}" title="Editar aquest moviment">
+                        data-id="${transaction.id}" title="${t('transactions.edit-row')}">
                     <span class="material-symbols-outlined text-sm">edit</span>
                 </button>
                 <button class="btn btn-sm btn-outline" data-action="delete-transaction"
-                        data-id="${transaction.id}" title="Esborrar aquest moviment">
+                        data-id="${transaction.id}" title="${t('transactions.delete-row')}">
                     <span class="material-symbols-outlined text-sm">delete</span>
                 </button>
             </td>
@@ -830,8 +812,8 @@ function partsToggle(transaction, expanded) {
         .join(' · ');
     return `<button type="button" class="badge badge-secondary parts-toggle" data-action="toggle-parts"
                     data-id="${transaction.id}" aria-expanded="${expanded}"
-                    title="${escapeHtml((expanded ? 'Amagar les parts. ' : 'Veure les parts. ') + summary)}">
-                dividit en ${transaction.parts.length}
+                    title="${escapeHtml(t(expanded ? 'transactions.hide-parts' : 'transactions.show-parts', { summary }))}">
+                ${escapeHtml(t('transactions.split-in', { count: transaction.parts.length }))}
                 <span class="material-symbols-outlined text-sm">${expanded ? 'expand_less' : 'expand_more'}</span>
             </button>`;
 }
@@ -875,7 +857,7 @@ function populateMonthOptions(transactions) {
             .filter(monthKey => monthKey !== 'no-date')
     )].sort((left, right) => right.localeCompare(left));
 
-    monthSelect.innerHTML = '<option value="">Tots els mesos</option>';
+    monthSelect.innerHTML = `<option value="">${t('transactions.all-months')}</option>`;
 
     monthKeys.forEach(monthKey => {
         const option = document.createElement('option');
@@ -913,17 +895,12 @@ function parseTransactionDate(rawDate) {
     return Number.isNaN(parsedDate.getTime()) ? null : parsedDate;
 }
 
-function formatTransactionDate(rawDate) {
-    const date = parseTransactionDate(rawDate);
-    return date ? date.toLocaleDateString('ca-ES') : '-';
-}
-
 function formatMonth(date) {
     if (!date) {
-        return 'Sense data';
+        return t('transactions.no-date');
     }
 
-    const label = MONTH_FORMATTER.format(date);
+    const label = monthAndYear(date.getFullYear(), date.getMonth() + 1);
     return label.charAt(0).toUpperCase() + label.slice(1);
 }
 

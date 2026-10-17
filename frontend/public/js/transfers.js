@@ -1,4 +1,5 @@
 import { escapeHtml } from './api.js';
+import { t } from './i18n.js';
 
 /**
  * Traspassos entre comptes propis, vistos des del navegador.
@@ -22,7 +23,8 @@ export const transferCounts = (own, counterpart) => isSavingsAccount(counterpart
 
 /** "⇄ a Revolut" si en surten, "⇄ des de Trade Republic" si hi tornen. */
 export const transferLabel = (type, counterpartName) =>
-    `⇄ ${type === 'INCOME' ? 'des de' : 'a'} ${counterpartName || 'un altre compte'}`;
+    t(type === 'INCOME' ? 'transfers.label-from' : 'transfers.label-to',
+        { account: counterpartName || t('transfers.another-account') });
 
 /**
  * Les opcions del desplegable de l'altre compte.
@@ -30,12 +32,12 @@ export const transferLabel = (type, counterpartName) =>
  * @param ownAccountId el compte del moviment, que no s'ofereix: un traspàs al
  *        mateix compte no mou res, i el backend el rebutja.
  */
-export function counterpartOptions(accounts, ownAccountId, selected = null, emptyLabel = 'No és un traspàs') {
+export function counterpartOptions(accounts, ownAccountId, selected = null, emptyLabel = t('transfers.not-a-transfer')) {
     return [`<option value="">${escapeHtml(emptyLabel)}</option>`]
         .concat((accounts || [])
             .filter(account => String(account.id) !== String(ownAccountId))
             .map(account => `<option value="${account.id}"${String(account.id) === String(selected) ? ' selected' : ''}>
-                ${escapeHtml(account.nom)}${isSavingsAccount(account) ? ' (estalvi)' : ''}
+                ${escapeHtml(account.nom)}${isSavingsAccount(account) ? ` (${t('transfers.savings')})` : ''}
             </option>`))
         .join('');
 }
@@ -52,12 +54,7 @@ export function counterpartOptions(accounts, ownAccountId, selected = null, empt
 export function savingsCategoryHint(type, own, counterpart) {
     if (counterpart) return '';
     if (isSavingsAccount(own)) {
-        return type === 'EXPENSE'
-            ? 'Pagat des d\'un compte d\'estalvi: compta com a gastat del fons. És despesa, però surt del que ja havies apartat.'
-            : '';
+        return type === 'EXPENSE' ? t('transfers.hint-paid-from-savings') : '';
     }
-    return type === 'EXPENSE'
-        ? 'És una categoria d\'estalvi: compta com a estalviat, encara que no ho marquis com a traspàs. '
-            + 'Si és una compra (un regal), posa-la en una categoria de despesa.'
-        : 'És una categoria d\'estalvi: el que torna al dia a dia resta de l\'estalviat.';
+    return t(type === 'EXPENSE' ? 'transfers.hint-savings-category-expense' : 'transfers.hint-savings-category-income');
 }
