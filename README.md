@@ -104,4 +104,7 @@ entidades y falla al arrancar si no es así.
 - **Un solo usuario.** No hay tabla de usuarios ni aislamiento de datos.
 - **No se pueden revocar sesiones** una por una; cambiar `JWT_SECRET` las
   invalida todas.
-- **La interfaz mezcla catalán y castellano** según la vista.
+- **Idiomas a medias.** Se puede elegir catalán, castellano, portugués o inglés
+  en Configuración, pero de momento solo están traducidos el menú, la entrada,
+  el tablero y Configuración; el resto de vistas siguen mezclando catalán y
+  castellano hasta que se pasen.

@@ -313,6 +313,11 @@
     text-align: center;
 }
 
+/* El selector d'idioma va al final: és l'últim camp de la targeta. */
+.login-input.login-language {
+    margin-bottom: 0;
+}
+
 /* Fila de revisió on la IA ha proposat una categoria desconeguda */
 .row-needs-review {
     background-color: #fffbeb;

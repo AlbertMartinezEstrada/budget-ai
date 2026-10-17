@@ -206,7 +206,9 @@ CREATE TABLE IF NOT EXISTS settings (
     -- Sou de referència sobre el qual s'apliquen els percentatges.
     expected_monthly_income DECIMAL(15, 2),
     created_at TIMESTAMP,
-    updated_at TIMESTAMP
+    updated_at TIMESTAMP,
+    -- Idioma de la interfície (ca, es, pt, en); buit, el del navegador.
+    language VARCHAR(5)
 );
 
 -- Sou d'un mes concret, quan no és el de sempre (paga extra, mes curt...).

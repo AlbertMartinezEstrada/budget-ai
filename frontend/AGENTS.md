@@ -33,7 +33,7 @@ test/                 tests con el ejecutor integrado de Node
 
 ```bash
 npm ci                 # instalar exactamente las versiones del lockfile
-npm test               # 95 tests (hace falta npm ci antes: compilan Tailwind)
+npm test               # 112 tests (hace falta npm ci antes: compilan Tailwind)
 npm run build:assets   # regenerar tailwind.css, las fuentes y Chart.js de public/vendor
 npm run test:navegador # todas las vistas en Chromium; solo contra una base de datos de prueba
 ```
@@ -59,6 +59,55 @@ funciona en Node 18 pero falla desde Node 20.
 
 Cada vista escribe su HTML en `#main-content` y engancha sus propios listeners.
 No hay estado compartido: se monta de cero cada vez.
+
+## Idiomas
+
+La interfaz va en catalán, castellano, portugués o inglés, como en Liferay:
+**cada texto es una clave** y cada idioma tiene su fichero,
+`public/lang/Language_ca.properties`, `Language_es`, `Language_pt` y
+`Language_en`. El catalán es el de referencia.
+
+```javascript
+import { t } from '../../i18n.js';
+
+`<h3>${t('dashboard.income')}</h3>`                                 // ✅ sin valores, tal cual
+`<p>${escapeHtml(t('dashboard.load-failed', { message }))}</p>`     // ✅ con valores, escapado
+element.textContent = t('settings.save-failed', { message });       // ✅ textContent no interpreta HTML
+`<h3>Ingressos</h3>`                                                 // ❌ sale en catalán en los cuatro
+```
+
+- **Un texto nuevo va a los cuatro ficheros**, con la misma clave. Las claves
+  son `vista.que-dice` en minúsculas (`settings.save-profile`); lo que se repite
+  en varias vistas va en `common.` o `table.`.
+- **Los `{valores}`** se sustituyen: `t('dashboard.savings-rate', { rate })`.
+  Con `{count}` numérico se elige el plural: `clave.one` y `clave.other`.
+- **Una traducción no lleva `< > " &` ni `` ` ``**: va tal cual dentro del HTML.
+  Para citar, comillas bajas «».
+- **Con valores, dentro de `escapeHtml()`**: los valores (el nombre de una
+  cuenta, un concepto del banco) no son de confianza.
+- **Los nombres que escribe el usuario no se traducen** (categorías, cuentas,
+  empresas): son datos.
+- **El HTML fijo** (`index.html`) lleva `data-i18n="clave"` o
+  `data-i18n-title="clave"`, y `translatePage()` pone el texto.
+- **Importes, números, porcentajes y fechas** con `formatCurrency` (en `api.js`),
+  `formatNumber`, `formatPercent` y `formatDate` (en `i18n.js`), que siguen el
+  idioma. `formatDate('2026-10-16')` lee la fecha de la API como día local: con
+  `new Date('2026-10-16')`, al oeste de Greenwich salía el día anterior.
+
+El idioma se guarda en los ajustes del backend (`settings.language`), como el
+tema, para que el PC y el móvil usen el mismo. Sin idioma guardado se usa el
+del navegador. La pantalla de entrada tiene su propio selector, y el último
+elegido se recuerda en el navegador (`localStorage`) porque antes de entrar no
+se pueden leer los ajustes. Cambiar de idioma vuelve a pintar la vista abierta
+(evento `languageChanged`).
+
+`test/i18n.test.js` falla si una clave falta en algún idioma, si una traducción
+no lleva los mismos `{valores}`, si el código pide una clave que no existe o si
+sobra alguna, y si en un fichero ya traducido (la lista `TRANSLATED_FILES`)
+queda un texto escrito a mano. **Al pasar una vista a claves, añádela a esa
+lista.** La prueba de navegador recorre todas las vistas en los cuatro idiomas:
+una clave que falta sale como error en la consola, y falla también si un texto
+no cabe (la página se ensancha o el menú corta un nombre).
 
 ## Detalles del frontend
 

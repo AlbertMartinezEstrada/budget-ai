@@ -31,9 +31,9 @@ docker compose logs -f backend        # logs
 scripts\backup.bat                    # copia de la base de datos (backup.sh fuera de Windows)
 scripts/migrate.sh                    # aplica las migraciones pendientes (copia antes; --estat para ver cuáles)
 
-cd backend-java && ./gradlew test              # 260 unitarios, sin Docker
+cd backend-java && ./gradlew test              # 266 unitarios, sin Docker
 cd backend-java && ./gradlew integrationTest   # 170, requieren Docker
-cd frontend && npm test                        # 95
+cd frontend && npm test                        # 112
 cd frontend && npm run test:navegador          # todas las vistas en un navegador (ver abajo)
 ```
 
@@ -441,7 +441,12 @@ un fichero con un token y hubo que deshacerlo.
 
 - **Commits y comentarios de código**: catalán.
 - **Documentación**: castellano, salvo `TESTING.md`, que está en catalán.
-- **Interfaz**: mezcla catalán y castellano según la vista. Es deuda conocida.
+- **Interfaz**: en catalán, castellano, portugués o inglés, a elegir en
+  Configuración. Cada texto es una clave de `frontend/public/lang/`
+  (`Language_ca.properties`…, como en Liferay): **un texto nuevo va a los
+  cuatro ficheros**, nunca escrito en la vista. Se está pasando vista a vista;
+  las que aún no lo están siguen con su mezcla de catalán y castellano. Ver
+  `frontend/AGENTS.md`.
 - Los comentarios explican **por qué**, no qué. Especialmente si algo parece
   raro: casi siempre lo parece porque arregla un fallo concreto.
 - **Los nombres dicen qué es cada cosa.** El código se tiene que entender
@@ -461,6 +466,10 @@ un fichero con un token y hubo que deshacerlo.
 ## Trampas conocidas
 
 - El backend escucha en el **8000**.
+- **Los importes y las fechas no se formatean a mano**: `formatCurrency`,
+  `formatDate`, `formatNumber` y `formatPercent` siguen el idioma (1.234,57 € en
+  catalán, €1,234.57 en inglés). Un `toFixed(2)` o un `toLocaleDateString('ca-ES')`
+  sale igual en todos los idiomas.
 - **Una variable nueva del backend se añade también a `docker-compose.yml`.** En
   Docker el backend solo ve las que el compose le pasa; ponerla en el `.env` no
   basta. Pasó con `CORS_ALLOWED_ORIGINS` y con todas las opciones de sesión.

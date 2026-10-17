@@ -5,9 +5,13 @@ import com.budgetai.backend.repository.SettingsRepository;
 import org.springframework.stereotype.Service;
 
 import java.util.Optional;
+import java.util.Set;
 
 @Service
 public class SettingsService {
+
+    /** Els idiomes que té el frontend: un fitxer lang/Language_xx.properties per a cadascun. */
+    static final Set<String> LANGUAGES = Set.of("ca", "es", "pt", "en");
 
     private final SettingsRepository settingsRepository;
 
@@ -32,6 +36,11 @@ public class SettingsService {
     }
 
     public Settings updateSettings(Settings settings) {
+        // Un idioma que el frontend no té deixaria la interfície sense textos.
+        if (settings.getLanguage() != null && !LANGUAGES.contains(settings.getLanguage())) {
+            throw new IllegalArgumentException("L'idioma «" + settings.getLanguage()
+                    + "» no existeix. Ha de ser ca, es, pt o en.");
+        }
         Optional<Settings> existing = settingsRepository.findFirstBy();
         if (existing.isPresent()) {
             Settings stored = existing.get();
@@ -39,6 +48,7 @@ public class SettingsService {
             if (settings.getUserEmail() != null) stored.setUserEmail(settings.getUserEmail());
             if (settings.getCurrency() != null) stored.setCurrency(settings.getCurrency());
             if (settings.getTheme() != null) stored.setTheme(settings.getTheme());
+            if (settings.getLanguage() != null) stored.setLanguage(settings.getLanguage());
             if (settings.getNotificationsExpenses() != null) stored.setNotificationsExpenses(settings.getNotificationsExpenses());
             if (settings.getNotificationsBudget() != null) stored.setNotificationsBudget(settings.getNotificationsBudget());
             if (settings.getNotificationsMonthly() != null) stored.setNotificationsMonthly(settings.getNotificationsMonthly());

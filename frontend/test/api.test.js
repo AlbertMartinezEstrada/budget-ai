@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 
 // api.js llegeix window.location en carregar-se per muntar la URL de l'API,
 // així que cal simular un mínim de navegador abans d'importar-lo.
@@ -16,30 +17,64 @@ global.CustomEvent = class CustomEvent {
 };
 
 let api;
+let i18n;
+
+// Els missatges es comproven en català, l'idioma de referència.
+function useLanguageFromDisk(code) {
+    const file = new URL(`../public/lang/Language_${code}.properties`, import.meta.url);
+    i18n.setMessages(code, i18n.parseProperties(fs.readFileSync(file, 'utf8')));
+}
 
 test.before(async () => {
     api = await import('../public/js/api.js');
+    i18n = await import('../public/js/i18n.js');
+    useLanguageFromDisk('ca');
 });
+
+/** Intl separa els milers amb un espai que no es trenca; a la vista és un espai. */
+const plainSpaces = (text) => text.replace(/[\u00a0\u202f]/g, ' ');
 
 test('formatCurrency no peta amb valors buits', () => {
     // Aquest era el detonant que tombava la graella d'objectius sencera:
     // undefined.toFixed(2) llança un TypeError dins d'un .map().
-    assert.equal(api.formatCurrency(null), '0.00 €');
-    assert.equal(api.formatCurrency(undefined), '0.00 €');
-    assert.equal(api.formatCurrency(''), '0.00 €');
-    assert.equal(api.formatCurrency('no és un número'), '0.00 €');
-    assert.equal(api.formatCurrency(NaN), '0.00 €');
+    for (const empty of [null, undefined, '', 'no és un número', NaN]) {
+        assert.equal(plainSpaces(api.formatCurrency(empty)), '0,00 €');
+    }
 });
 
 test('formatCurrency accepta números i cadenes numèriques', () => {
-    assert.equal(api.formatCurrency(45.3), '45.30 €');
-    assert.equal(api.formatCurrency('12.5'), '12.50 €');
-    assert.equal(api.formatCurrency(0), '0.00 €');
-    assert.equal(api.formatCurrency(-33.333), '-33.33 €');
+    assert.equal(plainSpaces(api.formatCurrency(45.3)), '45,30 €');
+    assert.equal(plainSpaces(api.formatCurrency('12.5')), '12,50 €');
+    assert.equal(plainSpaces(api.formatCurrency(0)), '0,00 €');
+    assert.equal(plainSpaces(api.formatCurrency(-33.333)), '-33,33 €');
 });
 
-test('formatCurrency arrodoneix a dos decimals', () => {
-    assert.equal(api.formatCurrency(1234.567), '1234.57 €');
+test('formatCurrency arrodoneix a dos decimals i separa els milers', () => {
+    // Abans sortia «1234.57 €» en tots els idiomes.
+    assert.equal(plainSpaces(api.formatCurrency(1234.567)), '1.234,57 €');
+});
+
+test('formatCurrency fa servir el format de l\'idioma i la moneda dels ajustos', () => {
+    try {
+        useLanguageFromDisk('en');
+        assert.equal(api.formatCurrency(1234.567), '€1,234.57');
+        api.setCurrency('GBP');
+        assert.equal(api.formatCurrency(-5), '-£5.00');
+        useLanguageFromDisk('pt');
+        assert.equal(plainSpaces(api.formatCurrency(1234.567)), '1 234,57 £');
+    } finally {
+        api.setCurrency('EUR');
+        useLanguageFromDisk('ca');
+    }
+});
+
+test('una moneda desconeguda als ajustos surt en euros en lloc de tombar la vista', () => {
+    try {
+        api.setCurrency('EURO');
+        assert.equal(plainSpaces(api.formatCurrency(3)), '3,00 €');
+    } finally {
+        api.setCurrency('EUR');
+    }
 });
 
 test('escapeHtml neutralitza les etiquetes', () => {

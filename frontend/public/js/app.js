@@ -13,6 +13,7 @@ import { initTransfers } from './features/transfers/Transfers.js';
 import { initRecurring } from './features/recurring/RecurringTransactions.js';
 import { initAnalytics } from './features/analytics/Analytics.js';
 import { initSettings } from './features/settings/Settings.js';
+import { t, useLanguage, preferredLanguage, translatePage, REFERENCE_LANGUAGE } from './i18n.js';
 
 const VIEWS = [
     'dashboard', 'transactions', 'upload', 'accounts', 'budgets',
@@ -20,7 +21,11 @@ const VIEWS = [
 ];
 
 document.addEventListener('DOMContentLoaded', async () => {
-    console.log('Budget AI Frontend Initialized');
+    // L'idioma, abans que res: la pantalla d'entrada ja surt traduïda. Encara
+    // no se saben els ajustos, així que és el que es va triar l'última vegada
+    // en aquest navegador o el del navegador; loadAppState el canvia després
+    // si a Configuració n'hi ha un altre.
+    await loadStartupLanguage();
 
     // Res no es carrega fins que hi ha sessió: si no n'hi ha, es mostra la
     // pantalla d'entrada i l'aplicació ni tan sols demana dades.
@@ -48,7 +53,7 @@ async function startApp() {
     // tornar a la pantalla d'entrada en comptes de deixar la vista buida.
     onUnauthorized(() => {
         showLogin({
-            message: 'La sessió ha caducat. Torna a entrar.',
+            message: t('session.expired'),
             onSuccess: startApp
         });
     });
@@ -152,6 +157,10 @@ async function startApp() {
         // recarregar manté la pantalla, el botó d'enrere funciona i els
         // enllaços es poden compartir.
         window.addEventListener('hashchange', () => navigate(currentView(), currentSubview()));
+
+        // Canviar d'idioma torna a pintar la vista oberta: els textos es
+        // posen en pintar-la, i no hi ha cap estat que s'hagi de conservar.
+        document.addEventListener('languageChanged', () => navigate(currentView(), currentSubview()));
     }
 
     // Initial Load
@@ -159,6 +168,20 @@ async function startApp() {
 }
 
 let listenersAttached = false;
+
+async function loadStartupLanguage() {
+    try {
+        await useLanguage(preferredLanguage());
+    } catch (error) {
+        console.error('No s\'ha pogut carregar l\'idioma:', error);
+        try {
+            await useLanguage(REFERENCE_LANGUAGE);
+        } catch {
+            // Sense cap fitxer d'idioma es veurien les claus; com a mínim, l'app funciona.
+        }
+    }
+    translatePage();
+}
 
 async function handleLogout() {
     try {

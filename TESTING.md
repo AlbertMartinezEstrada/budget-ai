@@ -48,7 +48,11 @@ moviments:
 cd frontend && E2E_BASE_DE_DADES_DE_PROVA=si E2E_USERNAME=… E2E_PASSWORD=… npm run test:navegador
 ```
 
-El CI la fa a cada PR amb un PostgreSQL nou (job «Navegador»).
+El CI la fa a cada PR amb un PostgreSQL nou (job «Navegador»). Després de les
+vistes en clar i en fosc, tria cada idioma a Configuració i torna a recórrer
+totes les vistes: falla si el menú no diu el que diu el fitxer de l'idioma, si
+falta una traducció (surt com a error a la consola) o si un text no hi cap (la
+pàgina s'eixampla o el menú talla un nom).
 
 ## Què cobreixen, i per què aquests i no uns altres
 
@@ -249,11 +253,37 @@ Com que buida els literals, una segona regla mira a part els àlies de les
 consultes de `@Query` (`FROM Budget b`), que viuen dins de les cometes i hi
 passaven.
 
+### `SettingsServiceTest`
+
+L'idioma de la interfície es desa als ajustos (`ca`, `es`, `pt` o `en`; buit
+vol dir el del navegador) i un altre es rebutja. I que una actualització
+parcial no toqui el que no s'ha enviat: els valors per defecte de `Settings`
+eren a la declaració dels camps (`theme = "light"`), de manera que desar només
+el perfil tornava el tema fosc a clar i les notificacions als valors per
+defecte. El cos de la petició es construeix amb Jackson, com al controlador;
+comprovat que, amb el valor a la declaració, el test falla.
+
 ### `frontend/test/api.test.js`
 
 `formatCurrency` amb valors buits i `escapeHtml`. El primer llançava un
 `TypeError` amb `undefined` que tombava graelles senceres; el segon és l'única
-barrera contra dades del CSV del banc i de la resposta de Gemini.
+barrera contra dades del CSV del banc i de la resposta de Gemini. També que
+`formatCurrency` segueixi l'idioma i la moneda: «1.234,57 €» en català,
+«€1,234.57» en anglès (abans sortia «1234.57 €» en tots).
+
+### `frontend/test/i18n.test.js`
+
+Els idiomes. Que els quatre fitxers (`public/lang/Language_xx.properties`)
+tinguin exactament les mateixes claus que el català, sense cap repetida; que
+cada traducció porti els mateixos `{valors}`; que cap traducció porti
+`< > " &` (van tal qual dins de l'HTML); que cada clau que demana el codi
+existeixi i que no en sobri cap; que un text amb valors no s'interpoli a
+l'HTML sense `escapeHtml`; i que a les vistes ja traduïdes (`TRANSLATED_FILES`)
+no quedi cap text escrit a mà, que sortiria en català en els quatre idiomes. El
+detector de textos escrits a mà té el seu propi test: si deixés de trobar-ne,
+l'altre passaria sempre. També el lector de `.properties`, els plurals, com es
+tria l'idioma (el desat, el del navegador, el català) i els formats de número,
+percentatge i data de cada idioma.
 
 ### `frontend/test/contract.test.js`
 
@@ -357,7 +387,8 @@ El servidor que entrega la pàgina: que enviï la Content-Security-Policy (nomé
 scripts propis, cap iframe d'una altra web, connexions només a la mateixa
 adreça i al backend del port 8000), `nosniff`, `X-Frame-Options` i
 `Referrer-Policy`; que no s'anunciï com a Express ni obri CORS a tothom; i que
-una capçalera `Host` estranya no pugui afegir regles a la política.
+una capçalera `Host` estranya no pugui afegir regles a la política. I que els
+fitxers d'idioma surtin com a text en UTF-8.
 
 ### `frontend/test/assets.test.js`
 
