@@ -168,7 +168,7 @@ public class DebtService {
     public Debt resolveForLink(Debt reference) {
         if (reference == null || reference.getId() == null || reference.getId() < 0) return null;
         return debtRepository.findById(reference.getId())
-                .orElseThrow(() -> new IllegalArgumentException("El deute triat ja no existeix."));
+                .orElseThrow(() -> new InvalidInputException("debts.gone"));
     }
 
     /**
@@ -182,22 +182,21 @@ public class DebtService {
     public Debt removeReceipt(Long id, LocalDate date, boolean discount) {
         Debt debt = find(id);
         if (!Debt.PLAN_INSTALLMENTS.equals(debt.getRepaymentPlan())) {
-            throw new IllegalArgumentException("Només es poden treure rebuts d'un deute a quotes.");
+            throw new InvalidInputException("debts.remove-only-installments");
         }
         if (date == null) {
-            throw new IllegalArgumentException("Falta quin rebut.");
+            throw new InvalidInputException("debts.receipt-missing");
         }
 
         Installment receipt = describe(debt, LocalDate.now(), transactionLines.all()).getSchedule().stream()
                 .filter(RepaymentSchedule::isActive)
                 .filter(candidate -> RepaymentSchedule.samePeriod(candidate.date(), date, debt.getFrequency()))
                 .findFirst()
-                .orElseThrow(() -> new IllegalArgumentException("Aquest rebut no és al calendari."));
+                .orElseThrow(() -> new InvalidInputException("debts.receipt-not-in-schedule"));
         // Un pagament que l'ha triat a ell no té on anar: el que toca podria
         // ser un altre mes que ja està pagat. Que el canviïn ells, sabent-ho.
         if (!receipt.removable()) {
-            throw new IllegalArgumentException("Hi ha pagaments que paguen precisament aquest rebut. "
-                    + "Des de Transaccions, canvia'ls de rebut abans de treure'l.");
+            throw new InvalidInputException("debts.receipt-has-payments");
         }
 
         DebtRemovedReceipt removal = new DebtRemovedReceipt();
@@ -216,7 +215,7 @@ public class DebtService {
                 .filter(removal -> removal.getDate().equals(date))
                 .toList();
         if (matching.isEmpty()) {
-            throw new IllegalArgumentException("Aquest rebut no està tret del calendari.");
+            throw new InvalidInputException("debts.receipt-not-removed");
         }
         removedReceiptRepository.deleteAll(matching);
         return describe(debt, LocalDate.now(), transactionLines.all());
@@ -342,7 +341,7 @@ public class DebtService {
 
     private Debt find(Long id) {
         return debtRepository.findById(id)
-                .orElseThrow(() -> new NotFoundException("el deute", id));
+                .orElseThrow(() -> new NotFoundException("not-found.debt", id));
     }
 
     /**
@@ -355,30 +354,29 @@ public class DebtService {
     private Category resolveCategory(Category reference) {
         if (reference == null || reference.getId() == null || reference.getId() < 0) return null;
         Category category = categoryRepository.findById(reference.getId())
-                .orElseThrow(() -> new IllegalArgumentException("La categoria triada ja no existeix."));
+                .orElseThrow(() -> new InvalidInputException("common.category-gone"));
         if (hierarchyService.isGroup(category.getId())) {
-            throw new IllegalArgumentException("La categoria \"" + category.getName()
-                    + "\" és un grup: tria'n una de concreta.");
+            throw new InvalidInputException("common.category-is-group", "name", category.getName());
         }
         return category;
     }
 
     private static void validateAndNormalize(Debt debt) {
         if (debt.getName() == null || debt.getName().isBlank()) {
-            throw new IllegalArgumentException("Posa-li un nom: a qui o per a què.");
+            throw new InvalidInputException("debts.name-missing");
         }
         debt.setName(debt.getName().trim());
         if (debt.getDirection() == null || !DIRECTIONS.contains(debt.getDirection())) {
-            throw new IllegalArgumentException("Digues si el deus tu o te'l deuen.");
+            throw new InvalidInputException("debts.direction-missing");
         }
         if (debt.getAmount() == null || debt.getAmount().signum() <= 0) {
-            throw new IllegalArgumentException("L'import ha de ser més gran que zero.");
+            throw new InvalidInputException("common.amount-positive");
         }
         if (debt.getDate() == null) {
-            throw new IllegalArgumentException("Falta la data del préstec.");
+            throw new InvalidInputException("debts.date-missing");
         }
         if (debt.getRepaymentPlan() == null || !PLANS.contains(debt.getRepaymentPlan())) {
-            throw new IllegalArgumentException("La forma de retorn ha de ser lliure, tot de cop o a quotes.");
+            throw new InvalidInputException("debts.plan-invalid");
         }
 
         switch (debt.getRepaymentPlan()) {
@@ -390,28 +388,29 @@ public class DebtService {
             case Debt.PLAN_SINGLE -> {
                 debt.setInstallment(null);
                 debt.setFrequency(null);
-                requireFirstPaymentAfterLoan(debt, "Falta el dia que es torna.");
+                requireFirstPaymentAfterLoan(debt, "debts.repayment-day-missing");
             }
             default -> {
                 if (debt.getInstallment() == null || debt.getInstallment().signum() <= 0) {
-                    throw new IllegalArgumentException("La quota ha de ser més gran que zero.");
+                    throw new InvalidInputException("debts.installment-positive");
                 }
                 if (debt.getFrequency() == null) debt.setFrequency(RepaymentSchedule.MONTHLY);
                 if (!RepaymentSchedule.FREQUENCIES.contains(debt.getFrequency())) {
-                    throw new IllegalArgumentException("La freqüència ha de ser setmanal, mensual o trimestral.");
+                    throw new InvalidInputException("debts.frequency-invalid");
                 }
-                requireFirstPaymentAfterLoan(debt, "Falta el dia de la primera quota.");
+                requireFirstPaymentAfterLoan(debt, "debts.first-installment-missing");
                 RepaymentSchedule.requireReasonableCount(debt.getAmount(), debt.getInstallment());
             }
         }
     }
 
-    private static void requireFirstPaymentAfterLoan(Debt debt, String missingMessage) {
+    /** @param missingKey el missatge si falta el dia: cada forma de retorn en diu un */
+    private static void requireFirstPaymentAfterLoan(Debt debt, String missingKey) {
         if (debt.getFirstPaymentDate() == null) {
-            throw new IllegalArgumentException(missingMessage);
+            throw new InvalidInputException(missingKey);
         }
         if (debt.getFirstPaymentDate().isBefore(debt.getDate())) {
-            throw new IllegalArgumentException("No es pot començar a tornar abans del préstec.");
+            throw new InvalidInputException("debts.repay-before-loan");
         }
     }
 }

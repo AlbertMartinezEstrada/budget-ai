@@ -52,7 +52,9 @@ El CI la fa a cada PR amb un PostgreSQL nou (job «Navegador»). Després de les
 vistes en clar i en fosc, tria cada idioma a Configuració i torna a recórrer
 totes les vistes: falla si el menú no diu el que diu el fitxer de l'idioma, si
 falta una traducció (surt com a error a la consola) o si un text no hi cap (la
-pàgina s'eixampla o el menú talla un nom).
+pàgina s'eixampla o el menú talla un nom). En tornar a pujar l'extracte, l'avís
+que ja hi era (el diu el backend) ha de ser en l'idioma de la pantalla: és la
+prova que la capçalera `Accept-Language` arriba.
 
 ## Què cobreixen, i per què aquests i no uns altres
 
@@ -253,6 +255,19 @@ Com que buida els literals, una segona regla mira a part els àlies de les
 consultes de `@Query` (`FROM Budget b`), que viuen dins de les cometes i hi
 passaven.
 
+### `MessagesTest`
+
+Els missatges del backend en els quatre idiomes
+(`src/main/resources/i18n/messages_xx.properties`), com `i18n.test.js` al
+frontend: les mateixes claus i els mateixos `{valors}` que el català, cap clau
+repetida, cada clau que fa servir el codi existeix i no en sobra cap. També la
+traducció: un missatge dins d'un altre va en el mateix idioma, el plural amb
+`count`, els imports amb el format de cada idioma i els identificadors sense
+punts de milers («10.000 pagaments» va sortir així en provar-ho), i que l'idioma
+sigui el de la petició, amb el català si no n'hi ha o no és un dels quatre.
+`ApiErrorsIntegrationTest` ho comprova per HTTP amb la capçalera
+`Accept-Language`.
+
 ### `SettingsServiceTest`
 
 L'idioma de la interfície es desa als ajustos (`ca`, `es`, `pt` o `en`; buit
@@ -269,7 +284,8 @@ comprovat que, amb el valor a la declaració, el test falla.
 `TypeError` amb `undefined` que tombava graelles senceres; el segon és l'única
 barrera contra dades del CSV del banc i de la resposta de Gemini. També que
 `formatCurrency` segueixi l'idioma i la moneda: «1.234,57 €» en català,
-«€1,234.57» en anglès (abans sortia «1234.57 €» en tots).
+«€1,234.57» en anglès (abans sortia «1234.57 €» en tots), i que cada petició
+porti l'idioma a la capçalera `Accept-Language` sense perdre les de qui crida.
 
 ### `frontend/test/i18n.test.js`
 
@@ -279,8 +295,9 @@ cada traducció porti els mateixos `{valors}`; que cap traducció porti
 `< > " &` (van tal qual dins de l'HTML); que cada clau que demana el codi
 existeixi i que no en sobri cap; que cada crida passi els `{valors}` que el
 seu text necessita (si no, sortiria «{name}» a la pantalla); que un text amb
-valors no s'interpoli a l'HTML sense `escapeHtml`; i que a les vistes ja traduïdes (`TRANSLATED_FILES`)
-no quedi cap text escrit a mà, que sortiria en català en els quatre idiomes. El
+valors no s'interpoli a l'HTML sense `escapeHtml`; i que a cap fitxer de
+`public/` no quedi cap text escrit a mà, que sortiria igual en els quatre
+idiomes. El
 detector de textos escrits a mà té el seu propi test: si deixés de trobar-ne,
 l'altre passaria sempre. També el lector de `.properties`, els plurals, com es
 tria l'idioma (el desat, el del navegador, el català) i els formats de número,

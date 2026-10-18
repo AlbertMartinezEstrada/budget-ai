@@ -15,6 +15,9 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 class ClientErrorsTest {
 
+    /** El principi del missatge genèric, en català: fora d'una petició, l'idioma de referència. */
+    private static final String INTERNAL = "Error intern. El detall és al log del backend.";
+
     @Test
     @DisplayName("Una validació pròpia arriba tal qual")
     void validationMessagesReachTheUser() {
@@ -31,10 +34,10 @@ class ClientErrorsTest {
                 new SQLException("ERROR: duplicate key value violates unique constraint \"transactions_pkey\""));
 
         assertThat(ClientErrors.messageFor(database, "prova"))
-                .startsWith(ClientErrors.GENERIC)
+                .startsWith(INTERNAL)
                 .doesNotContain("transactions_pkey");
         assertThat(ClientErrors.messageFor(new NullPointerException("Cannot invoke \"Account.getId()\""), "prova"))
-                .startsWith(ClientErrors.GENERIC)
+                .startsWith(INTERNAL)
                 .doesNotContain("Account.getId");
     }
 
@@ -53,6 +56,6 @@ class ClientErrorsTest {
     @DisplayName("Una validació sense missatge no deixa la pantalla en blanc")
     void validationWithoutMessageFallsBackToGeneric() {
         assertThat(ClientErrors.messageFor(new IllegalArgumentException(), "prova"))
-                .startsWith(ClientErrors.GENERIC);
+                .startsWith(INTERNAL);
     }
 }

@@ -4,6 +4,8 @@ import com.budgetai.backend.controller.TransferController;
 import com.budgetai.backend.model.Account;
 import com.budgetai.backend.model.Transfer;
 import com.budgetai.backend.repository.AccountRepository;
+import com.budgetai.backend.repository.RecurringTransactionRepository;
+import com.budgetai.backend.repository.TransactionRepository;
 import com.budgetai.backend.repository.TransferRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -26,12 +28,21 @@ class TransferIntegrationTest extends AbstractIntegrationTest {
     @Autowired private TransferController transferController;
     @Autowired private AccountRepository accountRepository;
     @Autowired private TransferRepository transferRepository;
+    @Autowired private TransactionRepository transactionRepository;
+    @Autowired private RecurringTransactionRepository recurringRepository;
 
     private Long sourceId;
     private Long destinationId;
 
     @BeforeEach
     void setUp() {
+        // Abans dels comptes, el que hi apunta. Els altres tests netegen en
+        // començar, no en acabar: si aquest anava just després del dels
+        // recurrents, els seus recurrents encara tenien compte i esborrar-los
+        // fallava per la clau forana. Depenia de l'ordre en què Gradle troba
+        // les classes.
+        transactionRepository.deleteAll();
+        recurringRepository.deleteAll();
         transferRepository.deleteAll();
         accountRepository.deleteAll();
 
@@ -114,7 +125,7 @@ class TransferIntegrationTest extends AbstractIntegrationTest {
                 transferController.createTransfer(transferRequest(sourceId, 999_999L, "25.50")))
                 .isInstanceOf(RuntimeException.class)
                 // El motiu arriba a la pantalla; abans sortia "Error 500".
-                .hasMessage("El compte de destí no existeix");
+                .hasMessage("El compte de destí no existeix.");
 
         assertThat(balanceOf(sourceId)).isEqualByComparingTo("100.00");
         assertThat(transferRepository.findAll()).isEmpty();

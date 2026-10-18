@@ -1,7 +1,9 @@
 package com.budgetai.backend.controller;
 
+import com.budgetai.backend.i18n.Messages;
 import com.budgetai.backend.model.RecurringTransaction;
 import com.budgetai.backend.service.FixedCostService;
+import com.budgetai.backend.service.InvalidInputException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -63,7 +65,7 @@ public class FixedCostController {
                                     @RequestParam(required = false) Integer month) {
         return respond(() -> {
             fixedCostService.remove(id, periodOf(year, month));
-            return Map.of("message", "Cost fix tret a partir d'aquest mes");
+            return Map.of("message", Messages.get("fixed-costs.removed"));
         });
     }
 
@@ -71,7 +73,7 @@ public class FixedCostController {
         LocalDate today = LocalDate.now();
         int monthValue = month != null ? month : today.getMonthValue();
         if (monthValue < 1 || monthValue > 12) {
-            throw new IllegalArgumentException("El mes ha de ser entre 1 i 12");
+            throw new InvalidInputException("months.number-range");
         }
         return YearMonth.of(year != null ? year : today.getYear(), monthValue);
     }
@@ -84,7 +86,7 @@ public class FixedCostController {
         try {
             return ResponseEntity.ok(action.run());
         } catch (IllegalArgumentException exception) {
-            return ResponseEntity.badRequest().body(Map.of("error", exception.getMessage()));
+            return ResponseEntity.badRequest().body(Map.of("error", Messages.forUser(exception)));
         }
     }
 }

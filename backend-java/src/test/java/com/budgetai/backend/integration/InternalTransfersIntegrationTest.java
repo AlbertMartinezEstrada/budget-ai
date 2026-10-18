@@ -405,7 +405,7 @@ class InternalTransfersIntegrationTest extends AbstractIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(List.of(line))))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.message", containsString("s'han ajuntat amb l'altra pota")));
+                .andExpect(jsonPath("$.message", containsString("1 traspàs s'ha ajuntat amb l'altra pota")));
 
         assertThat(transactionRepository.findAll()).hasSize(1);
         assertThat(balanceOf(principal)).isEqualByComparingTo("900.00");

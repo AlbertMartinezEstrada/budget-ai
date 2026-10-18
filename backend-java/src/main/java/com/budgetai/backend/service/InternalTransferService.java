@@ -89,10 +89,9 @@ public class InternalTransferService {
     public Account resolve(Account requested, Account own) {
         if (requested == null || requested.getId() == null || requested.getId() < 0) return null;
         Account counterpart = accountRepository.findById(requested.getId())
-                .orElseThrow(() -> new NotFoundException("el compte", requested.getId()));
+                .orElseThrow(() -> new NotFoundException("not-found.account", requested.getId()));
         if (own != null && counterpart.getId().equals(own.getId())) {
-            throw new IllegalArgumentException("Un traspàs ha d'anar a un altre compte: «"
-                    + counterpart.getName() + "» és el compte del mateix moviment.");
+            throw new InvalidInputException("transfers.same-account", "name", counterpart.getName());
         }
         return counterpart;
     }
@@ -312,25 +311,24 @@ public class InternalTransferService {
      */
     public void requireJoinable(Transaction outgoing, Transaction incoming) {
         if (!"EXPENSE".equals(outgoing.getType()) || !"INCOME".equals(incoming.getType())) {
-            throw new IllegalArgumentException("Un traspàs surt d'un compte i entra a un altre: "
-                    + "cal una despesa i un ingrés.");
+            throw new InvalidInputException("transfers.join-needs-both-types");
         }
         if (outgoing.getAccount() == null || incoming.getAccount() == null
                 || outgoing.getAccount().getId().equals(incoming.getAccount().getId())) {
-            throw new IllegalArgumentException("Els dos moviments han de ser de comptes diferents.");
+            throw new InvalidInputException("transfers.join-same-account");
         }
         if (outgoing.getAmount() == null || incoming.getAmount() == null
                 || outgoing.getAmount().compareTo(incoming.getAmount()) != 0) {
-            throw new IllegalArgumentException("Els dos moviments no són del mateix import.");
+            throw new InvalidInputException("transfers.join-different-amounts");
         }
         if (outgoing.isTransfer() || incoming.isTransfer()) {
-            throw new IllegalArgumentException("Un dels dos ja és un traspàs.");
+            throw new InvalidInputException("transfers.join-already-transfer");
         }
         if (outgoing.getDebt() != null || incoming.getDebt() != null) {
-            throw new IllegalArgumentException("Un dels dos està vinculat a un deute: desvincula'l abans.");
+            throw new InvalidInputException("transfers.join-has-debt");
         }
         if (!partRepository.findByTransactions(List.of(outgoing.getId(), incoming.getId())).isEmpty()) {
-            throw new IllegalArgumentException("Un dels dos està dividit en parts: treu la divisió abans.");
+            throw new InvalidInputException("transfers.join-split");
         }
     }
 

@@ -104,7 +104,8 @@ entidades y falla al arrancar si no es así.
 - **Un solo usuario.** No hay tabla de usuarios ni aislamiento de datos.
 - **No se pueden revocar sesiones** una por una; cambiar `JWT_SECRET` las
   invalida todas.
-- **Idiomas casi completos.** Se puede elegir catalán, castellano, portugués o
-  inglés en Configuración, y toda la interfaz sale en el idioma elegido salvo
-  Análisis y los mensajes de error del backend, que siguen en catalán y
-  castellano hasta la siguiente fase.
+- **Los datos no se traducen.** La interfaz y los mensajes del backend salen en
+  el idioma elegido (catalán, castellano, portugués o inglés), pero los nombres
+  que vienen de los datos se quedan como están: las categorías que crea
+  `init.sql` (en catalán), el nombre «Desconegut» de un movimiento sin empresa y
+  el perfil por defecto («Usuario»), que se cambia en Configuración.

@@ -1,5 +1,6 @@
 package com.budgetai.backend.controller;
 
+import com.budgetai.backend.i18n.Messages;
 import com.budgetai.backend.service.NotFoundException;
 import jakarta.servlet.http.HttpServletRequest;
 import org.apache.catalina.connector.ClientAbortException;
@@ -26,7 +27,7 @@ import java.util.Map;
 
 /**
  * Tots els errors arriben al navegador amb el mateix format i un missatge que
- * diu què ha passat:
+ * diu què ha passat, en l'idioma de la capçalera Accept-Language:
  *
  * <pre>{"status": "error", "message": "...", "path": "/gastos/12/parts"}</pre>
  *
@@ -50,7 +51,7 @@ public class ApiErrorHandler {
     /** El que s'ha demanat no existeix. El missatge ja diu què. */
     @ExceptionHandler(NotFoundException.class)
     public ResponseEntity<Map<String, Object>> notFound(NotFoundException exception, HttpServletRequest request) {
-        return error(HttpStatus.NOT_FOUND, exception.getMessage(), request);
+        return error(HttpStatus.NOT_FOUND, Messages.forUser(exception), request);
     }
 
     /** Validacions pròpies: el text està pensat per a l'usuari. */
@@ -75,17 +76,15 @@ public class ApiErrorHandler {
      */
     @ExceptionHandler(NoResourceFoundException.class)
     public ResponseEntity<Map<String, Object>> unknownRoute(NoResourceFoundException exception, HttpServletRequest request) {
-        return error(HttpStatus.NOT_FOUND, "El backend no té cap ruta " + request.getMethod() + " "
-                + request.getRequestURI() + ". Si acabes d'actualitzar l'aplicació, el backend en marxa és "
-                + "el d'abans: reconstrueix-lo amb «docker compose up -d --build backend».", request);
+        return error(HttpStatus.NOT_FOUND, Messages.get("errors.unknown-route",
+                "method", request.getMethod(), "path", request.getRequestURI()), request);
     }
 
     @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
     public ResponseEntity<Map<String, Object>> wrongMethod(HttpRequestMethodNotSupportedException exception,
                                                            HttpServletRequest request) {
-        return error(HttpStatus.METHOD_NOT_ALLOWED, "La ruta " + request.getRequestURI() + " no accepta "
-                + request.getMethod() + ". Si acabes d'actualitzar l'aplicació, reconstrueix el backend amb "
-                + "«docker compose up -d --build backend».", request);
+        return error(HttpStatus.METHOD_NOT_ALLOWED, Messages.get("errors.wrong-method",
+                "path", request.getRequestURI(), "method", request.getMethod()), request);
     }
 
     /**
@@ -95,39 +94,39 @@ public class ApiErrorHandler {
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ResponseEntity<Map<String, Object>> unreadable(HttpMessageNotReadableException exception,
                                                           HttpServletRequest request) {
-        return error(HttpStatus.BAD_REQUEST, "Les dades enviades no tenen el format que espera el backend: "
-                + "revisa que les dates i els imports estiguin ben escrits.", request);
+        return error(HttpStatus.BAD_REQUEST, Messages.get("errors.unreadable-body"), request);
     }
 
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
     public ResponseEntity<Map<String, Object>> wrongParameter(MethodArgumentTypeMismatchException exception,
                                                               HttpServletRequest request) {
-        return error(HttpStatus.BAD_REQUEST, "El valor «" + exception.getValue() + "» no és vàlid per a «"
-                + exception.getName() + "».", request);
+        return error(HttpStatus.BAD_REQUEST, Messages.get("errors.invalid-parameter",
+                "value", exception.getValue(), "name", exception.getName()), request);
     }
 
     @ExceptionHandler(MissingServletRequestParameterException.class)
     public ResponseEntity<Map<String, Object>> missingParameter(MissingServletRequestParameterException exception,
                                                                 HttpServletRequest request) {
-        return error(HttpStatus.BAD_REQUEST, "Falta el paràmetre «" + exception.getParameterName() + "».", request);
+        return error(HttpStatus.BAD_REQUEST, Messages.get("errors.missing-parameter", "name", exception.getParameterName()),
+                request);
     }
 
     @ExceptionHandler(HttpMediaTypeNotSupportedException.class)
     public ResponseEntity<Map<String, Object>> wrongMediaType(HttpMediaTypeNotSupportedException exception,
                                                               HttpServletRequest request) {
-        return error(HttpStatus.UNSUPPORTED_MEDIA_TYPE, "El backend espera JSON en aquesta ruta.", request);
+        return error(HttpStatus.UNSUPPORTED_MEDIA_TYPE, Messages.get("errors.json-expected"), request);
     }
 
     @ExceptionHandler(MaxUploadSizeExceededException.class)
     public ResponseEntity<Map<String, Object>> tooLarge(MaxUploadSizeExceededException exception,
                                                         HttpServletRequest request) {
-        return error(HttpStatus.PAYLOAD_TOO_LARGE, "El fitxer és massa gran: el màxim són 10 MB.", request);
+        return error(HttpStatus.PAYLOAD_TOO_LARGE, Messages.get("errors.file-too-large"), request);
     }
 
     /** Els llançats a mà amb un codi i un motiu, com el rang de dates del llistat. */
     @ExceptionHandler(ResponseStatusException.class)
     public ResponseEntity<Map<String, Object>> withStatus(ResponseStatusException exception, HttpServletRequest request) {
-        String reason = exception.getReason() != null ? exception.getReason() : "Petició no vàlida.";
+        String reason = exception.getReason() != null ? exception.getReason() : Messages.get("errors.invalid-request");
         return error(exception.getStatusCode(), reason, request);
     }
 
@@ -141,8 +140,7 @@ public class ApiErrorHandler {
     public ResponseEntity<Map<String, Object>> integrity(DataIntegrityViolationException exception,
                                                          HttpServletRequest request) {
         String internal = ClientErrors.messageFor(exception, request.getRequestURI());
-        return error(HttpStatus.CONFLICT, "La base de dades no ho permet: hi ha dades que en depenen o que ja "
-                + "existeixen. " + internal, request);
+        return error(HttpStatus.CONFLICT, Messages.get("errors.integrity", "detail", internal), request);
     }
 
     /** Qualsevol altra cosa és nostra: el detall va al log, amb una referència per trobar-lo. */

@@ -1,8 +1,10 @@
 package com.budgetai.backend.controller;
 
+import com.budgetai.backend.i18n.Messages;
 import com.budgetai.backend.model.Transfer;
 import com.budgetai.backend.repository.TransferRepository;
 import com.budgetai.backend.service.AccountService;
+import com.budgetai.backend.service.InvalidInputException;
 import com.budgetai.backend.service.NotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -37,7 +39,7 @@ public class TransferController {
     public ResponseEntity<Transfer> getTransferById(@PathVariable Long id) {
         return transferRepository.findById(id)
                 .map(ResponseEntity::ok)
-                .orElseThrow(() -> new NotFoundException("la transferència", id));
+                .orElseThrow(() -> new NotFoundException("not-found.transfer", id));
     }
 
     // @Transactional: els dos moviments de saldo i el desat de la
@@ -51,15 +53,15 @@ public class TransferController {
             if (transfer.getSourceAccount() == null || transfer.getDestinationAccount() == null
                     || transfer.getSourceAccount().getId() == null
                     || transfer.getDestinationAccount().getId() == null) {
-                return ResponseEntity.badRequest().body(Map.of("error", "Source and destination accounts are required"));
+                return ResponseEntity.badRequest().body(Map.of("error", Messages.get("transfers.accounts-required")));
             }
 
             if (transfer.getSourceAccount().getId().equals(transfer.getDestinationAccount().getId())) {
-                return ResponseEntity.badRequest().body(Map.of("error", "Source and destination accounts must be different"));
+                return ResponseEntity.badRequest().body(Map.of("error", Messages.get("transfers.accounts-different")));
             }
 
             if (transfer.getAmount() == null || transfer.getAmount().signum() <= 0) {
-                return ResponseEntity.badRequest().body(Map.of("error", "Amount must be positive"));
+                return ResponseEntity.badRequest().body(Map.of("error", Messages.get("common.amount-positive")));
             }
 
             if (transfer.getDate() == null) {
@@ -68,18 +70,18 @@ public class TransferController {
 
             // Verificar que la cuenta origen tenga saldo suficiente
             var sourceAccount = accountService.getAccountById(transfer.getSourceAccount().getId())
-                    .orElseThrow(() -> new IllegalArgumentException("El compte d'origen no existeix"));
+                    .orElseThrow(() -> new InvalidInputException("transfers.source-missing"));
 
             BigDecimal sourceBalance = sourceAccount.getCurrentBalance() != null
                     ? sourceAccount.getCurrentBalance()
                     : BigDecimal.ZERO;
 
             if (sourceBalance.compareTo(transfer.getAmount()) < 0) {
-                return ResponseEntity.badRequest().body(Map.of("error", "Insufficient balance in source account"));
+                return ResponseEntity.badRequest().body(Map.of("error", Messages.get("transfers.insufficient-balance")));
             }
 
             var destinationAccount = accountService.getAccountById(transfer.getDestinationAccount().getId())
-                    .orElseThrow(() -> new IllegalArgumentException("El compte de destí no existeix"));
+                    .orElseThrow(() -> new InvalidInputException("transfers.destination-missing"));
 
             // Es lliguen els comptes reals: el cos de la petició només porta
             // l'id, i sense això la resposta tornava els comptes amb el nom a
@@ -110,7 +112,7 @@ public class TransferController {
     public ResponseEntity<?> deleteTransfer(@PathVariable Long id) {
         // Abans de tocar cap saldo: no hi ha res a desfer.
         Transfer transfer = transferRepository.findById(id)
-                .orElseThrow(() -> new NotFoundException("la transferència", id));
+                .orElseThrow(() -> new NotFoundException("not-found.transfer", id));
 
         if (transfer.getAmount() != null
                 && transfer.getSourceAccount() != null
@@ -121,7 +123,7 @@ public class TransferController {
         }
 
         transferRepository.delete(transfer);
-        return ResponseEntity.ok(Map.of("message", "Transfer deleted successfully"));
+        return ResponseEntity.ok(Map.of("message", Messages.get("transfers.deleted")));
     }
 
     @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)

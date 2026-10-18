@@ -1,5 +1,6 @@
 package com.budgetai.backend.controller;
 
+import com.budgetai.backend.i18n.Messages;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -11,7 +12,8 @@ import java.util.UUID;
  * Les validacions pròpies es llancen com a IllegalArgumentException o
  * IllegalStateException amb un text pensat per a l'usuari ("Data il·legible al
  * CSV", "Un cost fix ha d'anar a una subcategoria fixa"), i aquest sí que ha
- * d'arribar: sense ell, la pantalla només diu "Error 500".
+ * d'arribar, en l'idioma de la petició: sense ell, la pantalla només diu
+ * "Error 500".
  *
  * Qualsevol altra excepció porta el text intern de Java, Hibernate o el driver
  * de PostgreSQL: noms de taules, consultes, classes. Això es queda al log del
@@ -21,8 +23,6 @@ import java.util.UUID;
 final class ClientErrors {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(ClientErrors.class);
-
-    static final String GENERIC = "Error intern. El detall és al log del backend.";
 
     private ClientErrors() {
     }
@@ -42,11 +42,11 @@ final class ClientErrors {
     static String messageFor(Exception exception, String context) {
         if (isForTheUser(exception) && exception.getMessage() != null) {
             LOGGER.warn("{}: {}{}", context, exception.getMessage(), causeOf(exception));
-            return exception.getMessage();
+            return Messages.forUser(exception);
         }
         String reference = UUID.randomUUID().toString().substring(0, 8);
         LOGGER.error("{}: error inesperat [ref {}]", context, reference, exception);
-        return GENERIC + " Referència " + reference + ": busca-la amb «docker compose logs backend».";
+        return Messages.get("errors.internal", "reference", reference);
     }
 
     /** " (causa: CSVException: Invalid character…)", o res si no en té. */

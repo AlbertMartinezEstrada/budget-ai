@@ -73,12 +73,11 @@ public class BudgetReviewService {
         // Un mes que encara no ha arribat no té res a comparar.
         if (to.isAfter(current)) to = current;
         if (from.isAfter(to)) {
-            throw new IllegalArgumentException("El primer mes (" + from + ") és posterior a l'últim (" + to + ").");
+            throw new InvalidInputException("months.reversed", "from", from, "to", to);
         }
         long months = from.until(to, ChronoUnit.MONTHS) + 1;
         if (months > MAX_MONTHS) {
-            throw new IllegalArgumentException("Com a molt es poden comparar " + MAX_MONTHS
-                    + " mesos, i se n'han demanat " + months + ".");
+            throw new InvalidInputException("months.too-many-to-compare", "max", MAX_MONTHS, "requested", months);
         }
 
         List<Map<String, Object>> monthViews = new ArrayList<>();

@@ -1,5 +1,7 @@
 package com.budgetai.backend.service;
 
+import com.budgetai.backend.i18n.Message;
+import com.budgetai.backend.i18n.Messages;
 import com.budgetai.backend.model.Transaction;
 import org.apache.commons.csv.CSVException;
 import org.apache.commons.csv.CSVFormat;
@@ -28,7 +30,7 @@ import java.util.regex.Pattern;
  * Converteix un extracte bancari en moviments.
  *
  * **Tot el que surti d'aquí cap a l'usuari ha de ser una
- * IllegalArgumentException amb un text que s'entengui**: quin problema té el
+ * InvalidInputException amb un text que s'entengui**: quin problema té el
  * fitxer, a quina línia i què s'esperava. Qualsevol altra excepció acaba com
  * un "Error intern" a la pantalla i una traça de commons-csv al log, que és
  * el que passava amb l'extracte de Trade Republic: el lector no el reconeixia,
@@ -37,9 +39,6 @@ import java.util.regex.Pattern;
  */
 @Service
 public class BankReaderService {
-
-    /** Els formats que se saben llegir, per dir-ho quan el fitxer no n'és cap. */
-    static final String KNOWN_FORMATS = "el clàssic (Fecha;Concepto;Importe), Revolut i Trade Republic";
 
     /**
      * La línia de l'error de commons-csv. La "position" que hi surt no es diu:
@@ -75,19 +74,19 @@ public class BankReaderService {
 
         String header = content.lines().findFirst().orElse("");
         if (header.isBlank()) {
-            throw new IllegalArgumentException("El fitxer és buit, o la primera línia no és la capçalera de les columnes.");
+            throw new InvalidInputException("upload.empty-file");
         }
 
         if (isTradeRepublic(header)) {
-            return readRows(content, ',', "Trade Republic", this::readTradeRepublicRow,
+            return readRows(content, ',', Message.of("upload.format-trade-republic"), this::readTradeRepublicRow,
                     new String[] {"date", "datetime"}, new String[] {"amount"});
         }
         if (isRevolut(header)) {
-            return readRows(content, ',', "Revolut", this::readRevolutRow,
+            return readRows(content, ',', Message.of("upload.format-revolut"), this::readRevolutRow,
                     new String[] {"Data de Conclusão", "Data de Conclusao", "Completed Date"},
                     new String[] {"Montante", "Amount"});
         }
-        return readRows(content, delimiterOf(header), "clàssic", this::readClassicRow,
+        return readRows(content, delimiterOf(header), Message.of("upload.format-classic"), this::readClassicRow,
                 new String[] {"Fecha"}, new String[] {"Concepto"}, new String[] {"Importe"});
     }
 
@@ -149,16 +148,15 @@ public class BankReaderService {
      * Llegeix totes les files d'un format i en tradueix els errors.
      *
      * Un error de commons-csv (unes cometes mal tancades, un separador que no
-     * és el que s'esperava) es converteix en un missatge en català amb la
-     * línia, i un error d'una fila concreta (una data o un import il·legibles)
+     * és el que s'esperava) es converteix en un missatge amb la línia, i un error d'una fila concreta (una data o un import il·legibles)
      * diu de quina línia és. La causa original es conserva: és la que surt al
      * log.
      *
-     * @param formatName per al missatge: "Trade Republic", "clàssic"...
+     * @param formatName per al missatge: «Trade Republic», «clàssic»...
      * @param required   per a cada columna imprescindible, els noms que pot
      *                   tenir; n'ha d'haver-hi almenys un de cada grup
      */
-    private List<Transaction> readRows(String content, char delimiter, String formatName, RowReader rowReader,
+    private List<Transaction> readRows(String content, char delimiter, Message formatName, RowReader rowReader,
                                        String[]... required) throws IOException {
         try (CSVParser csvParser = parse(content, delimiter)) {
             requireColumns(csvParser, formatName, required);
@@ -169,8 +167,9 @@ public class BankReaderService {
                     Transaction transaction = rowReader.read(csvRecord);
                     if (transaction != null) transactions.add(transaction);
                 } catch (IllegalArgumentException exception) {
-                    throw new IllegalArgumentException("Línia " + csvParser.getCurrentLineNumber() + " de l'extracte ("
-                            + formatName + "): " + exception.getMessage(), exception);
+                    // El motiu és una frase sencera, i va en l'idioma de la resta.
+                    throw new InvalidInputException(Message.of("upload.line-error", "line", csvParser.getCurrentLineNumber(),
+                            "format", formatName, "reason", Messages.reasonOf(exception)), exception);
                 }
             }
             return transactions;
@@ -183,7 +182,7 @@ public class BankReaderService {
         }
     }
 
-    private static void requireColumns(CSVParser csvParser, String formatName, String[]... required) {
+    private static void requireColumns(CSVParser csvParser, Message formatName, String[]... required) {
         List<String> present = csvParser.getHeaderNames();
         for (String[] alternatives : required) {
             boolean found = false;
@@ -191,38 +190,38 @@ public class BankReaderService {
                 found |= present.stream().anyMatch(column -> column.equalsIgnoreCase(name));
             }
             if (!found) {
-                throw new IllegalArgumentException("No reconec aquest extracte: per llegir-lo com a " + formatName
-                        + " li falta la columna «" + String.join("» o «", alternatives) + "». "
-                        + "Sé llegir " + KNOWN_FORMATS + ". Les columnes del fitxer són: "
-                        + abbreviate(String.join(", ", present), 200) + ".");
+                throw new InvalidInputException("upload.unrecognised", "format", formatName,
+                        "columns", "«" + String.join("» / «", alternatives) + "»",
+                        "present", abbreviate(String.join(", ", present), 200));
             }
         }
     }
 
     /** Un error de lectura del CSV, explicat. */
-    private static IllegalArgumentException unreadable(CSVException exception, char delimiter) {
+    private static InvalidInputException unreadable(CSVException exception, char delimiter) {
         String detail = exception.getMessage() != null ? exception.getMessage() : "";
         Matcher line = CSV_LINE.matcher(detail);
-        String where = line.find() ? "a la línia " + line.group(1) : "";
 
-        String what;
+        Message reason;
         if (detail.contains("Invalid character between encapsulated token and delimiter")) {
-            what = "després d'un camp entre cometes hi ha un caràcter que no és el separador «"
-                    + describe(delimiter) + "». Sol voler dir que el fitxer separa les columnes amb un altre caràcter";
+            reason = Message.of("upload.csv-wrong-delimiter", "delimiter", describe(delimiter));
         } else if (detail.contains("EOF reached before encapsulated token finished")) {
-            what = "unes cometes s'obren i no es tanquen fins al final del fitxer";
+            reason = Message.of("upload.csv-unclosed-quote");
         } else {
-            what = "el fitxer no té un format CSV vàlid";
+            reason = Message.of("upload.csv-invalid");
         }
-        return new IllegalArgumentException("No es pot llegir l'extracte" + (where.isEmpty() ? "" : " " + where)
-                + ": " + what + ". Sé llegir " + KNOWN_FORMATS + ".", exception);
+        Message message = line.find()
+                ? Message.of("upload.unreadable-at-line", "line", line.group(1), "reason", reason)
+                : Message.of("upload.unreadable", "reason", reason);
+        return new InvalidInputException(message, exception);
     }
 
-    private static String describe(char delimiter) {
+    /** El nom del separador, o el caràcter si no en té. */
+    private static Object describe(char delimiter) {
         return switch (delimiter) {
-            case ';' -> "punt i coma";
-            case ',' -> "coma";
-            case '\t' -> "tabulador";
+            case ';' -> Message.of("upload.delimiter-semicolon");
+            case ',' -> Message.of("upload.delimiter-comma");
+            case '\t' -> Message.of("upload.delimiter-tab");
             default -> String.valueOf(delimiter);
         };
     }
@@ -238,7 +237,8 @@ public class BankReaderService {
         BigDecimal amount = cleanNumber(csvRecord.get("Importe"));
         BigDecimal balance = (rawBalance != null) ? cleanNumber(rawBalance) : null;
 
-        return build(parseDate(csvRecord.get("Fecha"), DateTimeFormatter.ofPattern("dd/MM/yyyy"), "DD/MM/AAAA"),
+        return build(parseDate(csvRecord.get("Fecha"), DateTimeFormatter.ofPattern("dd/MM/yyyy"),
+                        Message.of("upload.pattern-day-month-year")),
                 csvRecord.get("Concepto"), amount, balance);
     }
 
@@ -268,10 +268,10 @@ public class BankReaderService {
 
         String rawDate = column(csvRecord, "date");
         if (rawDate == null || rawDate.isBlank()) rawDate = column(csvRecord, "datetime");
-        if (rawDate == null || rawDate.isBlank()) throw new IllegalArgumentException("falta la data.");
+        if (rawDate == null || rawDate.isBlank()) throw new InvalidInputException("upload.date-missing");
         // "2026-10-01" o "2026-10-01T03:24:22.922096Z": el dia és el principi.
         LocalDate date = parseDate(rawDate.length() > 10 ? rawDate.substring(0, 10) : rawDate,
-                DateTimeFormatter.ISO_LOCAL_DATE, "AAAA-MM-DD");
+                DateTimeFormatter.ISO_LOCAL_DATE, Message.of("upload.pattern-year-month-day"));
 
         String concept = firstNonBlank(column(csvRecord, "description"),
                 column(csvRecord, "counterparty_name"), column(csvRecord, "name"), column(csvRecord, "type"));
@@ -295,7 +295,7 @@ public class BankReaderService {
         try {
             return new BigDecimal(raw.trim()).setScale(2, RoundingMode.HALF_UP);
         } catch (NumberFormatException exception) {
-            throw new IllegalArgumentException("Import il·legible a la columna «" + columnName + "»: \"" + raw + "\"",
+            throw new InvalidInputException(Message.of("upload.amount-unreadable-column", "column", columnName, "value", raw),
                     exception);
         }
     }
@@ -307,11 +307,12 @@ public class BankReaderService {
         return "";
     }
 
-    private LocalDate parseDate(String value, DateTimeFormatter formatter, String expected) {
+    /** @param expected el format, per al missatge: «DD/MM/AAAA» */
+    private LocalDate parseDate(String value, DateTimeFormatter formatter, Message expected) {
         try {
             return LocalDate.parse(value.trim(), formatter);
         } catch (DateTimeParseException exception) {
-            throw new IllegalArgumentException("Data il·legible al CSV: \"" + value + "\" (s'esperava " + expected + ")",
+            throw new InvalidInputException(Message.of("upload.date-unreadable-expected", "value", value, "expected", expected),
                     exception);
         }
     }
@@ -379,7 +380,7 @@ public class BankReaderService {
         try {
             return LocalDate.parse(space > 0 ? trimmed.substring(0, space) : trimmed);
         } catch (Exception exception) {
-            throw new IllegalArgumentException("Data il·legible al CSV: \"" + value + "\"", exception);
+            throw new InvalidInputException(Message.of("upload.date-unreadable", "value", value), exception);
         }
     }
 
@@ -448,7 +449,7 @@ public class BankReaderService {
         } catch (NumberFormatException exception) {
             // Abans es retornava 0.0 en silenci i el moviment es desava amb
             // import zero. Millor avortar la importació que corrompre les dades.
-            throw new IllegalArgumentException("Import il·legible al CSV: \"" + rawAmount + "\"", exception);
+            throw new InvalidInputException(Message.of("upload.amount-unreadable", "value", rawAmount), exception);
         }
     }
 

@@ -1,5 +1,6 @@
 package com.budgetai.backend.controller;
 
+import com.budgetai.backend.i18n.Messages;
 import com.budgetai.backend.model.RecurringTransaction;
 import com.budgetai.backend.service.RecurringTransactionService;
 import com.budgetai.backend.service.NotFoundException;
@@ -30,7 +31,7 @@ public class RecurringTransactionController {
     public ResponseEntity<RecurringTransaction> getRecurringTransactionById(@PathVariable Long id) {
         return recurringTransactionService.getRecurringTransactionById(id)
                 .map(ResponseEntity::ok)
-                .orElseThrow(() -> new NotFoundException("el moviment recurrent", id));
+                .orElseThrow(() -> new NotFoundException("not-found.recurring", id));
     }
 
     @PostMapping
@@ -49,14 +50,14 @@ public class RecurringTransactionController {
     @DeleteMapping("/{id}")
     public ResponseEntity<?> deleteRecurringTransaction(@PathVariable Long id) {
         recurringTransactionService.deleteRecurringTransaction(id);
-        return ResponseEntity.ok(Map.of("message", "Recurring transaction deleted successfully"));
+        return ResponseEntity.ok(Map.of("message", Messages.get("recurring.deleted")));
     }
 
     @PostMapping("/process")
     public ResponseEntity<?> processDueRecurringTransactions() {
         try {
             recurringTransactionService.processDueRecurringTransactions();
-            return ResponseEntity.ok(Map.of("message", "Recurring transactions processed successfully"));
+            return ResponseEntity.ok(Map.of("message", Messages.get("recurring.processed")));
         } catch (Exception exception) {
             return ResponseEntity.internalServerError().body(Map.of("error",
                     ClientErrors.messageFor(exception, "Processar recurrents")));

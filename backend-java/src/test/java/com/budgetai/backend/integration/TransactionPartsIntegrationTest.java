@@ -190,7 +190,7 @@ class TransactionPartsIntegrationTest extends AbstractIntegrationTest {
                 part("300.00", savingsId, false, null),
                 part("150.00", insuranceId, false, null))))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("en falten 50.00 €");
+                .hasMessageContaining("en falten 50,00 €");
 
         assertThat(partRepository.findAll()).isEmpty();
         assertThat(spentIn("Trade Republic")).isEqualByComparingTo("500.00");
@@ -278,7 +278,7 @@ class TransactionPartsIntegrationTest extends AbstractIntegrationTest {
 
         assertThatThrownBy(() -> categoryService.delete(insuranceId))
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("moviments associats");
+                .hasMessageContaining("1 moviment associat");
     }
 
     // ============ EN IMPORTAR UN EXTRACTE ============
@@ -330,7 +330,7 @@ class TransactionPartsIntegrationTest extends AbstractIntegrationTest {
         assertThatThrownBy(() -> transactionController.confirmUpload(List.of(groceries, transfer)))
                 .hasMessageContaining("No s'ha importat res")
                 .hasMessageContaining("TRANSFERENCIA TRADE REPUBLIC")
-                .hasMessageContaining("en falten 50.00 €");
+                .hasMessageContaining("en falten 50,00 €");
 
         // Ni la fila bona: la importació és tota o res.
         assertThat(transactionRepository.findAll()).isEmpty();

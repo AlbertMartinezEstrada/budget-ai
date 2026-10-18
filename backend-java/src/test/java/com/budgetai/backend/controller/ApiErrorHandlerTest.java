@@ -32,7 +32,7 @@ class ApiErrorHandlerTest {
     @DisplayName("Tots els errors porten status, message i path")
     void everyErrorHasTheSameShape() {
         ResponseEntity<Map<String, Object>> response = handler.notFound(
-                new NotFoundException("el moviment", 12), request("PUT", "/gastos/12/parts"));
+                new NotFoundException("not-found.transaction", 12), request("PUT", "/gastos/12/parts"));
 
         assertThat(response.getStatusCode().value()).isEqualTo(404);
         assertThat(response.getBody()).containsKeys("status", "message", "path");

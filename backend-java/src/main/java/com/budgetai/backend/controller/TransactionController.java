@@ -1,5 +1,7 @@
 package com.budgetai.backend.controller;
 
+import com.budgetai.backend.i18n.Message;
+import com.budgetai.backend.i18n.Messages;
 import com.budgetai.backend.model.Account;
 import com.budgetai.backend.model.Category;
 import com.budgetai.backend.model.Company;
@@ -19,6 +21,7 @@ import com.budgetai.backend.service.ImportRuleService;
 import com.budgetai.backend.service.InternalTransferService;
 import com.budgetai.backend.service.TransactionHasher;
 import com.budgetai.backend.service.TransactionPartService;
+import com.budgetai.backend.service.InvalidInputException;
 import com.budgetai.backend.service.NotFoundException;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -32,7 +35,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
-import org.springframework.web.server.ResponseStatusException;
 
 import org.springframework.transaction.annotation.Transactional;
 
@@ -119,7 +121,7 @@ public class TransactionController {
             List<Transaction> initialTransactions = bankReaderService.readBankCsv(file);
 
             if (initialTransactions.isEmpty()) {
-                return ResponseEntity.badRequest().body("No s'han trobat moviments al CSV");
+                return ResponseEntity.badRequest().body(Map.of("error", Messages.get("upload.no-transactions")));
             }
 
             // 2. Es descarta el que ja s'ha importat en aquest mateix compte.
@@ -141,7 +143,7 @@ public class TransactionController {
             if (newTransactions.isEmpty()) {
                 return ResponseEntity.ok(Map.of(
                         "status", "info",
-                        "message", "Tots els moviments d'aquest fitxer ja existeixen a la BBDD",
+                        "message", Messages.get("upload.all-exist"),
                         "data", new ArrayList<>()
                 ));
             }
@@ -163,7 +165,7 @@ public class TransactionController {
 
             return ResponseEntity.ok(Map.of(
                     "status", "review",
-                    "message", "Revisa els nous moviments trobats (" + classifiedTransactions.size() + ")",
+                    "message", Messages.get("upload.review", "found", classifiedTransactions.size()),
                     "data", classifiedTransactions
             ));
 
@@ -178,7 +180,7 @@ public class TransactionController {
             String context = "Pujar extracte «" + file.getOriginalFilename() + "» ("
                     + (file.getSize() / 1024) + " KB, compte " + (accountId != null ? accountId : "per defecte") + ")";
             return ResponseEntity.status(status).body(Map.of("error",
-                    "Error processant el fitxer: " + ClientErrors.messageFor(exception, context)));
+                    Messages.get("upload.processing-failed", "reason", ClientErrors.messageFor(exception, context))));
         }
     }
 
@@ -222,9 +224,8 @@ public class TransactionController {
         // node que després tornaria a sumar-lo pels fills i es
         // comptaria dues vegades.
         if (categoryHierarchyService.isGroup(category.getId())) {
-            throw new ConfirmUploadException(
-                    "La categoria \"" + category.getName() + "\" és un grup: "
-                            + "tria'n una de concreta.", null, HttpStatus.BAD_REQUEST);
+            throw new ConfirmUploadException(Messages.get("common.category-is-group", "name", category.getName()),
+                    null, HttpStatus.BAD_REQUEST);
         }
         transaction.setCategory(category);
 
@@ -301,12 +302,12 @@ public class TransactionController {
         if (transaction.getAmount() == null || transaction.getAmount().signum() <= 0) {
             return ResponseEntity.badRequest().body(Map.of(
                     "status", "error",
-                    "message", "L'import ha de ser més gran que zero."));
+                    "message", Messages.get("common.amount-positive")));
         }
         if (transaction.getDate() == null) {
             return ResponseEntity.badRequest().body(Map.of(
                     "status", "error",
-                    "message", "Falta la data del moviment."));
+                    "message", Messages.get("transactions.date-missing")));
         }
 
         // L'import es desa sempre en positiu i el signe viu al tipus, igual que
@@ -339,7 +340,7 @@ public class TransactionController {
         } catch (IllegalArgumentException exception) {
             return ResponseEntity.badRequest().body(Map.of(
                     "status", "error",
-                    "message", exception.getMessage()));
+                    "message", Messages.forUser(exception)));
         }
 
         linkAndApplyToBalance(transaction, defaultAccount);
@@ -349,7 +350,7 @@ public class TransactionController {
 
         return ResponseEntity.ok(Map.of(
                 "status", "success",
-                "message", "Moviment afegit correctament" + joinedNote(joined),
+                "message", Messages.get("transactions.added") + joinedNote(joined),
                 "id", saved.getId()));
     }
 
@@ -378,12 +379,12 @@ public class TransactionController {
                                                @RequestBody Transaction changes) {
         // Abans de tocar cap saldo: no hi ha res a desfer.
         Transaction existing = transactionRepository.findById(id)
-                .orElseThrow(() -> new NotFoundException("el moviment", id));
+                .orElseThrow(() -> new NotFoundException("not-found.transaction", id));
 
         if (changes.getAmount() != null && changes.getAmount().signum() <= 0) {
             return ResponseEntity.badRequest().body(Map.of(
                     "status", "error",
-                    "message", "L'import ha de ser més gran que zero."));
+                    "message", Messages.get("common.amount-positive")));
         }
 
         // Les parts tenen el seu camí, que comprova que sumin el total. Si
@@ -391,7 +392,7 @@ public class TransactionController {
         if (changes.getParts() != null) {
             return ResponseEntity.badRequest().body(Map.of(
                     "status", "error",
-                    "message", "Les parts d'un moviment es canvien amb el botó de dividir, no editant-lo."));
+                    "message", Messages.get("transactions.parts-use-split")));
         }
 
         // Un moviment dividit no pot canviar d'import sense que les parts
@@ -401,13 +402,12 @@ public class TransactionController {
             if (changes.getAmount() != null && changes.getAmount().compareTo(existing.getAmount()) != 0) {
                 return ResponseEntity.badRequest().body(Map.of(
                         "status", "error",
-                        "message", "Aquest moviment està dividit en parts. Canvia-les perquè sumin el nou "
-                                + "import, o treu la divisió abans de canviar-lo."));
+                        "message", Messages.get("transactions.split-amount-change")));
             }
             if (changes.getDebt() != null && changes.getDebt().getId() != null && changes.getDebt().getId() > 0) {
                 return ResponseEntity.badRequest().body(Map.of(
                         "status", "error",
-                        "message", "Aquest moviment està dividit en parts: vincula el deute a la part que toca."));
+                        "message", Messages.get("transactions.split-debt")));
             }
         }
 
@@ -421,7 +421,7 @@ public class TransactionController {
             } catch (IllegalArgumentException exception) {
                 return ResponseEntity.badRequest().body(Map.of(
                         "status", "error",
-                        "message", exception.getMessage()));
+                        "message", Messages.forUser(exception)));
             }
         }
 
@@ -438,7 +438,7 @@ public class TransactionController {
         } catch (IllegalArgumentException exception) {
             return ResponseEntity.badRequest().body(Map.of(
                     "status", "error",
-                    "message", exception.getMessage()));
+                    "message", Messages.forUser(exception)));
         }
         boolean wasTransfer = existing.isTransfer();
         Long counterpartBefore = existing.getCounterpartAccountId();
@@ -488,7 +488,7 @@ public class TransactionController {
 
         return ResponseEntity.ok(Map.of(
                 "status", "success",
-                "message", "Moviment actualitzat" + joinedNote(joined)));
+                "message", Messages.get("transactions.updated") + joinedNote(joined)));
     }
 
     /**
@@ -515,8 +515,8 @@ public class TransactionController {
 
     private static String joinedNote(Transaction joined) {
         if (joined == null) return "";
-        return ". Era el mateix diner que el moviment de " + joined.getAccount().getName() + " del "
-                + joined.getDate() + ": s'han ajuntat en un sol traspàs";
+        return " " + Messages.get("transactions.joined-note",
+                "date", joined.getDate(), "account", joined.getAccount().getName());
     }
 
     /**
@@ -576,18 +576,18 @@ public class TransactionController {
         if (request.outgoingId() == null || request.incomingId() == null) {
             return ResponseEntity.badRequest().body(Map.of(
                     "status", "error",
-                    "message", "Falten els dos moviments del traspàs."));
+                    "message", Messages.get("transactions.join-needs-both")));
         }
         Transaction outgoing = transactionRepository.findById(request.outgoingId())
-                .orElseThrow(() -> new NotFoundException("el moviment", request.outgoingId()));
+                .orElseThrow(() -> new NotFoundException("not-found.transaction", request.outgoingId()));
         Transaction incoming = transactionRepository.findById(request.incomingId())
-                .orElseThrow(() -> new NotFoundException("el moviment", request.incomingId()));
+                .orElseThrow(() -> new NotFoundException("not-found.transaction", request.incomingId()));
         try {
             internalTransfers.requireJoinable(outgoing, incoming);
         } catch (IllegalArgumentException exception) {
             return ResponseEntity.badRequest().body(Map.of(
                     "status", "error",
-                    "message", exception.getMessage()));
+                    "message", Messages.forUser(exception)));
         }
 
         revertFromBalance(incoming);
@@ -599,8 +599,8 @@ public class TransactionController {
 
         return ResponseEntity.ok(Map.of(
                 "status", "success",
-                "message", "Traspàs de " + outgoing.getAccount().getName() + " a " + incoming.getAccount().getName()
-                        + ": ja no compta com a despesa ni com a ingrés. Els saldos no canvien.",
+                "message", Messages.get("transactions.transfer-joined",
+                        "from", outgoing.getAccount().getName(), "to", incoming.getAccount().getName()),
                 "id", outgoing.getId()));
     }
 
@@ -618,14 +618,14 @@ public class TransactionController {
     @Transactional
     public ResponseEntity<?> deleteTransaction(@PathVariable Long id) {
         Transaction transaction = transactionRepository.findById(id)
-                .orElseThrow(() -> new NotFoundException("el moviment", id));
+                .orElseThrow(() -> new NotFoundException("not-found.transaction", id));
 
         revertFromBalance(transaction);
         transactionRepository.delete(transaction);
 
         return ResponseEntity.ok(Map.of(
                 "status", "success",
-                "message", "Moviment esborrat"));
+                "message", Messages.get("transactions.deleted")));
     }
 
     // @Transactional: desar els moviments i ajustar els saldos ha de ser una
@@ -684,7 +684,7 @@ public class TransactionController {
             if (toPersist.isEmpty()) {
                 return ResponseEntity.ok(Map.of(
                         "status", "info",
-                        "message", "Tots els moviments ja existien a la BBDD",
+                        "message", Messages.get("upload.all-existed"),
                         "saved", 0,
                         "skipped", skipped
                 ));
@@ -701,7 +701,8 @@ public class TransactionController {
                             internalTransfers.resolve(transaction.getCounterpartAccount(), transaction.getAccount()));
                     parts = splitBeforeSaving(transaction);
                 } catch (IllegalArgumentException exception) {
-                    throw new IllegalArgumentException(describe(transaction) + ": " + exception.getMessage(), exception);
+                    throw new InvalidInputException(Message.of("upload.row-failed",
+                            "row", describe(transaction), "reason", Messages.reasonOf(exception)), exception);
                 }
                 if (!parts.isEmpty()) partsByTransaction.put(transaction, parts);
             }
@@ -723,9 +724,9 @@ public class TransactionController {
                     .count();
 
             String message = (skipped > 0
-                    ? toPersist.size() + " moviments guardats (" + skipped + " ja existien)"
-                    : toPersist.size() + " moviments guardats correctament")
-                    + (joined > 0 ? ". " + joined + " traspassos s'han ajuntat amb l'altra pota, que ja hi era" : "");
+                    ? Messages.get("upload.saved-skipped", "count", toPersist.size(), "skipped", skipped)
+                    : Messages.get("upload.saved", "count", toPersist.size()))
+                    + (joined > 0 ? " " + Messages.get("upload.joined", "count", joined) : "");
 
             return ResponseEntity.ok(Map.of(
                     "status", "success",
@@ -742,7 +743,7 @@ public class TransactionController {
             // retornar un ResponseEntity deixaria els saldos ja modificats.
             // Una validació és culpa de les dades (400); la resta, nostra (500).
             throw new ConfirmUploadException(
-                    "No s'ha importat res. " + ClientErrors.messageFor(exception, "Confirmar importació"),
+                    Messages.get("upload.nothing-imported", "reason", ClientErrors.messageFor(exception, "Confirmar importació")),
                     exception,
                     ClientErrors.isForTheUser(exception) ? HttpStatus.BAD_REQUEST : HttpStatus.INTERNAL_SERVER_ERROR);
         }
@@ -765,10 +766,10 @@ public class TransactionController {
         return parts;
     }
 
-    /** "Moviment del 2026-10-01, Trade Republic, 500.00 €": per dir quina fila falla. */
-    private static String describe(Transaction transaction) {
-        return "Moviment del " + transaction.getDate() + ", " + transaction.getEmpresa() + ", "
-                + (transaction.getAmount() != null ? transaction.getAmount().toPlainString() : "?") + " €";
+    /** «Moviment del 2026-10-01, Trade Republic, 500,00 €»: per dir quina fila falla. */
+    private static Message describe(Transaction transaction) {
+        return Message.of("upload.row", "date", transaction.getDate(), "company", transaction.getEmpresa(),
+                "amount", transaction.getAmount() != null ? transaction.getAmount() : "?");
     }
 
     /** Un error en importar, amb el codi que toca: 400 si és de les dades, 500 si és nostre. */
@@ -797,7 +798,7 @@ public class TransactionController {
     public ResponseEntity<Map<String, String>> handleConfirmUploadError(ConfirmUploadException exception) {
         return ResponseEntity.status(exception.status).body(Map.of(
                 "status", "error",
-                "message", exception.getMessage() != null ? exception.getMessage() : "Error desconegut"));
+                "message", exception.getMessage() != null ? exception.getMessage() : Messages.get("errors.unknown")));
     }
 
     @GetMapping("/gastos")
@@ -810,8 +811,7 @@ public class TransactionController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
 
         if (startDate != null && endDate != null && startDate.isAfter(endDate)) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                    "La data 'des de' no pot ser posterior a la data 'fins a'");
+            throw new InvalidInputException("transactions.date-range-reversed");
         }
 
         if (categoryId != null || companyId != null || accountId != null

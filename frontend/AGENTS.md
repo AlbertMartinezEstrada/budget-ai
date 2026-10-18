@@ -110,11 +110,14 @@ elegido se recuerda en el navegador (`localStorage`) porque antes de entrar no
 se pueden leer los ajustes. Cambiar de idioma vuelve a pintar la vista abierta
 (evento `languageChanged`).
 
+`apiFetch` envía el idioma en la cabecera `Accept-Language`, y el backend
+contesta los errores y los avisos de importación en ese idioma: un mensaje del
+backend se enseña tal cual, sin traducirlo aquí.
+
 `test/i18n.test.js` falla si una clave falta en algún idioma, si una traducción
 no lleva los mismos `{valores}`, si el código pide una clave que no existe o si
-sobra alguna, y si en un fichero ya traducido (la lista `TRANSLATED_FILES`)
-queda un texto escrito a mano. **Al pasar una vista a claves, añádela a esa
-lista.** La prueba de navegador recorre todas las vistas en los cuatro idiomas:
+sobra alguna, y si en cualquier fichero de `public/` queda un texto escrito a
+mano. La prueba de navegador recorre todas las vistas en los cuatro idiomas:
 una clave que falta sale como error en la consola, y falla también si un texto
 no cabe (la página se ensancha o el menú corta un nombre).
 

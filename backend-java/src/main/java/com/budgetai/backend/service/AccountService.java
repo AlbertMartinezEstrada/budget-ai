@@ -56,7 +56,7 @@ public class AccountService {
                     if (updatedAccount.getColor() != null) account.setColor(updatedAccount.getColor());
                     return accountRepository.save(account);
                 })
-                .orElseThrow(() -> new NotFoundException("el compte", id));
+                .orElseThrow(() -> new NotFoundException("not-found.account", id));
     }
 
     // Esborrar un compte amb moviments associats trencava la clau forana i
@@ -65,13 +65,11 @@ public class AccountService {
     public void deleteAccount(Long id) {
         long transactionCount = transactionRepository.countByAccountId(id);
         if (transactionCount > 0) {
-            throw new IllegalStateException(
-                    "No es pot esborrar el compte: té " + transactionCount + " moviments associats");
+            throw new ConflictException("accounts.delete-has-transactions", "count", transactionCount);
         }
 
         if (!transferRepository.findByAccountId(id).isEmpty()) {
-            throw new IllegalStateException(
-                    "No es pot esborrar el compte: té transferències associades");
+            throw new ConflictException("accounts.delete-has-transfers");
         }
 
         accountRepository.deleteById(id);
@@ -80,11 +78,11 @@ public class AccountService {
     @Transactional
     public void updateAccountBalance(Long accountId, BigDecimal amount, String operation) {
         if (amount == null) {
-            throw new IllegalArgumentException("Falta l'import per ajustar el saldo.");
+            throw new InvalidInputException("accounts.adjust-amount-missing");
         }
 
         Account account = accountRepository.findById(accountId)
-                .orElseThrow(() -> new NotFoundException("el compte", accountId));
+                .orElseThrow(() -> new NotFoundException("not-found.account", accountId));
 
         // Un compte creat abans que la columna tingués valor per defecte pot
         // tenir el saldo a null; tractar-lo com a zero evita un NPE.
@@ -97,7 +95,7 @@ public class AccountService {
         } else if ("SUBTRACT".equals(operation)) {
             account.setCurrentBalance(balance.subtract(amount));
         } else {
-            throw new IllegalArgumentException("L'operació sobre el saldo ha de ser ADD o SUBTRACT, no " + operation + ".");
+            throw new InvalidInputException("accounts.adjust-operation", "operation", operation);
         }
 
         accountRepository.save(account);

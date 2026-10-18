@@ -31,9 +31,9 @@ docker compose logs -f backend        # logs
 scripts\backup.bat                    # copia de la base de datos (backup.sh fuera de Windows)
 scripts/migrate.sh                    # aplica las migraciones pendientes (copia antes; --estat para ver cuáles)
 
-cd backend-java && ./gradlew test              # 266 unitarios, sin Docker
-cd backend-java && ./gradlew integrationTest   # 170, requieren Docker
-cd frontend && npm test                        # 113
+cd backend-java && ./gradlew test              # 274 unitarios, sin Docker
+cd backend-java && ./gradlew integrationTest   # 171, requieren Docker
+cd frontend && npm test                        # 115
 cd frontend && npm run test:navegador          # todas las vistas en un navegador (ver abajo)
 ```
 
@@ -351,8 +351,8 @@ Y dos de Trade Republic (se reconoce por `transaction_id` y `account_type`):
   intereses sí. La comisión y el impuesto van en columnas aparte y se restan.
 
 **Un fichero que no se puede leer es culpa del fichero**: el lector lanza una
-`IllegalArgumentException` en catalán que dice la línea, qué se esperaba y qué
-formatos sabe leer. Nunca deja escapar la `CSVException` de commons-csv, que
+`InvalidInputException` que dice, en el idioma de quien importa, la línea, qué
+se esperaba y qué formatos sabe leer. Nunca deja escapar la `CSVException` de commons-csv, que
 acababa en «Error intern» y una traza al log. `ClientErrors` apunta también
 estos errores del usuario en una línea `WARN`, con el fichero y la causa técnica.
 
@@ -444,9 +444,11 @@ un fichero con un token y hubo que deshacerlo.
 - **Interfaz**: en catalán, castellano, portugués o inglés, a elegir en
   Configuración. Cada texto es una clave de `frontend/public/lang/`
   (`Language_ca.properties`…, como en Liferay): **un texto nuevo va a los
-  cuatro ficheros**, nunca escrito en la vista. Está todo pasado menos Análisis
-  y los mensajes del backend, que siguen en catalán y castellano. Ver
-  `frontend/AGENTS.md`.
+  cuatro ficheros**, nunca escrito en la vista. Los mensajes del backend (errores
+  y avisos de importación) también: van en
+  `backend-java/src/main/resources/i18n/messages_xx.properties` y salen en el
+  idioma de la cabecera `Accept-Language`. Ver `frontend/AGENTS.md` y
+  `backend-java/AGENTS.md`.
 - Los comentarios explican **por qué**, no qué. Especialmente si algo parece
   raro: casi siempre lo parece porque arregla un fallo concreto.
 - **Los nombres dicen qué es cada cosa.** El código se tiene que entender

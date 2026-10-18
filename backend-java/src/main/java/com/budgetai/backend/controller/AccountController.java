@@ -1,7 +1,9 @@
 package com.budgetai.backend.controller;
 
+import com.budgetai.backend.i18n.Messages;
 import com.budgetai.backend.model.Account;
 import com.budgetai.backend.service.AccountService;
+import com.budgetai.backend.service.InvalidInputException;
 import com.budgetai.backend.service.NotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -31,7 +33,7 @@ public class AccountController {
     public ResponseEntity<Account> getAccountById(@PathVariable Long id) {
         return accountService.getAccountById(id)
                 .map(ResponseEntity::ok)
-                .orElseThrow(() -> new NotFoundException("el compte", id));
+                .orElseThrow(() -> new NotFoundException("not-found.account", id));
     }
 
     @PostMapping
@@ -52,11 +54,11 @@ public class AccountController {
     public ResponseEntity<?> deleteAccount(@PathVariable Long id) {
         try {
             accountService.deleteAccount(id);
-            return ResponseEntity.ok(Map.of("message", "Account deleted successfully"));
+            return ResponseEntity.ok(Map.of("message", Messages.get("accounts.deleted")));
         } catch (IllegalStateException exception) {
             // El compte té moviments o transferències: abans això petava com a
             // violació de clau forana i arribava com un 500 sense explicació.
-            return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("error", exception.getMessage()));
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("error", Messages.forUser(exception)));
         }
     }
 
@@ -65,7 +67,7 @@ public class AccountController {
                                                    @RequestBody Map<String, Object> payload) {
         Object rawAmount = payload.get("amount");
         if (!(rawAmount instanceof Number)) {
-            throw new IllegalArgumentException("L'import ha de ser un número.");
+            throw new InvalidInputException("accounts.amount-not-number");
         }
         // new BigDecimal(double) arrossega el soroll del binari; via String no.
         BigDecimal amount = new BigDecimal(rawAmount.toString());
@@ -76,6 +78,6 @@ public class AccountController {
         accountService.updateAccountBalance(id, amount, operation);
 
         return ResponseEntity.ok(accountService.getAccountById(id)
-                .orElseThrow(() -> new NotFoundException("el compte", id)));
+                .orElseThrow(() -> new NotFoundException("not-found.account", id)));
     }
 }

@@ -78,7 +78,7 @@ class TransactionPartServiceTest {
     void partsMustAddUpToTheTotal() {
         assertThatThrownBy(() -> service.replace(10L, List.of(request("300.00", 1L), request("180.00", 2L))))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("en falten 20.00 €");
+                .hasMessageContaining("en falten 20,00 €");
 
         verify(partRepository, never()).deleteAll(anyList());
         verify(partRepository, never()).saveAll(anyList());

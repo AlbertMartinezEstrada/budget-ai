@@ -1,5 +1,6 @@
 package com.budgetai.backend.controller;
 
+import com.budgetai.backend.i18n.Messages;
 import com.budgetai.backend.model.Category;
 import com.budgetai.backend.service.CategoryService;
 import com.budgetai.backend.service.NotFoundException;
@@ -34,7 +35,7 @@ public class CategoryController {
     public ResponseEntity<Category> getById(@PathVariable Long id) {
         return categoryService.getById(id)
                 .map(ResponseEntity::ok)
-                .orElseThrow(() -> new NotFoundException("la categoria", id));
+                .orElseThrow(() -> new NotFoundException("not-found.category", id));
     }
 
     @PostMapping
@@ -42,7 +43,7 @@ public class CategoryController {
         try {
             return ResponseEntity.ok(categoryService.create(category));
         } catch (IllegalArgumentException exception) {
-            return ResponseEntity.badRequest().body(Map.of("error", exception.getMessage()));
+            return ResponseEntity.badRequest().body(Map.of("error", Messages.forUser(exception)));
         }
     }
 
@@ -51,7 +52,7 @@ public class CategoryController {
         try {
             return ResponseEntity.ok(categoryService.update(id, category));
         } catch (IllegalArgumentException exception) {
-            return ResponseEntity.badRequest().body(Map.of("error", exception.getMessage()));
+            return ResponseEntity.badRequest().body(Map.of("error", Messages.forUser(exception)));
         }
     }
 
@@ -59,9 +60,9 @@ public class CategoryController {
     public ResponseEntity<?> delete(@PathVariable Long id) {
         try {
             categoryService.delete(id);
-            return ResponseEntity.ok(Map.of("message", "Categoria esborrada"));
+            return ResponseEntity.ok(Map.of("message", Messages.get("categories.deleted")));
         } catch (IllegalStateException exception) {
-            return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("error", exception.getMessage()));
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("error", Messages.forUser(exception)));
         }
     }
 }
