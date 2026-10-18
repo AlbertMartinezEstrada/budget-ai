@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 
 // budgetReview.js fa servir escapeHtml i formatCurrency d'api.js, que llegeix
 // window en carregar-se.
@@ -16,6 +17,10 @@ let module;
 
 test.before(async () => {
     module = await import('../public/js/budgetReview.js');
+    // Els textos es comproven en castellà, l'idioma en què es va escriure la vista.
+    const i18n = await import('../public/js/i18n.js');
+    const spanish = fs.readFileSync(new URL('../public/lang/Language_es.properties', import.meta.url), 'utf8');
+    i18n.setMessages('es', i18n.parseProperties(spanish));
 });
 
 /** Intl separa l'import del símbol amb un espai que no es trenca; aquí és un espai. */
@@ -37,6 +42,8 @@ test('les paraules del semàfor depenen de la secció: passar-se en una despesa,
 
 test('la pastilla explica els estats que no s\'entenen sols', () => {
     assert.match(module.statusPill('CARREC_PUNTUAL', 'FIXED'), /title="Es un recurrente trimestral o anual/);
+    // El llindar de l'avís, amb el format de l'idioma.
+    assert.match(module.statusPill('AVIS', 'VARIABLE'), /title="Fuera del plan por poco: hasta un 10\s%\s\(o 5,00\s€\)\."/);
     assert.match(module.statusPill('DESVIAT', 'VARIABLE'), /bg-red-100/);
 });
 
@@ -56,7 +63,7 @@ test('els mesos es compten enrere sense errors al canvi d\'any', () => {
     assert.equal(module.shiftMonths('2026-10', 5), '2026-05');
     assert.equal(module.shiftMonths('2026-02', 3), '2025-11');
     assert.equal(module.shiftMonths('2026-12', -1), '2027-01');
-    assert.equal(module.monthLabel('2026-10'), 'octubre 2026');
+    assert.equal(module.monthLabel('2026-10'), 'octubre de 2026');
     assert.equal(module.shortMonthLabel('2026-01'), 'ene');
 
     const months = module.selectableMonths(new Date(2026, 1, 15), 4);
@@ -76,6 +83,9 @@ test('el resum de l\'historial només parla dels mesos tancats amb pla', () => {
     equalText(module.historySummary({
         seccio: 'SAVINGS', mesos_tancats_amb_pla: 4, mesos_desviats: 0, mesos_avis: 0, desviacio_mitjana: '12'
     }), 'Cumplido los 4 meses · de media +12,00 €');
+    // Amb un sol mes, en singular: abans sortia «Dentro los 1 meses».
+    assert.equal(module.historySummary({ seccio: 'FIXED', mesos_tancats_amb_pla: 1, mesos_desviats: 0, mesos_avis: 0 }),
+        'Dentro el mes cerrado');
     assert.equal(module.historySummary({ seccio: 'VARIABLE', mesos_tancats_amb_pla: 0 }), 'Sin meses cerrados con plan');
 });
 
@@ -119,6 +129,14 @@ test('l\'efecte net compta només les propostes marcades', () => {
     assert.match(module.netEffectText(-15), /liberas 15,00\s€ al mes/);
     assert.match(module.netEffectText(25), /necesitas 25,00\s€ más al mes/);
     assert.equal(module.netEffectText(0), 'Las marcadas no cambian el total del mes.');
+});
+
+test('el resultat d\'aplicar els canvis, en frases', () => {
+    assert.equal(module.appliedText({ aplicats: 1, copiats: 0, omesos: [] }, 'noviembre de 2026'),
+        'Hecho: 1 cambio en noviembre de 2026.');
+    assert.equal(module.appliedText({ aplicats: 2, copiats: 3, omesos: ['Oci', 'Llar'] }, 'noviembre de 2026'),
+        'Hecho: 2 cambios en noviembre de 2026. Se han copiado 3 asignaciones de este mes. '
+        + 'No se ha tocado Oci y Llar: tienen un presupuesto de más de un mes.');
 });
 
 test('el que s\'envia: un pla per percentatge es queda per percentatge', () => {

@@ -1,4 +1,5 @@
 import { getGeneralAnalysis, getCategoryMovements, formatCurrency, escapeHtml } from '../../api.js';
+import { t, formatNumber, formatPercent, formatDate } from '../../i18n.js';
 import {
     PERIOD_KINDS, periodOptions, periodRange, rangeLabel, SUMMARY_METRICS, changeOf, formatChange,
     structureShares, STRUCTURE_SERIES, EVOLUTION_SERIES, chartTheme, unclassifiedIsHigh, barWidths,
@@ -31,9 +32,9 @@ export async function initGeneral(container) {
     container.innerHTML = `
         <div class="flex flex-wrap items-end gap-3 mb-4">
             <div>
-                <label class="block text-xs text-slate-500 dark:text-slate-400 mb-1" for="general-kind">Periodo</label>
+                <label class="block text-xs text-slate-500 dark:text-slate-400 mb-1" for="general-kind">${t('general.period')}</label>
                 <select id="general-kind" class="pl-3 pr-10 py-2 border rounded-lg">
-                    ${PERIOD_KINDS.map(kind => `<option value="${kind.id}">${escapeHtml(kind.label)}</option>`).join('')}
+                    ${PERIOD_KINDS.map(kind => `<option value="${kind.id}">${t(kind.label)}</option>`).join('')}
                 </select>
             </div>
             <div id="general-value-wrapper">
@@ -43,7 +44,7 @@ export async function initGeneral(container) {
             <p class="text-sm text-slate-500 dark:text-slate-400 flex-1 min-w-0" id="general-range"></p>
         </div>
         <div id="general-content" class="space-y-6">
-            <p class="text-sm text-slate-500">Cargando…</p>
+            <p class="text-sm text-slate-500">${t('common.loading')}</p>
         </div>
     `;
 
@@ -63,12 +64,15 @@ export async function initGeneral(container) {
         try {
             const result = await getGeneralAnalysis(from, to);
             container.querySelector('#general-range').textContent = result.anterior
-                ? `${rangeLabel(result.des_de, result.fins_a)}, frente a ${rangeLabel(result.anterior.des_de, result.anterior.fins_a)}`
+                ? t('general.range-versus', {
+                    range: rangeLabel(result.des_de, result.fins_a),
+                    previous: rangeLabel(result.anterior.des_de, result.anterior.fins_a)
+                })
                 : rangeLabel(result.des_de, result.fins_a);
             render(content, result);
         } catch (error) {
             content.innerHTML = `<div class="p-3 rounded-lg text-sm bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-300">
-                No se ha podido cargar el análisis: ${escapeHtml(error.message)}</div>`;
+                ${escapeHtml(t('general.load-failed', { message: error.message }))}</div>`;
         }
     };
 
@@ -93,33 +97,30 @@ function render(content, result) {
         </div>
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <div class="${card}">
-                <h3 class="text-lg font-semibold mb-1">Evolución</h3>
-                <p class="text-xs text-slate-500 dark:text-slate-400 mb-3">Los 12 meses hasta ${escapeHtml(rangeLabel(result.fins_a, result.fins_a))}.</p>
+                <h3 class="text-lg font-semibold mb-1">${t('general.evolution')}</h3>
+                <p class="text-xs text-slate-500 dark:text-slate-400 mb-3">${escapeHtml(t('general.evolution-hint', { month: rangeLabel(result.fins_a, result.fins_a) }))}</p>
                 <div class="relative h-64"><canvas id="evolution-chart" role="img"
-                     aria-label="Ingresos, gastos y ahorro de los últimos 12 meses"></canvas></div>
+                     aria-label="${t('general.evolution-chart')}"></canvas></div>
                 ${evolutionTable(result.evolucio)}
             </div>
             <div class="${card}">
-                <h3 class="text-lg font-semibold mb-1">A dónde va lo que ingresas</h3>
-                <p class="text-xs text-slate-500 dark:text-slate-400 mb-3">
-                    Cada mes, qué parte de los ingresos va a fijos, a variables y a ahorro, y cuánto queda sin destinar.
-                    Lo pagado desde una cuenta de ahorro no cuenta: sale de lo ya apartado.
-                </p>
+                <h3 class="text-lg font-semibold mb-1">${t('general.structure')}</h3>
+                <p class="text-xs text-slate-500 dark:text-slate-400 mb-3">${t('general.structure-hint')}</p>
                 <div class="relative" style="height: ${Math.max(120,
                     trimEmptyLeading(result.estructura, ['ingressos', 'fixos', 'variables', 'estalvi']).length * 34 + 70)}px">
-                    <canvas id="structure-chart" role="img" aria-label="Reparto de los ingresos de cada mes"></canvas>
+                    <canvas id="structure-chart" role="img" aria-label="${t('general.structure-chart')}"></canvas>
                 </div>
                 ${structureTable(result.estructura)}
             </div>
         </div>
         <div class="${card}">
-            <h3 class="text-lg font-semibold mb-1">Gastos por categoría</h3>
-            <p class="text-xs text-slate-500 dark:text-slate-400 mb-3">Despliega un bloque para ver sus subcategorías, y una subcategoría para ver sus movimientos.</p>
+            <h3 class="text-lg font-semibold mb-1">${t('general.by-category')}</h3>
+            <p class="text-xs text-slate-500 dark:text-slate-400 mb-3">${t('general.by-category-hint')}</p>
             ${categoryList(result.categories, 0)}
         </div>
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            ${merchantCard('Dónde más gastas', result.comercos?.per_import, 'total')}
-            ${merchantCard('Dónde vas más veces', result.comercos?.per_visites, 'moviments')}
+            ${merchantCard(t('general.top-spend'), result.comercos?.per_import, 'total')}
+            ${merchantCard(t('general.top-visits'), result.comercos?.per_visites, 'moviments')}
         </div>
         ${smallExpensesCard(result.despesa_formiga)}
     `;
@@ -138,15 +139,15 @@ function summaryCard(metric, result) {
                <span class="text-slate-500 dark:text-slate-400">${escapeHtml(label)}</span></div>`
         : '';
     const rate = metric.key === 'total_savings' && result.resum?.savings_rate != null
-        ? `<div class="text-xs text-slate-500 dark:text-slate-400">${Number(result.resum.savings_rate).toFixed(1)} % de los ingresos</div>`
+        ? `<div class="text-xs text-slate-500 dark:text-slate-400">${escapeHtml(t('general.savings-rate', { percent: formatPercent(result.resum.savings_rate) }))}</div>`
         : '';
     return `
         <div class="${card}" data-metric="${metric.key}">
-            <div class="text-sm text-slate-500 dark:text-slate-400 mb-1">${escapeHtml(metric.label)}</div>
+            <div class="text-sm text-slate-500 dark:text-slate-400 mb-1">${t(metric.label)}</div>
             <div class="text-2xl font-bold">${formatCurrency(value)}</div>
             ${rate}
-            ${line(previous, `frente a ${rangeLabel(result.anterior.des_de, result.anterior.fins_a)}`)}
-            ${line(usual, 'frente a lo habitual')}
+            ${result.anterior ? line(previous, t('general.versus', { range: rangeLabel(result.anterior.des_de, result.anterior.fins_a) })) : ''}
+            ${line(usual, t('general.versus-usual'))}
         </div>
     `;
 }
@@ -154,14 +155,18 @@ function summaryCard(metric, result) {
 function unclassifiedNotice(unclassified) {
     const total = Number.parseFloat(unclassified?.total) || 0;
     if (total <= 0) return '';
-    const text = `${formatCurrency(total)} de gasto sin clasificar (${unclassified.moviments} movimientos`
-        + `${unclassified.percentatge != null ? `, ${Number(unclassified.percentatge).toFixed(0)} % del gasto` : ''}), sin categoría o en «Altres».`;
+    const count = Number(unclassified.moviments) || 0;
+    const text = unclassified.percentatge != null
+        ? t('general.unclassified', {
+            amount: formatCurrency(total), count, percent: formatPercent(unclassified.percentatge, 0)
+        })
+        : t('general.unclassified-no-percent', { amount: formatCurrency(total), count });
     if (!unclassifiedIsHigh(unclassified)) {
         return `<p class="text-xs text-slate-500 dark:text-slate-400" id="unclassified-notice">${escapeHtml(text)}</p>`;
     }
     return `<div class="p-3 rounded-lg text-sm bg-amber-100 text-amber-800 dark:bg-amber-500/20 dark:text-amber-300" id="unclassified-notice">
-        ${escapeHtml(text)} Con tanto sin clasificar, el resto de números valen poco:
-        <a href="#transactions" class="underline">clasifícalo en Transacciones</a>.
+        ${escapeHtml(text)} ${t('general.unclassified-high')}
+        <a href="#transactions" class="underline">${t('general.unclassified-link')}</a>.
     </div>`;
 }
 
@@ -183,7 +188,7 @@ function drawCharts(content, result) {
             data: {
                 labels: evolution.map(month => axisMonth(month.period)),
                 datasets: EVOLUTION_SERIES.map((series, index) => ({
-                    label: series.label,
+                    label: t(series.label),
                     data: evolution.map(month => Number.parseFloat(month[series.key]) || 0),
                     borderColor: theme.series[index],
                     backgroundColor: theme.series[index],
@@ -223,9 +228,11 @@ function drawCharts(content, result) {
         charts.push(new Chart(structureCanvas, {
             type: 'bar',
             data: {
-                labels: rows.map(row => axisMonth(row.periode) + (row.shares ? '' : ' (sin ingresos)')),
+                labels: rows.map(row => (row.shares
+                    ? axisMonth(row.periode)
+                    : t('general.axis-no-income', { month: axisMonth(row.periode) }))),
                 datasets: STRUCTURE_SERIES.map((series, index) => ({
-                    label: series.label,
+                    label: t(series.label),
                     data: rows.map(row => (row.shares ? row.shares[series.key] : 0)),
                     backgroundColor: theme.series[index],
                     // El buit de 2 px entre trams, del color de la superfície.
@@ -246,7 +253,7 @@ function drawCharts(content, result) {
                             label: context => {
                                 const month = amountsByMonth[rows[context.dataIndex].periode];
                                 const key = STRUCTURE_SERIES[context.datasetIndex].key;
-                                return `${context.dataset.label}: ${context.parsed.x} % (${formatCurrency(month[key])})`;
+                                return `${context.dataset.label}: ${formatPercent(context.parsed.x, 1, 0)} (${formatCurrency(month[key])})`;
                             }
                         }
                     }
@@ -255,7 +262,7 @@ function drawCharts(content, result) {
                     x: {
                         stacked: true, max: structureAxisMax(rows),
                         grid: { color: theme.grid }, border: { display: false },
-                        ticks: { color: theme.muted, callback: value => `${value} %` }
+                        ticks: { color: theme.muted, callback: value => formatPercent(value, 0) }
                     },
                     y: { stacked: true, grid: { display: false }, border: { color: theme.grid }, ticks: { color: theme.muted } }
                 }
@@ -264,21 +271,19 @@ function drawCharts(content, result) {
     }
 }
 
-/** 0, 500, 1K, 1,5K: els eixos no necessiten cèntims. */
+/** 0, 500, 1 k, 1,5 k: els eixos no necessiten cèntims. */
 function compact(value) {
-    const number = Number(value) || 0;
-    if (Math.abs(number) >= 1000) return `${(number / 1000).toLocaleString('es-ES', { maximumFractionDigits: 1 })}K`;
-    return number.toLocaleString('es-ES');
+    return formatNumber(Number(value) || 0, { notation: 'compact', maximumFractionDigits: 1 });
 }
 
 /** Les mateixes dades en una taula: el gràfic no és l'única manera de llegir-les. */
 function evolutionTable(evolution) {
     return `
         <details class="mt-3 text-sm">
-            <summary class="cursor-pointer text-xs text-slate-500 dark:text-slate-400">Ver como tabla</summary>
+            <summary class="cursor-pointer text-xs text-slate-500 dark:text-slate-400">${t('general.as-table')}</summary>
             <div class="table-responsive mt-2">
                 <table class="table w-full text-sm">
-                    <thead><tr><th class="text-left">Mes</th>${EVOLUTION_SERIES.map(series => `<th class="text-right">${escapeHtml(series.label)}</th>`).join('')}</tr></thead>
+                    <thead><tr><th class="text-left">${t('common.month')}</th>${EVOLUTION_SERIES.map(series => `<th class="text-right">${t(series.label)}</th>`).join('')}</tr></thead>
                     <tbody>
                         ${(evolution || []).map(month => `<tr>
                             <td>${escapeHtml(rangeLabel(month.period, month.period))}</td>
@@ -294,21 +299,21 @@ function evolutionTable(evolution) {
 function structureTable(structure) {
     return `
         <details class="mt-3 text-sm">
-            <summary class="cursor-pointer text-xs text-slate-500 dark:text-slate-400">Ver como tabla</summary>
+            <summary class="cursor-pointer text-xs text-slate-500 dark:text-slate-400">${t('general.as-table')}</summary>
             <div class="table-responsive mt-2">
                 <table class="table w-full text-sm">
                     <thead><tr>
-                        <th class="text-left">Mes</th><th class="text-right">Ingresos</th>
-                        ${STRUCTURE_SERIES.map(series => `<th class="text-right">${escapeHtml(series.label)}</th>`).join('')}
-                        <th class="text-right">Del fondo</th>
+                        <th class="text-left">${t('common.month')}</th><th class="text-right">${t('general.income')}</th>
+                        ${STRUCTURE_SERIES.map(series => `<th class="text-right">${t(series.label)}</th>`).join('')}
+                        <th class="text-right">${t('general.from-fund')}</th>
                     </tr></thead>
                     <tbody>
                         ${(structure || []).map(month => {
                             const row = structureShares(month);
-                            const share = key => (row.shares ? ` <span class="text-xs text-slate-500">${row.shares[key]} %</span>` : '');
+                            const share = key => (row.shares ? ` <span class="text-xs text-slate-500">${formatPercent(row.shares[key], 1, 0)}</span>` : '');
                             return `<tr>
                                 <td>${escapeHtml(rangeLabel(month.periode, month.periode))}${row.excedit
-                                    ? ` <span class="text-xs text-red-700 dark:text-red-300">gastaste un ${row.excedit} % más de lo que entró</span>` : ''}</td>
+                                    ? ` <span class="text-xs text-red-700 dark:text-red-300">${escapeHtml(t('general.overspent', { percent: formatPercent(row.excedit, 1, 0) }))}</span>` : ''}</td>
                                 <td class="text-right whitespace-nowrap">${formatCurrency(month.ingressos)}</td>
                                 ${STRUCTURE_SERIES.map(series => `<td class="text-right whitespace-nowrap">${formatCurrency(month[series.key])}${share(series.key)}</td>`).join('')}
                                 <td class="text-right whitespace-nowrap">${formatCurrency(month.gastat_del_fons)}</td>
@@ -326,7 +331,7 @@ function structureTable(structure) {
 /** Una llista de categories germanes, cadascuna amb la seva barra relativa a la més gran. */
 function categoryList(nodes, depth) {
     if (!nodes || nodes.length === 0) {
-        return depth === 0 ? '<p class="text-sm text-slate-500">Sin gastos en este periodo.</p>' : '';
+        return depth === 0 ? `<p class="text-sm text-slate-500">${t('general.no-spending')}</p>` : '';
     }
     const widths = barWidths(nodes);
     return `<ul class="space-y-2 ${depth > 0 ? 'mt-2 pl-4 border-l-2 border-slate-200 dark:border-slate-700' : ''}">
@@ -343,7 +348,7 @@ function categoryList(nodes, depth) {
                         <span class="whitespace-nowrap">
                             <span class="font-medium">${formatCurrency(node.total)}</span>
                             <span class="text-xs text-slate-500 dark:text-slate-400">
-                                ${node.percentatge != null ? `${Number(node.percentatge).toFixed(0)} % · ` : ''}${node.moviments} mov.
+                                ${node.percentatge != null ? `${formatPercent(node.percentatge, 0)} · ` : ''}${escapeHtml(t('general.movements-short', { count: node.moviments }))}
                             </span>
                         </span>
                     </div>
@@ -372,33 +377,26 @@ async function toggleCategory(event, content) {
     // Els moviments es demanen el primer cop que s'obre la subcategoria.
     if (!expand || button.dataset.catMovements === undefined || children.dataset.loaded) return;
     children.dataset.loaded = 'true';
-    children.innerHTML = '<p class="text-xs text-slate-500 mt-2 pl-4">Cargando movimientos…</p>';
+    children.innerHTML = `<p class="text-xs text-slate-500 mt-2 pl-4">${t('general.loading-movements')}</p>`;
     try {
         const movements = await getCategoryMovements(key === 'none' ? null : key, content.dataset.from, content.dataset.to);
         children.innerHTML = movementList(movements);
     } catch (error) {
         delete children.dataset.loaded;
-        children.innerHTML = `<p class="text-xs text-red-700 dark:text-red-300 mt-2 pl-4">No se han podido cargar: ${escapeHtml(error.message)}</p>`;
+        children.innerHTML = `<p class="text-xs text-red-700 dark:text-red-300 mt-2 pl-4">${escapeHtml(t('general.movements-failed', { message: error.message }))}</p>`;
     }
 }
 
-/** «2026-10-05» → «05/10/2026», sense passar per Date: en una zona horaria
- *  amb desfasament negatiu, la mitjanit UTC seria el dia abans. */
-function dayLabel(isoDate) {
-    const [year, month, day] = String(isoDate).split('-');
-    return day ? `${day}/${month}/${year}` : String(isoDate);
-}
-
 function movementList(movements) {
-    if (!movements || movements.length === 0) return '<p class="text-xs text-slate-500 mt-2 pl-4">Sin movimientos.</p>';
+    if (!movements || movements.length === 0) return `<p class="text-xs text-slate-500 mt-2 pl-4">${t('general.no-movements')}</p>`;
     return `<div class="mt-2 pl-4 max-h-64 overflow-y-auto">
         <table class="w-full text-xs">
             <tbody class="divide-y divide-slate-100 dark:divide-slate-700">
                 ${movements.map(movement => `<tr data-movement>
-                    <td class="py-1 pr-2 whitespace-nowrap text-slate-500 dark:text-slate-400">${escapeHtml(dayLabel(movement.data))}</td>
+                    <td class="py-1 pr-2 whitespace-nowrap text-slate-500 dark:text-slate-400">${escapeHtml(formatDate(movement.data) || movement.data)}</td>
                     <td class="py-1 pr-2">${escapeHtml(movement.empresa)}${movement.descripcio && movement.descripcio !== movement.empresa
                         ? ` <span class="text-slate-500">· ${escapeHtml(movement.descripcio)}</span>` : ''}${movement.es_part
-                        ? ' <span class="text-slate-500">(parte)</span>' : ''}</td>
+                        ? ` <span class="text-slate-500">${t('general.part')}</span>` : ''}</td>
                     <td class="py-1 text-right whitespace-nowrap">${formatCurrency(movement.import)}</td>
                 </tr>`).join('')}
             </tbody>
@@ -415,15 +413,15 @@ function merchantCard(title, merchants, key) {
     return `
         <div class="${card}" data-merchants="${key}">
             <h3 class="text-lg font-semibold mb-3">${escapeHtml(title)}</h3>
-            ${list.length === 0 ? '<p class="text-sm text-slate-500">Sin gastos en este periodo.</p>' : `
+            ${list.length === 0 ? `<p class="text-sm text-slate-500">${t('general.no-spending')}</p>` : `
             <ul class="space-y-2">
                 ${list.map((merchant, index) => `<li>
                     <div class="flex items-center justify-between gap-3 text-sm">
                         <span>${escapeHtml(merchant.nom)}</span>
                         <span class="whitespace-nowrap">
-                            <span class="font-medium">${key === 'moviments' ? `${merchant.moviments} veces` : formatCurrency(merchant.total)}</span>
+                            <span class="font-medium">${key === 'moviments' ? escapeHtml(t('general.times', { count: merchant.moviments })) : formatCurrency(merchant.total)}</span>
                             <span class="text-xs text-slate-500 dark:text-slate-400">
-                                ${key === 'moviments' ? formatCurrency(merchant.total) : `${merchant.moviments} ${merchant.moviments === 1 ? 'vez' : 'veces'}`}
+                                ${key === 'moviments' ? formatCurrency(merchant.total) : escapeHtml(t('general.times', { count: merchant.moviments }))}
                             </span>
                         </span>
                     </div>
@@ -441,22 +439,22 @@ function smallExpensesCard(small) {
     const merchants = small.comercos || [];
     return `
         <div class="${card}" id="small-expenses">
-            <h3 class="text-lg font-semibold mb-1">Gasto hormiga</h3>
+            <h3 class="text-lg font-semibold mb-1">${t('general.small')}</h3>
             <p class="text-xs text-slate-500 dark:text-slate-400 mb-3">
-                Gastos de hasta ${formatCurrency(small.llindar)} fuera de los fijos: uno a uno no se notan, sumados sí.
+                ${escapeHtml(t('general.small-hint', { amount: formatCurrency(small.llindar) }))}
             </p>
             <div class="text-2xl font-bold">${formatCurrency(small.total)}</div>
             <div class="text-xs text-slate-500 dark:text-slate-400 mb-3">
-                ${small.moviments} ${small.moviments === 1 ? 'gasto' : 'gastos'}${small.percentatge != null
-                    ? ` · ${Number(small.percentatge).toFixed(1)} % de todo el gasto` : ''}
+                ${escapeHtml(t('general.small-count', { count: small.moviments }))}${small.percentatge != null
+                    ? ` · ${escapeHtml(t('general.small-share', { percent: formatPercent(small.percentatge) }))}` : ''}
             </div>
             ${merchants.length === 0 ? '' : `
-            <p class="text-xs text-slate-500 dark:text-slate-400 mb-1">Donde más se repiten:</p>
+            <p class="text-xs text-slate-500 dark:text-slate-400 mb-1">${t('general.small-most')}</p>
             <ul class="text-sm divide-y divide-slate-100 dark:divide-slate-700">
                 ${merchants.map(merchant => `<li class="flex justify-between gap-3 py-1">
                     <span>${escapeHtml(merchant.nom)}</span>
                     <span class="whitespace-nowrap">${formatCurrency(merchant.total)}
-                        <span class="text-xs text-slate-500 dark:text-slate-400">${merchant.moviments} veces</span></span>
+                        <span class="text-xs text-slate-500 dark:text-slate-400">${escapeHtml(t('general.times', { count: merchant.moviments }))}</span></span>
                 </li>`).join('')}
             </ul>`}
         </div>

@@ -1,6 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 import * as general from '../public/js/generalAnalysis.js';
+import { setMessages, parseProperties } from '../public/js/i18n.js';
+
+// Els textos es comproven en castellà, l'idioma en què es va escriure la vista.
+setMessages('es', parseProperties(fs.readFileSync(new URL('../public/lang/Language_es.properties', import.meta.url), 'utf8')));
 
 // Divendres 16 d'octubre de 2026.
 const TODAY = new Date(2026, 9, 16);
@@ -16,13 +21,14 @@ test('els períodes: mes, trimestre, any i els últims 12 mesos', () => {
 test('les opcions de cada tipus de període comencen pel més recent', () => {
     const months = general.periodOptions('mes', TODAY);
     assert.equal(months.length, 24);
-    assert.deepEqual(months[0], { value: '2026-10', label: 'octubre 2026' });
-    assert.deepEqual(months[10], { value: '2025-12', label: 'diciembre 2025' });
+    assert.deepEqual(months[0], { value: '2026-10', label: 'octubre de 2026' });
+    assert.deepEqual(months[10], { value: '2025-12', label: 'diciembre de 2025' });
 
     const quarters = general.periodOptions('trimestre', TODAY);
     assert.deepEqual(quarters.slice(0, 5).map(option => option.value),
         ['2026-T4', '2026-T3', '2026-T2', '2026-T1', '2025-T4']);
-    assert.equal(quarters[1].label, '3.º trimestre 2026');
+    assert.equal(quarters[1].label, '3.er trimestre de 2026');
+    assert.equal(quarters[2].label, '2.º trimestre de 2026');
 
     assert.deepEqual(general.periodOptions('any', TODAY).map(option => option.value),
         ['2026', '2025', '2024', '2023', '2022']);
@@ -30,10 +36,10 @@ test('les opcions de cada tipus de període comencen pel més recent', () => {
 });
 
 test('el nom d\'un rang', () => {
-    assert.equal(general.rangeLabel('2026-10', '2026-10'), 'octubre 2026');
-    assert.equal(general.rangeLabel('2026-07', '2026-09'), 'jul–sep 2026');
+    assert.equal(general.rangeLabel('2026-10', '2026-10'), 'octubre de 2026');
+    assert.equal(general.rangeLabel('2026-07', '2026-09'), 'julio–septiembre de 2026');
     assert.equal(general.rangeLabel('2025-01', '2025-12'), '2025');
-    assert.equal(general.rangeLabel('2025-11', '2026-10'), 'nov 2025 – oct 2026');
+    assert.equal(general.rangeLabel('2025-11', '2026-10').replace(/[\u2009\u202f]/g, ' '), 'noviembre de 2025 – octubre de 2026');
     assert.equal(general.monthsBefore('2026-02', 3), '2025-11');
 });
 
