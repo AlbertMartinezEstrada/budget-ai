@@ -33,7 +33,7 @@ test/                 tests con el ejecutor integrado de Node
 
 ```bash
 npm ci                 # instalar exactamente las versiones del lockfile
-npm test               # 112 tests (hace falta npm ci antes: compilan Tailwind)
+npm test               # 113 tests (hace falta npm ci antes: compilan Tailwind)
 npm run build:assets   # regenerar tailwind.css, las fuentes y Chart.js de public/vendor
 npm run test:navegador # todas las vistas en Chromium; solo contra una base de datos de prueba
 ```
@@ -81,6 +81,15 @@ element.textContent = t('settings.save-failed', { message });       // ✅ textC
   en varias vistas va en `common.` o `table.`.
 - **Los `{valores}`** se sustituyen: `t('dashboard.savings-rate', { rate })`.
   Con `{count}` numérico se elige el plural: `clave.one` y `clave.other`.
+- **Las frases van enteras en una clave**, con los valores dentro: no se
+  construyen pegando trozos («Tornar» + importe + «: el rebut…»), porque el
+  orden de las palabras cambia de un idioma a otro. Lo que sí cambia según la
+  palabra (el apóstrofo del catalán, «d'agost» frente a «de setembre»; «dels
+  ingressos» frente a «de los ingresos») va en dos claves y lo elige el código,
+  como `ofReceipt` en `Debts.js` o `potOf` en `Budgets.js`.
+- **Los meses**, con `formatMonth(año, mes)` («octubre del 2026», «October
+  2026»), `formatMonthRange` y `formatMonthName`: nunca una lista de nombres
+  escrita a mano.
 - **Una traducción no lleva `< > " &` ni `` ` ``**: va tal cual dentro del HTML.
   Para citar, comillas bajas «».
 - **Con valores, dentro de `escapeHtml()`**: los valores (el nombre de una

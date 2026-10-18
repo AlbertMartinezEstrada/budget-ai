@@ -1,7 +1,8 @@
 import {
     getCategories, createCategory, updateCategory, deleteCategory, escapeHtml
 } from '../../api.js';
-import { categoryOptions } from '../../categoryOptions.js';
+import { categoryOptions, sectionLabel } from '../../categoryOptions.js';
+import { t } from '../../i18n.js';
 
 // Tailwind no pot generar classes construïdes en temps d'execució.
 const BADGE_CLASSES = {
@@ -16,21 +17,21 @@ export async function initCategories(container) {
     container.innerHTML = `
         <div class="page-header flex justify-between items-center mb-6">
             <div>
-                <h2 class="text-2xl font-bold text-slate-800 dark:text-slate-100">Categorías</h2>
+                <h2 class="text-2xl font-bold text-slate-800 dark:text-slate-100">${t('nav.categories')}</h2>
                 <p class="text-sm text-gray-500 dark:text-slate-400 mt-1">
-                    Agrupa las categorías y marca cuáles son gastos fijos.
+                    ${t('categories.subtitle')}
                 </p>
             </div>
             <button id="add-category-btn" class="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/90 flex items-center gap-2">
                 <span class="material-symbols-outlined">add</span>
-                Nueva categoría
+                ${t('categories.add')}
             </button>
         </div>
 
         <div class="bg-white dark:bg-slate-800 rounded-xl p-4 shadow-sm border border-slate-200 dark:border-slate-700 mb-6 text-sm text-gray-600 dark:text-slate-300">
-            <p><strong>Grupo</strong>: agrupa subcategorías y suma sus gastos. No recibe movimientos.</p>
-            <p><strong>Fijo</strong>: gasto recurrente. En «coste de vida» cuenta prorrateado mes a mes.</p>
-            <p><strong>Variable</strong>: cuenta por el gasto real de cada mes.</p>
+            <p><strong>${t('categories.legend-group-term')}</strong>: ${t('categories.legend-group')}</p>
+            <p><strong>${t('categories.legend-fixed-term')}</strong>: ${t('categories.legend-fixed')}</p>
+            <p><strong>${t('categories.legend-variable-term')}</strong>: ${t('categories.legend-variable')}</p>
         </div>
 
         <div id="categories-list" class="space-y-4"></div>
@@ -38,38 +39,38 @@ export async function initCategories(container) {
         <!-- Modal -->
         <div id="category-modal" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-50">
             <div class="bg-white dark:bg-slate-800 rounded-xl p-6 w-full max-w-md">
-                <h3 class="text-xl font-bold mb-4" id="category-modal-title">Nueva categoría</h3>
+                <h3 class="text-xl font-bold mb-4" id="category-modal-title">${t('categories.add')}</h3>
                 <form id="category-form" class="space-y-4">
                     <input type="hidden" id="category-id">
                     <div>
-                        <label class="block text-sm font-medium mb-1" for="category-name">Nombre</label>
+                        <label class="block text-sm font-medium mb-1" for="category-name">${t('common.name')}</label>
                         <input type="text" id="category-name" required class="w-full px-3 py-2 border rounded-lg">
                     </div>
                     <div>
-                        <label class="block text-sm font-medium mb-1" for="category-parent">Grupo</label>
+                        <label class="block text-sm font-medium mb-1" for="category-parent">${t('categories.parent')}</label>
                         <select id="category-parent" class="w-full px-3 py-2 border rounded-lg"></select>
                     </div>
                     <div id="category-nature-wrapper">
-                        <label class="block text-sm font-medium mb-1" for="category-nature">Naturaleza</label>
+                        <label class="block text-sm font-medium mb-1" for="category-nature">${t('categories.nature')}</label>
                         <select id="category-nature" class="w-full px-3 py-2 border rounded-lg">
-                            <option value="VARIABLE">Variable — se mide por el gasto del mes</option>
-                            <option value="FIXED">Fijo — se prorratea en coste de vida</option>
+                            <option value="VARIABLE">${t('categories.nature-variable')}</option>
+                            <option value="FIXED">${t('categories.nature-fixed')}</option>
                         </select>
                     </div>
                     <div id="category-section-wrapper" style="display: none;">
-                        <label class="block text-sm font-medium mb-1" for="category-section">Sección del reparto</label>
+                        <label class="block text-sm font-medium mb-1" for="category-section">${t('categories.section')}</label>
                         <select id="category-section" class="w-full px-3 py-2 border rounded-lg">
-                            <option value="AUTO">Deducir de las subcategorías</option>
-                            <option value="FIXED">Gastos fijos</option>
-                            <option value="VARIABLE">Gastos variables</option>
-                            <option value="SAVINGS">Estalvi i inversió — lo que apartas, del mismo bote que los variables</option>
-                            <option value="INCOME">Ingresos — dinero que entra, no se reparte</option>
+                            <option value="AUTO">${t('categories.section-auto')}</option>
+                            <option value="FIXED">${sectionLabel('FIXED')}</option>
+                            <option value="VARIABLE">${sectionLabel('VARIABLE')}</option>
+                            <option value="SAVINGS">${t('categories.section-savings-option')}</option>
+                            <option value="INCOME">${t('categories.section-income-option')}</option>
                         </select>
                     </div>
                     <p id="category-hint" class="text-xs text-gray-500 dark:text-slate-400"></p>
                     <div class="flex gap-2 justify-end">
-                        <button type="button" id="category-cancel-btn" class="px-4 py-2 border rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700">Cancelar</button>
-                        <button type="submit" class="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/90">Guardar</button>
+                        <button type="button" id="category-cancel-btn" class="px-4 py-2 border rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700">${t('common.cancel')}</button>
+                        <button type="submit" class="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/90">${t('common.save')}</button>
                     </div>
                 </form>
             </div>
@@ -94,7 +95,7 @@ async function loadCategories() {
     } catch (error) {
         console.error('Error loading categories:', error);
         document.getElementById('categories-list').innerHTML =
-            '<p class="text-red-600">Error al cargar categorías</p>';
+            `<p class="text-red-600">${t('categories.load-failed')}</p>`;
     }
 }
 
@@ -108,7 +109,7 @@ function renderTree() {
     const container = document.getElementById('categories-list');
 
     if (categories.length === 0) {
-        container.innerHTML = '<p class="text-gray-500 dark:text-slate-400 text-center py-8">No hay categorías</p>';
+        container.innerHTML = `<p class="text-gray-500 dark:text-slate-400 text-center py-8">${t('categories.empty')}</p>`;
         return;
     }
 
@@ -126,7 +127,7 @@ function renderTree() {
     if (loose.length > 0) {
         cards.push(`
             <div class="bg-white dark:bg-slate-800 rounded-xl p-4 shadow-sm border border-slate-200 dark:border-slate-700">
-                <h3 class="font-semibold text-gray-500 dark:text-slate-400 text-sm mb-3">Sin grupo</h3>
+                <h3 class="font-semibold text-gray-500 dark:text-slate-400 text-sm mb-3">${t('categories.no-group')}</h3>
                 <div class="space-y-2">
                     ${loose.map(category => renderRow(category, false)).join('')}
                 </div>
@@ -160,12 +161,12 @@ function renderRow(category, asGroupHeader) {
     // Un bloc d'ingressos sense subcategories tampoc: el que diu el seu camp és
     // la secció, i "variable" hauria estat mentida.
     const badge = group
-        ? { text: 'grupo', cls: BADGE_CLASSES.group }
+        ? { text: t('categories.badge-group'), cls: BADGE_CLASSES.group }
         : SECTION_ONLY.has(category.tipus_cost)
             ? null
             : category.tipus_cost === 'FIXED'
-                ? { text: 'fijo', cls: BADGE_CLASSES.fixed }
-                : { text: 'variable', cls: BADGE_CLASSES.variable };
+                ? { text: t('categories.badge-fixed'), cls: BADGE_CLASSES.fixed }
+                : { text: t('categories.badge-variable'), cls: BADGE_CLASSES.variable };
 
     return `
         <div class="flex items-center justify-between ${asGroupHeader ? '' : 'text-sm'}">
@@ -173,13 +174,13 @@ function renderRow(category, asGroupHeader) {
                 <span class="${asGroupHeader ? 'font-semibold text-lg' : ''}">${escapeHtml(category.nom)}</span>
                 ${badge ? `<span class="text-xs px-2 py-0.5 rounded-full ${badge.cls}">${badge.text}</span>` : ''}
                 ${sectionBadge(category, group)}
-                ${group ? `<span class="text-xs text-gray-500 dark:text-slate-400">${childrenOf(category.id).length} subcategorías</span>` : ''}
+                ${group ? `<span class="text-xs text-gray-500 dark:text-slate-400">${escapeHtml(t('categories.subcategory-count', { count: childrenOf(category.id).length }))}</span>` : ''}
             </span>
             <span class="flex gap-1">
-                <button data-action="edit" data-id="${category.id}" class="p-1 hover:bg-gray-100 dark:hover:bg-slate-700 rounded" title="Editar">
+                <button data-action="edit" data-id="${category.id}" class="p-1 hover:bg-gray-100 dark:hover:bg-slate-700 rounded" title="${t('common.edit')}">
                     <span class="material-symbols-outlined text-sm">edit</span>
                 </button>
-                <button data-action="delete" data-id="${category.id}" class="p-1 hover:bg-red-50 text-red-600 rounded" title="Eliminar">
+                <button data-action="delete" data-id="${category.id}" class="p-1 hover:bg-red-50 text-red-600 rounded" title="${t('common.delete')}">
                     <span class="material-symbols-outlined text-sm">delete</span>
                 </button>
             </span>
@@ -201,15 +202,15 @@ function sectionBadge(category, group) {
     if (!group && !SECTION_ONLY.has(category.tipus_cost)) return '';
 
     if (category.tipus_cost === 'FIXED') {
-        return '<span class="text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">en gastos fijos</span>';
+        return `<span class="text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">${t('categories.in-fixed')}</span>`;
     }
     if (category.tipus_cost === 'INCOME') {
-        return '<span class="text-xs px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">en ingresos</span>';
+        return `<span class="text-xs px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">${t('categories.in-income')}</span>`;
     }
     if (category.tipus_cost === 'SAVINGS') {
-        return '<span class="text-xs px-2 py-0.5 rounded-full bg-teal-100 text-teal-700">en estalvi i inversió</span>';
+        return `<span class="text-xs px-2 py-0.5 rounded-full bg-teal-100 text-teal-700">${t('categories.in-savings')}</span>`;
     }
-    return '<span class="text-xs px-2 py-0.5 rounded-full bg-violet-100 text-violet-700">en gastos variables</span>';
+    return `<span class="text-xs px-2 py-0.5 rounded-full bg-violet-100 text-violet-700">${t('categories.in-variable')}</span>`;
 }
 
 /**
@@ -233,7 +234,7 @@ function parentOptions(editingId) {
 
     // Qualsevol categoria pot fer de grup: en penjar-li un fill, passa a
     // ser-ho automàticament.
-    return '<option value="">— Sin grupo —</option>'
+    return `<option value="">${t('categories.no-group-option')}</option>`
         + categoryOptions(categories, { groups: true, exclude: excluded });
 }
 
@@ -246,7 +247,7 @@ function openModal(category = null) {
 
     form.reset();
     document.getElementById('category-modal-title').textContent =
-        category ? 'Editar categoría' : 'Nueva categoría';
+        t(category ? 'categories.edit-title' : 'categories.add');
     document.getElementById('category-parent').innerHTML = parentOptions(category?.id);
 
     if (category) {
@@ -266,17 +267,15 @@ function openModal(category = null) {
         natureWrapper.style.display = root || group ? 'none' : '';
         sectionWrapper.style.display = root ? '' : 'none';
         hint.textContent = group
-            ? (category.parent_id
-                ? 'Es un grupo: su coste sale de sumar sus subcategorías.'
-                : 'Un bloque puede ser fijo y tener dentro subcategorías variables: el alquiler no se mueve, la luz sí.')
+            ? t(category.parent_id ? 'categories.hint-group' : 'categories.hint-block')
             : root
-                ? 'Está en el primer nivel: aquí eliges en qué sección del presupuesto cuenta.'
+                ? t('categories.hint-root')
                 : '';
     } else {
         document.getElementById('category-id').value = '';
         natureWrapper.style.display = '';
         sectionWrapper.style.display = 'none';
-        hint.textContent = 'Si le cuelgas subcategorías, pasará a ser un grupo.';
+        hint.textContent = t('categories.hint-new');
     }
 
     modal.classList.remove('hidden');
@@ -305,13 +304,13 @@ async function handleListClick(event) {
     }
 
     if (button.dataset.action === 'delete') {
-        if (!confirm(`¿Eliminar «${category.nom}»?`)) return;
+        if (!confirm(t('categories.delete-confirm', { name: category.nom }))) return;
         try {
             await deleteCategory(id);
             await loadCategories();
         } catch (error) {
             // El backend explica per què no es pot: moviments o subcategories.
-            alert(error.message || 'Error al eliminar la categoría');
+            alert(error.message || t('categories.delete-failed'));
         }
     }
 }
@@ -354,6 +353,6 @@ async function handleSubmit(event) {
         closeModal();
         await loadCategories();
     } catch (error) {
-        alert(error.message || 'Error al guardar la categoría');
+        alert(error.message || t('categories.save-failed'));
     }
 }

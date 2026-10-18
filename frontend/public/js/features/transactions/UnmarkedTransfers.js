@@ -1,4 +1,5 @@
 import { getUnmarkedTransfers, joinTransfer, formatCurrency, escapeHtml } from '../../api.js';
+import { t, formatDate } from '../../i18n.js';
 
 /**
  * L'avís de traspassos sense marcar, a Transaccions.
@@ -35,12 +36,6 @@ function dismiss(key) {
 
 const pairKey = (pair) => `${pair.sortida.id}-${pair.entrada.id}`;
 
-function formatDate(isoDate) {
-    if (!isoDate || !/^\d{4}-\d{2}-\d{2}$/.test(isoDate)) return isoDate || '';
-    const [year, month, day] = isoDate.split('-').map(Number);
-    return new Date(year, month - 1, day).toLocaleDateString('ca-ES');
-}
-
 /**
  * @param container el bloc on va l'avís; s'amaga si no hi ha res a dir
  * @param onJoined  per tornar a carregar la llista després d'ajuntar
@@ -62,17 +57,15 @@ export function setUpUnmarkedTransfers(container, { onJoined }) {
         container.innerHTML = `
             <div class="flex flex-wrap items-center justify-between gap-2">
                 <div class="text-sm">
-                    <strong>⇄ ${visible.length} ${visible.length === 1 ? 'parell de moviments sembla' : 'parells de moviments semblen'}
-                    traspassos entre els teus comptes.</strong>
-                    Ara compten a l'anàlisi com a despesa i com a ingrés. Ajuntar-los en deixa un sol traspàs, que només
-                    mou els saldos.
+                    <strong>${escapeHtml(t('unmarked.found', { count: visible.length }))}</strong>
+                    ${t('unmarked.explanation')}
                 </div>
                 <div class="flex gap-2">
                     ${expanded && visible.length > 1
-                        ? '<button type="button" class="btn btn-sm btn-primary" data-action="join-all-transfers">Ajuntar-los tots</button>'
+                        ? `<button type="button" class="btn btn-sm btn-primary" data-action="join-all-transfers">${t('unmarked.join-all')}</button>`
                         : ''}
                     <button type="button" class="btn btn-sm btn-outline" data-action="toggle-unmarked-transfers">
-                        ${expanded ? 'Amagar' : 'Revisar'}
+                        ${t(expanded ? 'unmarked.hide' : 'unmarked.review')}
                     </button>
                 </div>
             </div>
@@ -85,24 +78,21 @@ export function setUpUnmarkedTransfers(container, { onJoined }) {
                                     ${escapeHtml(pair.sortida.compte)} → ${escapeHtml(pair.entrada.compte)} · ${formatCurrency(pair.import)}
                                 </div>
                                 <div class="text-xs text-slate-500 dark:text-slate-400">
-                                    Surt el ${escapeHtml(formatDate(pair.sortida.data))}: «${escapeHtml(pair.sortida.descripcio)}»
+                                    ${escapeHtml(t('unmarked.out-on', { date: formatDate(pair.sortida.data), description: pair.sortida.descripcio }))}
                                 </div>
                                 <div class="text-xs text-slate-500 dark:text-slate-400">
-                                    Entra el ${escapeHtml(formatDate(pair.entrada.data))}: «${escapeHtml(pair.entrada.descripcio)}»
+                                    ${escapeHtml(t('unmarked.in-on', { date: formatDate(pair.entrada.data), description: pair.entrada.descripcio }))}
                                 </div>
                             </div>
                             <div class="flex gap-2 shrink-0">
                                 <button type="button" class="btn btn-sm btn-primary" data-action="join-transfer"
-                                        data-out="${pair.sortida.id}" data-in="${pair.entrada.id}">Ajuntar</button>
+                                        data-out="${pair.sortida.id}" data-in="${pair.entrada.id}">${t('unmarked.join')}</button>
                                 <button type="button" class="btn btn-sm btn-outline" data-action="dismiss-transfer"
-                                        data-key="${escapeHtml(pairKey(pair))}">No és un traspàs</button>
+                                        data-key="${escapeHtml(pairKey(pair))}">${t('unmarked.not-a-transfer')}</button>
                             </div>
                         </div>`).join('')}
                 </div>
-                <p class="text-xs text-slate-500 dark:text-slate-400 mt-2">
-                    Es queda el moviment que surt, com a traspàs, i el que entra s'esborra: és el mateix diner. Si va cap
-                    a un compte d'estalvi, segueix comptant al pressupost com a estalvi.
-                </p>
+                <p class="text-xs text-slate-500 dark:text-slate-400 mt-2">${t('unmarked.what-happens')}</p>
                 <p class="text-error text-sm hidden mt-2" data-role="error"></p>` : ''}
         `;
     };
@@ -153,7 +143,7 @@ export function setUpUnmarkedTransfers(container, { onJoined }) {
                 await onJoined();
             } catch (error) {
                 await refresh();
-                showError(error.message || 'No s\'han pogut ajuntar.');
+                showError(error.message || t('unmarked.join-failed'));
             }
         }
     });

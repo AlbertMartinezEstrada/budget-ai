@@ -277,8 +277,9 @@ Els idiomes. Que els quatre fitxers (`public/lang/Language_xx.properties`)
 tinguin exactament les mateixes claus que el català, sense cap repetida; que
 cada traducció porti els mateixos `{valors}`; que cap traducció porti
 `< > " &` (van tal qual dins de l'HTML); que cada clau que demana el codi
-existeixi i que no en sobri cap; que un text amb valors no s'interpoli a
-l'HTML sense `escapeHtml`; i que a les vistes ja traduïdes (`TRANSLATED_FILES`)
+existeixi i que no en sobri cap; que cada crida passi els `{valors}` que el
+seu text necessita (si no, sortiria «{name}» a la pantalla); que un text amb
+valors no s'interpoli a l'HTML sense `escapeHtml`; i que a les vistes ja traduïdes (`TRANSLATED_FILES`)
 no quedi cap text escrit a mà, que sortiria en català en els quatre idiomes. El
 detector de textos escrits a mà té el seu propi test: si deixés de trobar-ne,
 l'altre passaria sempre. També el lector de `.properties`, els plurals, com es

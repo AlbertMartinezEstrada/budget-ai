@@ -4,7 +4,8 @@ import {
     copyPreviousMonthBudgets, getCategories, formatCurrency, escapeHtml,
     getFixedCosts, createFixedCost, updateFixedCost, deleteFixedCost
 } from '../../api.js';
-import { categoryOptions, EXPENSE_SECTIONS } from '../../categoryOptions.js';
+import { categoryOptions, sectionLabel, EXPENSE_SECTIONS } from '../../categoryOptions.js';
+import { t, formatPercent, formatMonth, formatMonthName } from '../../i18n.js';
 
 // Tailwind no pot generar classes construïdes en temps d'execució
 // (`bg-${color}-500`), així que s'enumeren senceres.
@@ -16,58 +17,78 @@ const TEXT_CLASSES = { low: 'text-green-700', medium: 'text-orange-700', high: '
 // compromès i on comença el que es pot moure.
 const SECTIONS = {
     FIXED: {
-        titol: 'Gastos fijos',
-        descripcio: 'Importe conocido cada mes. Se reparten primero, sobre el total de ingresos.',
+        descripcio: 'budgets.section-fixed-description',
         accent: 'border-l-4 border-blue-500',
         pastilla: 'bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300',
         barra: 'bg-blue-500',
-        buit: 'Ningún bloque es fijo todavía. Un bloque cuenta como fijo cuando todas sus subcategorías están marcadas como «fijo» en Categorías.'
+        buit: 'budgets.section-fixed-empty'
     },
     VARIABLE: {
-        titol: 'Gastos variables',
-        descripcio: 'Se reparten sobre lo que queda después de los fijos, junto con el ahorro.',
+        descripcio: 'budgets.section-variable-description',
         accent: 'border-l-4 border-violet-500',
         pastilla: 'bg-violet-100 text-violet-700 dark:bg-violet-500/20 dark:text-violet-300',
         barra: 'bg-violet-500',
-        buit: 'Todavía no hay bloques variables.'
+        buit: 'budgets.section-variable-empty'
     },
     // El ahorro se reparte del mismo bote que los variables (con su porcentaje,
     // como siempre), pero no es gasto: cuenta lo que va a sus categorías, esté
     // marcado como traspaso o no. Lo que se paga después desde una cuenta de
     // ahorro es «gastado del fondo» y sale aparte.
     SAVINGS: {
-        titol: 'Estalvi i inversió',
-        descripcio: 'Del mismo bote que los variables, pero no es gasto: cuenta lo que apartas en estas categorías, igual que en Análisis y en el tablero.',
+        descripcio: 'budgets.section-savings-description',
         accent: 'border-l-4 border-teal-500',
         pastilla: 'bg-teal-100 text-teal-700 dark:bg-teal-500/20 dark:text-teal-300',
         barra: 'bg-teal-500',
-        buit: 'Ningún bloque en ahorro. En Categorías, elige «Estalvi i inversió» como sección de un bloque.',
+        buit: 'budgets.section-savings-empty',
         esEstalvi: true
     },
     // Los ingresos no se reparten: son de donde sale todo lo demás, así que su
     // total es justo lo que las otras dos secciones tienen para repartir. Por
     // eso van primero y no llevan bote ni barra de reparto.
     INCOME: {
-        titol: 'Ingresos',
-        descripcio: 'De aquí sale todo. El sueldo es un bloque más, al lado de un regalo o un trabajo puntual.',
+        descripcio: 'budgets.section-income-description',
         accent: 'border-l-4 border-emerald-500',
         pastilla: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300',
         barra: 'bg-emerald-500',
-        buit: 'Ningún bloque marcado como ingresos.',
+        buit: 'budgets.section-income-empty',
         esIngres: true
     }
 };
 
 const FREQUENCIES = {
-    MENSUAL: 'Mensual',
-    TRIMESTRAL: 'Trimestral',
-    ANUAL: 'Anual',
-    SETMANAL: 'Semanal',
-    DIARIA: 'Diaria'
+    MENSUAL: 'frequency.monthly',
+    TRIMESTRAL: 'frequency.quarterly',
+    ANUAL: 'frequency.yearly',
+    SETMANAL: 'frequency.weekly',
+    DIARIA: 'frequency.daily'
 };
 
-const MONTH_NAMES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
-    'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+/**
+ * Els bots dels quals penja un percentatge. Cadascun té dues formes perquè
+ * «de» s'ajunta amb l'article de manera diferent a cada idioma: «dels
+ * ingressos», «de los ingresos», «das receitas», «of income».
+ */
+const POT_KEYS = {
+    income: { name: 'budgets.pot-income', of: 'budgets.pot-income-of' },
+    forecast: { name: 'budgets.pot-forecast', of: 'budgets.pot-forecast-of' },
+    afterFixed: { name: 'budgets.pot-after-fixed', of: 'budgets.pot-after-fixed-of' },
+    above: { name: 'budgets.pot-above', of: 'budgets.pot-above-of' }
+};
+const POT_ABOVE = { kind: 'above' };
+
+/** El nom del bot: «els ingressos» o el nom del bloc. */
+const potName = (pot) => pot.kind === 'category' ? pot.name : t(POT_KEYS[pot.kind].name);
+
+/** «dels ingressos», «de Gast mensual», «d'Estalvis»: en català, s'apostrofa davant de vocal. */
+function potOf(pot) {
+    if (pot.kind !== 'category') return t(POT_KEYS[pot.kind].of);
+    return t(/^h?[aeiouàèéíòóú]/i.test(pot.name) ? 'budgets.pot-category-of-vowel' : 'budgets.pot-category-of', { name: pot.name });
+}
+
+const selectedMonthLabel = () => {
+    const { year, month } = selectedPeriod();
+    return formatMonth(year, month);
+};
 
 let categories = [];
 // Els blocs desplegats es recorden entre recàrregues perquè guardar un
@@ -86,29 +107,27 @@ export async function initBudgets(container) {
     container.innerHTML = `
         <div class="page-header flex flex-wrap justify-between items-center gap-3 mb-6">
             <div>
-                <h2 class="text-2xl font-bold text-slate-800 dark:text-slate-100">Presupuestos</h2>
-                <p class="text-sm text-gray-500 dark:text-slate-400 mt-1">
-                    Los ingresos bajan en cascada: primero fijos y variables, luego los bloques, luego sus subsecciones.
-                </p>
+                <h2 class="text-2xl font-bold text-slate-800 dark:text-slate-100">${t('nav.budgets')}</h2>
+                <p class="text-sm text-gray-500 dark:text-slate-400 mt-1">${t('budgets.subtitle')}</p>
             </div>
             <div class="flex items-center gap-2">
                 <select id="budget-year" class="px-3 py-2 border rounded-lg bg-white dark:bg-slate-800 dark:border-slate-600"></select>
                 <select id="budget-month" class="px-3 py-2 border rounded-lg bg-white dark:bg-slate-800 dark:border-slate-600">
-                    ${MONTH_NAMES.map((monthName, monthIndex) => `<option value="${monthIndex + 1}">${monthName}</option>`).join('')}
+                    ${Array.from({ length: 12 }, (unused, monthIndex) => `<option value="${monthIndex + 1}">${formatMonthName(monthIndex + 1)}</option>`).join('')}
                 </select>
                 <button id="fixed-costs-btn" class="px-3 py-2 border rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700 dark:border-slate-600 flex items-center gap-2"
-                        title="Los gastos que se repiten y se copian a cada mes">
+                        title="${t('budgets.recurring-button-title')}">
                     <span class="material-symbols-outlined">event_repeat</span>
-                    Recurrentes
+                    ${t('budgets.recurring-button')}
                 </button>
                 <button id="copy-month-btn" class="px-3 py-2 border rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700 dark:border-slate-600 flex items-center gap-2"
-                        title="Duplicar aquí las asignaciones del mes anterior">
+                        title="${t('budgets.copy-month-title')}">
                     <span class="material-symbols-outlined">content_copy</span>
-                    Copiar mes anterior
+                    ${t('budgets.copy-month')}
                 </button>
                 <button id="add-budget-btn" class="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/90 flex items-center gap-2">
                     <span class="material-symbols-outlined">add</span>
-                    Asignar
+                    ${t('budgets.assign')}
                 </button>
             </div>
         </div>
@@ -121,8 +140,8 @@ export async function initBudgets(container) {
         <div id="fixed-costs-modal" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-50 p-4">
             <div class="bg-white dark:bg-slate-800 rounded-xl p-6 w-full max-w-2xl max-h-full overflow-y-auto">
                 <div class="flex justify-between items-start gap-4 mb-1">
-                    <h3 class="text-xl font-bold">Gastos recurrentes</h3>
-                    <button type="button" id="fixed-costs-close" class="p-1 hover:bg-gray-100 dark:hover:bg-slate-700 rounded" title="Cerrar">
+                    <h3 class="text-xl font-bold">${t('budgets.recurring-title')}</h3>
+                    <button type="button" id="fixed-costs-close" class="p-1 hover:bg-gray-100 dark:hover:bg-slate-700 rounded" title="${t('common.close')}">
                         <span class="material-symbols-outlined">close</span>
                     </button>
                 </div>
@@ -132,31 +151,31 @@ export async function initBudgets(container) {
 
                 <form id="fixed-cost-form" class="rounded-lg bg-slate-50 dark:bg-slate-700/50 p-4 space-y-3">
                     <input type="hidden" id="fixed-cost-id">
-                    <div class="font-semibold text-sm" id="fixed-cost-form-title">Añadir un gasto recurrente</div>
+                    <div class="font-semibold text-sm" id="fixed-cost-form-title">${t('budgets.recurring-add-title')}</div>
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div>
-                            <label class="block text-sm font-medium mb-1" for="fixed-cost-name">Nombre</label>
+                            <label class="block text-sm font-medium mb-1" for="fixed-cost-name">${t('common.name')}</label>
                             <input type="text" id="fixed-cost-name" required maxlength="150" class="w-full px-3 py-2 border rounded-lg bg-white dark:bg-slate-700 dark:border-slate-600">
                         </div>
                         <div>
-                            <label class="block text-sm font-medium mb-1" for="fixed-cost-category">Categoría</label>
+                            <label class="block text-sm font-medium mb-1" for="fixed-cost-category">${t('common.category')}</label>
                             <select id="fixed-cost-category" required class="w-full px-3 py-2 border rounded-lg bg-white dark:bg-slate-700 dark:border-slate-600"></select>
                         </div>
                         <div>
-                            <label class="block text-sm font-medium mb-1" for="fixed-cost-amount">Importe</label>
+                            <label class="block text-sm font-medium mb-1" for="fixed-cost-amount">${t('common.amount')}</label>
                             <input type="number" id="fixed-cost-amount" required step="0.01" min="0" class="w-full px-3 py-2 border rounded-lg bg-white dark:bg-slate-700 dark:border-slate-600">
                         </div>
                         <div>
-                            <label class="block text-sm font-medium mb-1" for="fixed-cost-frequency">Cada cuánto</label>
+                            <label class="block text-sm font-medium mb-1" for="fixed-cost-frequency">${t('budgets.how-often')}</label>
                             <select id="fixed-cost-frequency" class="w-full px-3 py-2 border rounded-lg bg-white dark:bg-slate-700 dark:border-slate-600">
-                                ${Object.entries(FREQUENCIES).map(([value, label]) => `<option value="${value}">${label}</option>`).join('')}
+                                ${Object.entries(FREQUENCIES).map(([value, key]) => `<option value="${value}">${t(key)}</option>`).join('')}
                             </select>
                         </div>
                     </div>
                     <p class="text-xs text-gray-500 dark:text-slate-400" id="fixed-cost-hint"></p>
                     <div class="flex gap-2 justify-end">
-                        <button type="button" id="fixed-cost-cancel" class="px-4 py-2 border rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700 dark:border-slate-600 hidden">Cancelar</button>
-                        <button type="submit" class="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/90" id="fixed-cost-submit">Añadir</button>
+                        <button type="button" id="fixed-cost-cancel" class="px-4 py-2 border rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700 dark:border-slate-600 hidden">${t('common.cancel')}</button>
+                        <button type="submit" class="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/90" id="fixed-cost-submit">${t('common.add')}</button>
                     </div>
                 </form>
             </div>
@@ -165,48 +184,48 @@ export async function initBudgets(container) {
         <!-- Modal -->
         <div id="budget-modal" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-50 p-4">
             <div class="bg-white dark:bg-slate-800 rounded-xl p-6 w-full max-w-md max-h-full overflow-y-auto">
-                <h3 class="text-xl font-bold mb-1" id="modal-title">Asignar dinero</h3>
+                <h3 class="text-xl font-bold mb-1" id="modal-title">${t('budgets.assign-title')}</h3>
                 <p class="text-sm text-gray-500 dark:text-slate-400 mb-4" id="modal-subtitle"></p>
                 <form id="budget-form" class="space-y-4">
                     <input type="hidden" id="budget-id">
                     <div>
-                        <label class="block text-sm font-medium mb-1" for="budget-category">Categoría</label>
+                        <label class="block text-sm font-medium mb-1" for="budget-category">${t('common.category')}</label>
                         <select id="budget-category" required class="w-full px-3 py-2 border rounded-lg bg-white dark:bg-slate-700 dark:border-slate-600"></select>
                     </div>
                     <div class="rounded-lg bg-slate-50 dark:bg-slate-700/50 p-3 text-sm" id="budget-pot">
-                        <div class="text-xs text-gray-500 dark:text-slate-400">Se reparte sobre</div>
+                        <div class="text-xs text-gray-500 dark:text-slate-400">${t('budgets.pot-label')}</div>
                         <div class="font-semibold" id="budget-pot-label">—</div>
                     </div>
                     <div>
-                        <label class="block text-sm font-medium mb-1" for="budget-mode">Cómo lo fijas</label>
+                        <label class="block text-sm font-medium mb-1" for="budget-mode">${t('budgets.mode')}</label>
                         <select id="budget-mode" class="w-full px-3 py-2 border rounded-lg bg-white dark:bg-slate-700 dark:border-slate-600">
-                            <option value="AMOUNT">Importe exacto</option>
-                            <option value="PERCENT">Porcentaje de lo que hay encima</option>
+                            <option value="AMOUNT">${t('budgets.mode-amount')}</option>
+                            <option value="PERCENT">${t('budgets.mode-percent')}</option>
                         </select>
                     </div>
                     <div id="budget-limit-wrapper">
-                        <label class="block text-sm font-medium mb-1" for="budget-limit">Importe mensual</label>
+                        <label class="block text-sm font-medium mb-1" for="budget-limit">${t('budgets.monthly-amount')}</label>
                         <input type="number" id="budget-limit" step="0.01" min="0" class="w-full px-3 py-2 border rounded-lg bg-white dark:bg-slate-700 dark:border-slate-600">
                         <p class="text-xs text-gray-500 dark:text-slate-400 mt-1" id="budget-limit-hint"></p>
                     </div>
                     <div id="budget-percent-wrapper" style="display: none;">
-                        <label class="block text-sm font-medium mb-1" for="budget-percent">Porcentaje</label>
+                        <label class="block text-sm font-medium mb-1" for="budget-percent">${t('budgets.percent')}</label>
                         <input type="number" id="budget-percent" step="0.01" min="0" max="100" class="w-full px-3 py-2 border rounded-lg bg-white dark:bg-slate-700 dark:border-slate-600">
                         <p class="text-xs text-gray-500 dark:text-slate-400 mt-1" id="budget-percent-hint"></p>
                     </div>
                     <div class="grid grid-cols-2 gap-4">
                         <div>
-                            <label class="block text-sm font-medium mb-1" for="budget-start">Inicio</label>
+                            <label class="block text-sm font-medium mb-1" for="budget-start">${t('budgets.start')}</label>
                             <input type="date" id="budget-start" required class="w-full px-3 py-2 border rounded-lg bg-white dark:bg-slate-700 dark:border-slate-600">
                         </div>
                         <div>
-                            <label class="block text-sm font-medium mb-1" for="budget-end">Fin</label>
+                            <label class="block text-sm font-medium mb-1" for="budget-end">${t('budgets.end')}</label>
                             <input type="date" id="budget-end" required class="w-full px-3 py-2 border rounded-lg bg-white dark:bg-slate-700 dark:border-slate-600">
                         </div>
                     </div>
                     <div class="flex gap-2 justify-end">
-                        <button type="button" id="cancel-btn" class="px-4 py-2 border rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700 dark:border-slate-600">Cancelar</button>
-                        <button type="submit" class="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/90">Guardar</button>
+                        <button type="button" id="cancel-btn" class="px-4 py-2 border rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700 dark:border-slate-600">${t('common.cancel')}</button>
+                        <button type="submit" class="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/90">${t('common.save')}</button>
                     </div>
                 </form>
             </div>
@@ -264,10 +283,6 @@ const toNumber = (value) => {
     return Number.isFinite(parsed) ? parsed : null;
 };
 
-// "de" + "el sueldo" es "del sueldo". Los nombres de los botes se guardan como
-// sintagma ("el sueldo", "Gast mensual") porque también se usan sueltos.
-const prefixDe = (label) => label.startsWith('el ') ? `del ${label.slice(3)}` : `de ${label}`;
-
 /**
  * Si un presupuesto está vigente en el mes que se está mirando.
  *
@@ -308,7 +323,7 @@ async function loadSummary() {
         renderSections(summary, budgets);
     } catch (error) {
         console.error('Error loading budgets:', error);
-        container.innerHTML = '<p class="text-red-600">Error al cargar presupuestos</p>';
+        container.innerHTML = `<p class="text-red-600">${t('budgets.load-failed')}</p>`;
     }
 }
 
@@ -323,23 +338,23 @@ function indexPots(summary) {
     potByCategory = new Map();
 
     for (const section of summary.seccions || []) {
-        const label = section.tipus === 'FIXED'
-            ? 'los ingresos'
+        const pot = section.tipus === 'FIXED'
+            ? { kind: 'income' }
             : section.tipus === 'INCOME'
                 // Los ingresos no cuelgan de ningún bote: no se reparten.
-                ? 'lo previsto'
+                ? { kind: 'forecast' }
                 // Variables y ahorro se reparten el mismo bote.
-                : 'lo que queda después de los fijos';
+                : { kind: 'afterFixed' };
 
         for (const node of section.grups || []) {
-            walkPots(node, label, section.base);
+            walkPots(node, pot, section.base);
         }
     }
 }
 
-function walkPots(node, potLabel, potAmount) {
+function walkPots(node, parentPot, potAmount) {
     potByCategory.set(node.categoria.id, {
-        label: potLabel,
+        pot: parentPot,
         base: toNumber(node.base_assignacio) ?? potAmount,
         // El que val el mes segons els seus recurrents, sigui fixa o variable.
         // És el punt de partida quan es canvia l'import només d'aquest mes.
@@ -355,11 +370,11 @@ function walkPots(node, potLabel, potAmount) {
     const explicit = node.percentatge != null
         ? node.base_assignacio != null
         : node.quantitat_limit != null;
-    const childLabel = explicit ? node.categoria.nom : potLabel;
-    const childPot = explicit ? toNumber(node.cost_vida_pla) : potAmount;
+    const childPot = explicit ? { kind: 'category', name: node.categoria.nom } : parentPot;
+    const childAmount = explicit ? toNumber(node.cost_vida_pla) : potAmount;
 
     for (const child of node.subcategories || []) {
-        walkPots(child, childLabel, childPot);
+        walkPots(child, childPot, childAmount);
     }
 }
 
@@ -384,13 +399,10 @@ function renderHeader(summary) {
     if (base == null || base <= 0) {
         document.getElementById('salary-header').innerHTML = `
             <div class="text-center py-2">
-                <div class="text-lg font-semibold mb-1">No hay ingresos este mes</div>
-                <p class="text-sm text-gray-500 dark:text-slate-400 mb-3">
-                    Sin ellos no hay nada que repartir. Ponle una previsión a la nómina
-                    en el bloque de <strong>Ingresos</strong>, o fija un sueldo de referencia.
-                </p>
+                <div class="text-lg font-semibold mb-1">${t('budgets.no-income-title')}</div>
+                <p class="text-sm text-gray-500 dark:text-slate-400 mb-3">${t('budgets.no-income-hint')}</p>
                 <button data-action="edit-income" class="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/90">
-                    Fijar sueldo de referencia
+                    ${t('budgets.set-salary')}
                 </button>
             </div>`;
         return;
@@ -402,25 +414,25 @@ function renderHeader(summary) {
     document.getElementById('salary-header').innerHTML = `
         <div class="flex flex-wrap justify-between items-start gap-4 mb-4">
             <div>
-                <div class="text-xs uppercase tracking-wide text-gray-500 dark:text-slate-400">Ingresos del mes</div>
+                <div class="text-xs uppercase tracking-wide text-gray-500 dark:text-slate-400">${t('budgets.month-income')}</div>
                 <div class="text-3xl font-bold">${formatCurrency(base)}</div>
                 <div class="text-xs text-gray-500 dark:text-slate-400">
                     ${fromIncome
-                        ? `suma de los bloques de ingreso${real > 0 ? ` · ${formatCurrency(real)} ya recibidos` : ' (previsión)'}
-                           · <button data-action="edit-income" class="text-primary hover:underline">cambiar sueldo</button>`
-                        : `sueldo de referencia${summary.sou_base_origen === 'MES' ? ' de este mes' : ' por defecto'}
-                           · <button data-action="edit-income" class="text-primary hover:underline">cambiar</button>`}
+                        ? `${t('budgets.income-from-blocks')}${real > 0 ? ` · ${escapeHtml(t('budgets.already-received', { amount: formatCurrency(real) }))}` : ` ${t('budgets.forecast-only')}`}
+                           · <button data-action="edit-income" class="text-primary hover:underline">${t('budgets.change-salary')}</button>`
+                        : `${t(summary.sou_base_origen === 'MES' ? 'budgets.reference-salary-month' : 'budgets.reference-salary-default')}
+                           · <button data-action="edit-income" class="text-primary hover:underline">${t('budgets.change')}</button>`}
                 </div>
             </div>
             <div class="text-right">
-                <div class="text-xs text-gray-500 dark:text-slate-400">Previsto / recibido</div>
+                <div class="text-xs text-gray-500 dark:text-slate-400">${t('budgets.forecast-received')}</div>
                 <div class="text-lg font-semibold">
                     ${formatCurrency(forecast)} <span class="text-gray-500">/</span> ${formatCurrency(real)}
                 </div>
                 <div class="text-xs text-gray-500 dark:text-slate-400">
                     ${real > forecast && forecast > 0
-                        ? 'ha entrado más de lo previsto'
-                        : real === 0 ? 'todavía sin movimientos importados' : ''}
+                        ? t('budgets.more-than-forecast')
+                        : real === 0 ? t('budgets.no-transactions-yet') : ''}
                 </div>
             </div>
         </div>
@@ -430,12 +442,12 @@ function renderHeader(summary) {
         </div>
         <div class="flex flex-wrap justify-between gap-2 text-sm">
             <span class="${TEXT_CLASSES[level]} font-medium">
-                Repartido ${formatCurrency(assigned)}${share != null ? ` · ${share.toFixed(1)}%` : ''}
+                ${escapeHtml(t('budgets.assigned-total', { amount: formatCurrency(assigned) }))}${share != null ? ` · ${formatPercent(share)}` : ''}
             </span>
             <span class="text-gray-600 dark:text-slate-300">
                 ${free >= 0
-                    ? `Sin asignar <strong>${formatCurrency(free)}</strong>`
-                    : `<strong class="text-red-600">${formatCurrency(-free)} de más</strong>`}
+                    ? `${t('budgets.unassigned-label')} <strong>${formatCurrency(free)}</strong>`
+                    : `<strong class="text-red-600">${escapeHtml(t('budgets.over', { amount: formatCurrency(-free) }))}</strong>`}
             </span>
         </div>
     `;
@@ -447,7 +459,7 @@ function renderSections(summary, budgets) {
 
     if (sections.length === 0) {
         container.innerHTML = `
-            <p class="text-gray-500 dark:text-slate-400 text-center py-8">No hay categorías todavía.</p>`;
+            <p class="text-gray-500 dark:text-slate-400 text-center py-8">${t('categories.empty')}</p>`;
         return;
     }
 
@@ -491,20 +503,22 @@ function renderSection(section, budgetByCategory, available) {
             <header class="p-5 pb-4 border-b border-slate-200 dark:border-slate-700">
                 <div class="flex flex-wrap justify-between items-start gap-3">
                     <div>
-                        <h3 class="text-xl font-bold">${style.titol}</h3>
-                        <p class="text-xs text-gray-500 dark:text-slate-400 mt-0.5">${style.descripcio}</p>
+                        <h3 class="text-xl font-bold">${escapeHtml(sectionLabel(section.tipus))}</h3>
+                        <p class="text-xs text-gray-500 dark:text-slate-400 mt-0.5">${t(style.descripcio)}</p>
                     </div>
                     <div class="text-right">
                         <div class="text-2xl font-bold">${formatCurrency(style.esIngres ? (available || 0) : assigned)}</div>
                         <div class="text-xs text-gray-500 dark:text-slate-400">
                             ${style.esIngres
-                                ? `previsto ${formatCurrency(assigned)} · recibido ${formatCurrency(real)}`
-                                : share != null ? `${share.toFixed(1)}% de los ingresos` : 'sin ingresos definidos'}
+                                ? escapeHtml(t('budgets.forecast-and-received', { forecast: formatCurrency(assigned), received: formatCurrency(real) }))
+                                : share != null
+                                    ? escapeHtml(t('budgets.share-of-income', { percent: formatPercent(share) }))
+                                    : t('budgets.no-income-defined')}
                         </div>
                         ${style.esEstalvi ? `
                             <div class="text-xs text-teal-700 dark:text-teal-300">
-                                ahorrado ${formatCurrency(real)}${toNumber(section.gastat_del_fons) > 0
-                                    ? ` · gastado del fondo ${formatCurrency(toNumber(section.gastat_del_fons))}`
+                                ${escapeHtml(t('budgets.saved-amount', { amount: formatCurrency(real) }))}${toNumber(section.gastat_del_fons) > 0
+                                    ? ` · ${escapeHtml(t('budgets.fund-spent', { amount: formatCurrency(toNumber(section.gastat_del_fons)) }))}`
                                     : ''}
                             </div>` : ''}
                     </div>
@@ -517,19 +531,19 @@ function renderSection(section, budgetByCategory, available) {
                         </div>
                         <div class="flex flex-wrap justify-between gap-2 text-xs mt-1.5">
                             <span class="text-gray-600 dark:text-slate-300">
-                                Hay <strong>${formatCurrency(pot)}</strong>
-                                ${section.tipus === 'FIXED' ? 'disponibles este mes' : 'después de los fijos'}
+                                ${t('budgets.there-is')} <strong>${formatCurrency(pot)}</strong>
+                                ${t(section.tipus === 'FIXED' ? 'budgets.available-this-month' : 'budgets.after-fixed')}
                             </span>
                             <span class="${left < 0 ? 'text-red-600 font-medium' : 'text-gray-600 dark:text-slate-300'}">
-                                ${left < 0
-                                    ? `${formatCurrency(-left)} por encima de lo que hay`
+                                ${escapeHtml(left < 0
+                                    ? t('budgets.over-pot', { amount: formatCurrency(-left) })
                                     : section.tipus === 'FIXED'
                                         // Lo que no se llevan los fijos no queda libre: es exactamente
                                         // el bote con el que empiezan los variables.
-                                        ? `${formatCurrency(left)} pasan a variables y ahorro`
+                                        ? t('budgets.passes-to-variable', { amount: formatCurrency(left) })
                                         // El bote es el mismo para variables y ahorro: lo que queda
                                         // es de los dos, y sale igual en las dos secciones.
-                                        : `quedan ${formatCurrency(left)} por repartir entre variables y ahorro`}
+                                        : t('budgets.left-to-share', { amount: formatCurrency(left) }))}
                             </span>
                         </div>
                     </div>` : ''}
@@ -537,7 +551,7 @@ function renderSection(section, budgetByCategory, available) {
 
             <div class="p-4 space-y-3">
                 ${nodes.length === 0
-                    ? `<p class="text-sm text-gray-500 dark:text-slate-400 py-2">${style.buit}</p>`
+                    ? `<p class="text-sm text-gray-500 dark:text-slate-400 py-2">${t(style.buit)}</p>`
                     : byRelevance(nodes).map(node => renderBlock(node, budgetByCategory, style)).join('')}
             </div>
         </section>
@@ -576,7 +590,7 @@ function renderBlock(node, budgetByCategory, style) {
                     ${children.length > 0 ? `
                         <button data-action="toggle" data-id="${category.id}"
                                 class="p-1 -ml-1 hover:bg-gray-100 dark:hover:bg-slate-700 rounded shrink-0"
-                                title="${expanded ? 'Plegar' : 'Desplegar'}">
+                                title="${t(expanded ? 'budgets.collapse' : 'budgets.expand')}">
                             <span class="material-symbols-outlined text-base">${expanded ? 'expand_less' : 'expand_more'}</span>
                         </button>` : '<span class="w-6 shrink-0"></span>'}
                     <div class="min-w-0">
@@ -584,10 +598,10 @@ function renderBlock(node, budgetByCategory, style) {
                         <div class="flex flex-wrap items-center gap-1.5 mt-1">
                             ${shareBadge(node, style)}
                             ${children.length > 0
-                                ? `<span class="text-xs text-gray-500 dark:text-slate-400">${children.length} subsecciones</span>`
+                                ? `<span class="text-xs text-gray-500 dark:text-slate-400">${escapeHtml(t('budgets.subsection-count', { count: children.length }))}</span>`
                                 : ''}
                             ${node.carrec_puntual_aquest_mes
-                                ? '<span class="text-xs text-orange-700" title="Este mes ha caído un cargo fijo puntual">⚑ cargo este mes</span>'
+                                ? `<span class="text-xs text-orange-700" title="${t('budgets.one-off-charge-title')}">${t('budgets.one-off-charge')}</span>`
                                 : ''}
                         </div>
                     </div>
@@ -601,10 +615,12 @@ function renderBlock(node, budgetByCategory, style) {
                             // la sección de encima ya decía que aportaba miles.
                             ? `<div class="text-lg font-bold">${formatCurrency(Math.max(real, plan))}</div>
                                <div class="text-xs text-gray-500 dark:text-slate-400">
-                                   ${plan > 0 ? `previsto ${formatCurrency(plan)} · recibido ${formatCurrency(real)}` : 'recibido'}
+                                   ${plan > 0
+                                       ? escapeHtml(t('budgets.forecast-and-received', { forecast: formatCurrency(plan), received: formatCurrency(real) }))
+                                       : t('budgets.received')}
                                </div>`
                             : `<div class="text-lg font-bold">${plan > 0 ? formatCurrency(plan) : '—'}</div>
-                               <div class="text-xs text-gray-500 dark:text-slate-400">asignado</div>`}
+                               <div class="text-xs text-gray-500 dark:text-slate-400">${t('budgets.assigned')}</div>`}
                     </div>
                     ${actionButtons(node, budgetByCategory)}
                 </div>
@@ -616,24 +632,20 @@ function renderBlock(node, budgetByCategory, style) {
                 </div>
                 <div class="flex flex-wrap justify-between gap-2 text-xs mt-1.5">
                     <span class="${textClass} font-medium">
-                        ${style.esEstalvi ? 'Ahorrado' : 'Gastado'} ${formatCurrency(real)} de ${formatCurrency(plan)}
+                        ${escapeHtml(t(style.esEstalvi ? 'budgets.saved-of' : 'budgets.spent-of', { real: formatCurrency(real), plan: formatCurrency(plan) }))}
                         ${fundSpent(node)}
                     </span>
                     ${left != null
                         ? `<span class="${left < 0 ? 'text-red-600' : 'text-gray-500 dark:text-slate-400'}">
-                               ${left < 0
-                                    ? `${formatCurrency(-left)} repartidos de más entre las subsecciones`
-                                    : `${formatCurrency(left)} sin repartir dentro`}
+                               ${escapeHtml(left < 0
+                                    ? t('budgets.over-subsections', { amount: formatCurrency(-left) })
+                                    : t('budgets.unshared-inside', { amount: formatCurrency(left) }))}
                            </span>`
                         : ''}
                 </div>` : style.esIngres ? `
+                <p class="text-xs text-gray-500 dark:text-slate-400">${t('budgets.income-block-note')}</p>` : `
                 <p class="text-xs text-gray-500 dark:text-slate-400">
-                    Lo que entra por este bloque. Cuenta lo recibido o lo previsto, lo que sea mayor.
-                </p>` : `
-                <p class="text-xs text-gray-500 dark:text-slate-400">
-                    Sin asignar. ${children.length > 0
-                        ? 'Su total sale de sumar lo que tengan sus subsecciones.'
-                        : 'Ponle un importe o un porcentaje para que cuente en el reparto.'}
+                    ${t(children.length > 0 ? 'budgets.unassigned-with-children' : 'budgets.unassigned-leaf')}
                 </p>`}
 
             ${children.length > 0 && expanded ? `
@@ -655,7 +667,6 @@ function renderLeaf(node, budgetByCategory, style) {
     const level = plan > 0 && real > plan ? 'high' : percent > 80 ? 'medium' : 'low';
     const barClass = style.esEstalvi ? style.barra : BAR_CLASSES[level];
     const textClass = style.esEstalvi ? 'text-teal-700 dark:text-teal-300' : TEXT_CLASSES[level];
-    const verb = style.esEstalvi ? 'ahorrado' : 'gastado';
 
     // Una subsecció buida s'apaga en comptes d'ocupar el mateix que una amb
     // diners: hi ha catorze i només compten les que tenen alguna cosa.
@@ -666,18 +677,18 @@ function renderLeaf(node, budgetByCategory, style) {
             <div class="min-w-0 flex-1">
                 <div class="flex flex-wrap items-center gap-1.5">
                     <span class="text-sm truncate">${escapeHtml(category.nom)}</span>
-                    ${fixed ? '<span class="text-xs px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300">fijo</span>' : ''}
+                    ${fixed ? `<span class="text-xs px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300">${t('categories.badge-fixed')}</span>` : ''}
                     ${toNumber(node.quotes_deutes) > 0
                         ? `<span class="text-xs px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-800 dark:bg-amber-500/20 dark:text-amber-300"
-                                 title="Cuotas pactadas de deudas que vencen este mes: ya están comprometidas y se reservan solas.">
-                               cuotas de deudas ${formatCurrency(toNumber(node.quotes_deutes))}
+                                 title="${t('budgets.debt-quotas-title')}">
+                               ${escapeHtml(t('budgets.debt-quotas', { amount: formatCurrency(toNumber(node.quotes_deutes)) }))}
                            </span>`
                         : ''}
                     ${shareBadge(node, style)}
                     ${toNumber(node.aporta_al_disponible) > 0
                         ? `<span class="text-xs px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-300"
-                                 title="Lo que esta categoría pone en el total a repartir: lo recibido o lo previsto, lo que sea mayor.">
-                               aporta ${formatCurrency(toNumber(node.aporta_al_disponible))}
+                                 title="${t('budgets.contributes-title')}">
+                               ${escapeHtml(t('budgets.contributes', { amount: formatCurrency(toNumber(node.aporta_al_disponible)) }))}
                            </span>`
                         : ''}
                 </div>
@@ -692,15 +703,17 @@ function renderLeaf(node, budgetByCategory, style) {
                     ${style.esIngres
                         ? `<div class="font-medium ${real > 0 ? 'text-green-700' : ''}">${formatCurrency(Math.max(real, plan))}</div>
                            <div class="text-xs text-gray-500 dark:text-slate-400">
-                               ${plan > 0 ? `previsto ${formatCurrency(plan)} · recibido ${formatCurrency(real)}` : 'recibido'}
+                               ${plan > 0
+                                   ? escapeHtml(t('budgets.forecast-and-received', { forecast: formatCurrency(plan), received: formatCurrency(real) }))
+                                   : t('budgets.received')}
                            </div>`
                         : plan > 0
                             ? `<div class="font-medium">${formatCurrency(plan)}</div>
-                               <div class="text-xs ${textClass}">${verb} ${formatCurrency(real)}</div>`
+                               <div class="text-xs ${textClass}">${escapeHtml(t(style.esEstalvi ? 'budgets.saved-amount' : 'budgets.spent-amount', { amount: formatCurrency(real) }))}</div>`
                             : real > 0
                                 ? `<div class="font-medium ${style.esEstalvi ? 'text-teal-700 dark:text-teal-300' : 'text-orange-700'}">${formatCurrency(real)}</div>
-                                   <div class="text-xs text-gray-500 dark:text-slate-400">${verb} sin asignar</div>`
-                                : '<div class="text-xs text-gray-500 dark:text-slate-400">sin asignar</div>'}
+                                   <div class="text-xs text-gray-500 dark:text-slate-400">${t(style.esEstalvi ? 'budgets.saved-unassigned' : 'budgets.spent-unassigned')}</div>`
+                                : `<div class="text-xs text-gray-500 dark:text-slate-400">${t('budgets.not-assigned')}</div>`}
                 </div>
                 ${actionButtons(node, budgetByCategory)}
             </div>
@@ -717,8 +730,8 @@ function fundSpent(node, { inline = true } = {}) {
     const spent = toNumber(node.gastat_del_fons) || 0;
     if (spent <= 0) return '';
     return `<span class="text-gray-500 dark:text-slate-400 font-normal"
-                  title="Pagado desde una cuenta de ahorro: cuenta como gasto en Análisis, pero no resta de lo ahorrado.">
-                ${inline ? '· ' : ''}gastado del fondo ${formatCurrency(spent)}
+                  title="${t('budgets.fund-spent-title')}">
+                ${inline ? '· ' : ''}${escapeHtml(t('budgets.fund-spent', { amount: formatCurrency(spent) }))}
             </span>`;
 }
 
@@ -755,13 +768,12 @@ function shareBadge(node, style) {
     // les que sí que tenen diners.
     if (share == null || (declared == null && share === 0)) return '';
 
-    const pot = potByCategory.get(node.categoria.id);
-    const label = pot ? pot.label : 'lo que hay encima';
+    const pot = potByCategory.get(node.categoria.id)?.pot || POT_ABOVE;
 
     // El "≈" distingeix el percentatge que ha triat l'usuari del que surt de
     // dividir un import exacte: el primer es manté si canvia el sou, el segon no.
     return `<span class="text-xs px-2 py-0.5 rounded-full ${style.pastilla}">
-                ${declared == null ? '≈' : ''}${share.toFixed(share % 1 === 0 ? 0 : 1)}% ${escapeHtml(prefixDe(label))}
+                ${declared == null ? '≈' : ''}${formatPercent(share, share % 1 === 0 ? 0 : 1)} ${escapeHtml(potOf(pot))}
             </span>`;
 }
 
@@ -773,17 +785,17 @@ function actionButtons(node, budgetByCategory) {
     const hasFixedCost = toNumber(node.prorrateig_mensual) > 0;
     if (budget) {
         return `
-            <button data-action="edit" data-id="${budget.id}" class="p-1 hover:bg-gray-100 dark:hover:bg-slate-700 rounded" title="Cambiar la asignación">
+            <button data-action="edit" data-id="${budget.id}" class="p-1 hover:bg-gray-100 dark:hover:bg-slate-700 rounded" title="${t('budgets.edit-allocation')}">
                 <span class="material-symbols-outlined text-sm">edit</span>
             </button>
             <button data-action="delete" data-id="${budget.id}" data-fixed="${hasFixedCost}" class="p-1 hover:bg-red-50 dark:hover:bg-red-500/10 text-red-600 rounded"
-                    title="${hasFixedCost ? 'Volver al recurrente' : 'Quitar la asignación'}">
+                    title="${t(hasFixedCost ? 'budgets.back-to-recurring' : 'budgets.remove-allocation')}">
                 <span class="material-symbols-outlined text-sm">${hasFixedCost ? 'undo' : 'delete'}</span>
             </button>`;
     }
     return `
         <button data-action="create" data-category="${node.categoria.id}" class="p-1 hover:bg-gray-100 dark:hover:bg-slate-700 rounded"
-                title="${hasFixedCost ? 'Cambiar solo este mes' : 'Asignar dinero'}">
+                title="${t(hasFixedCost ? 'budgets.change-this-month' : 'budgets.assign-title')}">
             <span class="material-symbols-outlined text-sm">${hasFixedCost ? 'edit' : 'add'}</span>
         </button>`;
 }
@@ -793,14 +805,14 @@ function actionButtons(node, budgetByCategory) {
 /** El bot sobre el qual es reparteix la categoria que hi ha seleccionada. */
 function selectedPot() {
     const id = Number.parseInt(document.getElementById('budget-category').value, 10);
-    return potByCategory.get(id) || { label: 'lo que hay encima', base: null };
+    return potByCategory.get(id) || { pot: POT_ABOVE, base: null };
 }
 
 function refreshPot() {
     const pot = selectedPot();
     document.getElementById('budget-pot-label').textContent = pot.base != null
-        ? `${formatCurrency(pot.base)} · ${pot.label}`
-        : `${pot.label} (sin cifra: faltan los ingresos del mes)`;
+        ? `${formatCurrency(pot.base)} · ${potName(pot.pot)}`
+        : t('budgets.pot-no-amount', { pot: potName(pot.pot) });
     updateHints();
 }
 
@@ -824,18 +836,18 @@ function updateHints() {
     const amount = toNumber(document.getElementById('budget-limit').value);
 
     if (pot.base == null) {
-        percentHint.textContent = 'Sin ingresos definidos no se puede calcular el importe.';
+        percentHint.textContent = t('budgets.no-income-for-amount');
         amountHint.textContent = '';
         return;
     }
 
     percentHint.textContent = percent == null
         ? ''
-        : `Son ${formatCurrency(pot.base * percent / 100)} ${prefixDe(pot.label)} (${formatCurrency(pot.base)}).`;
+        : t('budgets.percent-hint', { amount: formatCurrency(pot.base * percent / 100), of: potOf(pot.pot), base: formatCurrency(pot.base) });
 
     amountHint.textContent = amount == null || pot.base <= 0
         ? ''
-        : `Es el ${(amount / pot.base * 100).toFixed(1)}% ${prefixDe(pot.label)}.`;
+        : t('budgets.amount-hint', { percent: formatPercent(amount / pot.base * 100), of: potOf(pot.pot) });
 }
 
 /**
@@ -846,19 +858,17 @@ function updateHints() {
  */
 async function copyPreviousMonth() {
     const { year, month } = selectedPeriod();
-    const monthName = MONTH_NAMES[month - 1];
 
-    if (!confirm(`Copiar a ${monthName} las asignaciones del mes anterior.
-Lo que ya tenga asignación este mes no se toca.`)) return;
+    if (!confirm(t('budgets.copy-confirm', { month: selectedMonthLabel() }))) return;
 
     try {
         const result = await copyPreviousMonthBudgets(year, month);
         await loadSummary();
         alert(result.copiats > 0
-            ? `Copiadas ${result.copiats} asignaciones de ${result.origen}.`
-            : `No había nada que copiar de ${result.origen}, o ya lo tenías todo asignado.`);
+            ? t('budgets.copied', { count: result.copiats, source: result.origen })
+            : t('budgets.nothing-to-copy', { source: result.origen }));
     } catch (error) {
-        alert(error.message || 'Error al copiar el mes anterior');
+        alert(error.message || t('budgets.copy-failed'));
     }
 }
 
@@ -875,9 +885,7 @@ async function editMonthlyIncome() {
         ? toNumber(lastSummary.sou_base)
         : '';
 
-    const input = prompt(
-        `Sueldo para ${period}. También se pondrá como previsión de la nómina.
-Déjalo vacío para volver al sueldo por defecto.`,
+    const input = prompt(t('budgets.salary-prompt', { month: selectedMonthLabel() }),
         current === '' || current == null ? '' : String(current));
     if (input === null) return;
 
@@ -887,14 +895,14 @@ Déjalo vacío para volver al sueldo por defecto.`,
         } else {
             const amount = Number.parseFloat(input.replace(',', '.'));
             if (!Number.isFinite(amount) || amount < 0) {
-                alert('Introduce un importe positivo.');
+                alert(t('budgets.amount-positive'));
                 return;
             }
             await setMonthlyIncome(period, { import: amount });
         }
         await loadSummary();
     } catch (error) {
-        alert(error.message || 'Error al guardar el sueldo del mes');
+        alert(error.message || t('budgets.salary-save-failed'));
     }
 }
 
@@ -913,7 +921,7 @@ function openModal(budget = null, presetCategoryId = null) {
     document.getElementById('budget-end').value = toInputDate(end);
 
     if (budget) {
-        document.getElementById('modal-title').textContent = 'Cambiar la asignación';
+        document.getElementById('modal-title').textContent = t('budgets.edit-allocation');
         document.getElementById('budget-id').value = budget.id;
         document.getElementById('budget-category').value = budget.category?.id;
         document.getElementById('budget-limit').value = budget.quantitat_limit;
@@ -922,7 +930,7 @@ function openModal(budget = null, presetCategoryId = null) {
         document.getElementById('budget-start').value = budget.periode_inici;
         document.getElementById('budget-end').value = budget.periode_fi;
     } else {
-        document.getElementById('modal-title').textContent = 'Asignar dinero';
+        document.getElementById('modal-title').textContent = t('budgets.assign-title');
         document.getElementById('budget-id').value = '';
         document.getElementById('budget-mode').value = 'AMOUNT';
         if (presetCategoryId) {
@@ -937,14 +945,13 @@ function openModal(budget = null, presetCategoryId = null) {
     const fixedCost = potByCategory.get(categoryId)?.fixedCost;
     if (fixedCost > 0) {
         if (!budget) {
-            document.getElementById('modal-title').textContent = 'Cambiar solo este mes';
+            document.getElementById('modal-title').textContent = t('budgets.change-this-month');
             document.getElementById('budget-limit').value = fixedCost.toFixed(2);
         }
         document.getElementById('modal-subtitle').textContent =
-            `Solo para ${MONTH_NAMES[month - 1]} ${year}. El recurrente es ${formatCurrency(fixedCost)} y no cambia: se edita en «Recurrentes».`;
+            t('budgets.only-this-month', { month: formatMonth(year, month), amount: formatCurrency(fixedCost) });
     } else {
-        document.getElementById('modal-subtitle').textContent =
-            'Un porcentaje se mide siempre sobre el nivel que tiene encima, no sobre el total de ingresos.';
+        document.getElementById('modal-subtitle').textContent = t('budgets.percent-explainer');
     }
 
     refreshPot();
@@ -978,18 +985,14 @@ let loadedFixedCosts = [];
 
 async function openFixedCosts() {
     const modal = document.getElementById('fixed-costs-modal');
-    const { year, month } = selectedPeriod();
-
     document.getElementById('fixed-costs-subtitle').textContent =
-        'Se copian a cada mes y son lo previsto en su categoría: en una fija, lo que cuesta; '
-        + 'en una variable, como la luz, el tope con el que se compara lo gastado. '
-        + `Los cambios valen desde ${MONTH_NAMES[month - 1]} ${year}; los meses anteriores no cambian.`;
+        t('budgets.recurring-subtitle', { month: selectedMonthLabel() });
 
     // Cualquier subcategoría de gasto: antes solo las fijas, y la luz no podía
     // tener el suyo.
     const options = categoryOptions(categories, { sections: EXPENSE_SECTIONS });
     document.getElementById('fixed-cost-category').innerHTML = options
-        || '<option value="">No hay subcategorías de gasto</option>';
+        || `<option value="">${t('budgets.no-expense-subcategories')}</option>`;
 
     resetFixedCostForm();
     modal.classList.remove('hidden');
@@ -1011,7 +1014,7 @@ async function loadFixedCosts() {
         loadedFixedCosts = response.costos || [];
         renderFixedCosts(loadedFixedCosts, toNumber(response.total_mensual) || 0);
     } catch (error) {
-        list.innerHTML = `<p class="text-red-600 text-sm">${escapeHtml(error.message || 'Error al cargar los recurrentes')}</p>`;
+        list.innerHTML = `<p class="text-red-600 text-sm">${escapeHtml(error.message || t('recurring.load-failed'))}</p>`;
     }
 }
 
@@ -1019,14 +1022,12 @@ function renderFixedCosts(fixedCosts, monthlyTotal) {
     const list = document.getElementById('fixed-costs-list');
     if (fixedCosts.length === 0) {
         list.innerHTML = `
-            <p class="text-sm text-gray-500 dark:text-slate-400 text-center py-4">
-                Todavía no hay gastos recurrentes este mes.
-            </p>`;
+            <p class="text-sm text-gray-500 dark:text-slate-400 text-center py-4">${t('budgets.no-recurring-this-month')}</p>`;
         return;
     }
 
     const rows = fixedCosts.map(fixedCost => {
-        const frequency = FREQUENCIES[fixedCost.frequencia] || fixedCost.frequencia;
+        const frequency = FREQUENCIES[fixedCost.frequencia] ? t(FREQUENCIES[fixedCost.frequencia]) : (fixedCost.frequencia || '');
         const monthly = toNumber(fixedCost.prorrateig_mensual) || 0;
         const isMonthly = fixedCost.frequencia === 'MENSUAL';
         return `
@@ -1034,17 +1035,17 @@ function renderFixedCosts(fixedCosts, monthlyTotal) {
                 <div class="min-w-0">
                     <div class="font-medium truncate">${escapeHtml(fixedCost.nom)}</div>
                     <div class="text-xs text-gray-500 dark:text-slate-400">
-                        ${escapeHtml(fixedCost.category?.nom || 'Sin categoría')}
+                        ${escapeHtml(fixedCost.category?.nom || t('budgets.no-category'))}
                         · ${formatCurrency(fixedCost.import)} ${escapeHtml(frequency.toLowerCase())}
-                        ${isMonthly ? '' : ` · ${formatCurrency(monthly)} al mes`}
+                        ${isMonthly ? '' : ` · ${escapeHtml(t('budgets.per-month-amount', { amount: formatCurrency(monthly) }))}`}
                     </div>
                 </div>
                 <div class="flex items-center gap-1 shrink-0">
                     <span class="font-semibold mr-2">${formatCurrency(monthly)}</span>
-                    <button data-action="edit-fixed" data-id="${fixedCost.id}" class="p-1 hover:bg-gray-100 dark:hover:bg-slate-700 rounded" title="Cambiar desde este mes">
+                    <button data-action="edit-fixed" data-id="${fixedCost.id}" class="p-1 hover:bg-gray-100 dark:hover:bg-slate-700 rounded" title="${t('budgets.change-from-this-month')}">
                         <span class="material-symbols-outlined text-sm">edit</span>
                     </button>
-                    <button data-action="delete-fixed" data-id="${fixedCost.id}" class="p-1 hover:bg-red-50 dark:hover:bg-red-500/10 text-red-600 rounded" title="Quitar desde este mes">
+                    <button data-action="delete-fixed" data-id="${fixedCost.id}" class="p-1 hover:bg-red-50 dark:hover:bg-red-500/10 text-red-600 rounded" title="${t('budgets.remove-from-this-month')}">
                         <span class="material-symbols-outlined text-sm">delete</span>
                     </button>
                 </div>
@@ -1053,7 +1054,7 @@ function renderFixedCosts(fixedCosts, monthlyTotal) {
 
     list.innerHTML = rows + `
         <div class="flex justify-between px-3 pt-2 text-sm">
-            <span class="text-gray-500 dark:text-slate-400">Total al mes</span>
+            <span class="text-gray-500 dark:text-slate-400">${t('budgets.monthly-total')}</span>
             <span class="font-bold">${formatCurrency(monthlyTotal)}</span>
         </div>`;
 }
@@ -1061,8 +1062,8 @@ function renderFixedCosts(fixedCosts, monthlyTotal) {
 function resetFixedCostForm() {
     document.getElementById('fixed-cost-form').reset();
     document.getElementById('fixed-cost-id').value = '';
-    document.getElementById('fixed-cost-form-title').textContent = 'Añadir un gasto recurrente';
-    document.getElementById('fixed-cost-submit').textContent = 'Añadir';
+    document.getElementById('fixed-cost-form-title').textContent = t('budgets.recurring-add-title');
+    document.getElementById('fixed-cost-submit').textContent = t('common.add');
     document.getElementById('fixed-cost-cancel').classList.add('hidden');
     document.getElementById('fixed-cost-frequency').value = 'MENSUAL';
     document.getElementById('fixed-cost-hint').textContent = '';
@@ -1076,6 +1077,7 @@ async function handleFixedCostListClick(event) {
     const fixedCost = loadedFixedCosts.find(candidate => candidate.id === id);
     if (!fixedCost) return;
     const { year, month } = selectedPeriod();
+    const monthLabel = formatMonth(year, month);
 
     if (button.dataset.action === 'edit-fixed') {
         document.getElementById('fixed-cost-id').value = fixedCost.id;
@@ -1083,23 +1085,22 @@ async function handleFixedCostListClick(event) {
         document.getElementById('fixed-cost-category').value = fixedCost.category?.id ?? '';
         document.getElementById('fixed-cost-amount').value = fixedCost.import;
         document.getElementById('fixed-cost-frequency').value = fixedCost.frequencia;
-        document.getElementById('fixed-cost-form-title').textContent = `Cambiar «${fixedCost.nom}»`;
-        document.getElementById('fixed-cost-submit').textContent = 'Guardar';
+        document.getElementById('fixed-cost-form-title').textContent = t('budgets.change-named', { name: fixedCost.nom });
+        document.getElementById('fixed-cost-submit').textContent = t('common.save');
         document.getElementById('fixed-cost-cancel').classList.remove('hidden');
-        document.getElementById('fixed-cost-hint').textContent =
-            `Vale desde ${MONTH_NAMES[month - 1]} ${year}. Los meses anteriores se quedan con el importe de antes.`;
+        document.getElementById('fixed-cost-hint').textContent = t('budgets.valid-from', { month: monthLabel });
         document.getElementById('fixed-cost-name').focus();
         return;
     }
 
     if (button.dataset.action === 'delete-fixed') {
-        if (!confirm(`¿Quitar «${fixedCost.nom}» desde ${MONTH_NAMES[month - 1]} ${year}?\nLos meses anteriores lo conservan.`)) return;
+        if (!confirm(t('budgets.remove-recurring-confirm', { name: fixedCost.nom, month: monthLabel }))) return;
         try {
             await deleteFixedCost(id, year, month);
             resetFixedCostForm();
             await Promise.all([loadFixedCosts(), loadSummary()]);
         } catch (error) {
-            alert(error.message || 'Error al quitar el recurrente');
+            alert(error.message || t('budgets.remove-recurring-failed'));
         }
     }
 }
@@ -1112,11 +1113,11 @@ async function handleFixedCostSubmit(event) {
     const amount = toNumber(document.getElementById('fixed-cost-amount').value);
 
     if (!Number.isInteger(categoryId)) {
-        alert('Primero crea alguna subcategoría de gasto en Categorías.');
+        alert(t('budgets.create-subcategory-first'));
         return;
     }
     if (amount == null || amount < 0) {
-        alert('Introduce un importe positivo.');
+        alert(t('budgets.amount-positive'));
         return;
     }
 
@@ -1136,7 +1137,7 @@ async function handleFixedCostSubmit(event) {
         resetFixedCostForm();
         await Promise.all([loadFixedCosts(), loadSummary()]);
     } catch (error) {
-        alert(error.message || 'Error al guardar el recurrente');
+        alert(error.message || t('recurring.save-failed'));
     }
 }
 
@@ -1172,21 +1173,21 @@ async function handleListClick(event) {
         try {
             openModal(await getBudget(id));
         } catch (error) {
-            alert(error.message || 'Error al cargar presupuesto');
+            alert(error.message || t('budgets.load-one-failed'));
         }
         return;
     }
 
     if (action === 'delete') {
         const question = button.dataset.fixed === 'true'
-            ? '¿Volver al recurrente en este mes?'
-            : '¿Quitar esta asignación?';
-        if (!confirm(question)) return;
+            ? 'budgets.back-to-recurring-confirm'
+            : 'budgets.remove-allocation-confirm';
+        if (!confirm(t(question))) return;
         try {
             await deleteBudget(id);
             await loadSummary();
         } catch (error) {
-            alert(error.message || 'Error al eliminar presupuesto');
+            alert(error.message || t('budgets.delete-failed'));
         }
     }
 }
@@ -1199,7 +1200,7 @@ async function handleSubmit(event) {
     const pot = selectedPot();
 
     if (byPercent && (percent == null || percent < 0 || percent > 100)) {
-        alert('El porcentaje debe estar entre 0 y 100.');
+        alert(t('budgets.percent-range'));
         return;
     }
 
@@ -1212,7 +1213,7 @@ async function handleSubmit(event) {
         : toNumber(document.getElementById('budget-limit').value);
 
     if (!byPercent && (limit == null || limit < 0)) {
-        alert('Introduce un importe positivo.');
+        alert(t('budgets.amount-positive'));
         return;
     }
 
@@ -1243,6 +1244,6 @@ async function handleSubmit(event) {
         closeModal();
         await loadSummary();
     } catch (error) {
-        alert(error.message || 'Error al guardar presupuesto');
+        alert(error.message || t('budgets.save-failed'));
     }
 }

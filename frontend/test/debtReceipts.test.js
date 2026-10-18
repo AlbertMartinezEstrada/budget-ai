@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 
 // debtReceipts.js fa servir escapeHtml i formatCurrency d'api.js, que llegeix
 // window en carregar-se.
@@ -16,6 +17,10 @@ let module;
 
 test.before(async () => {
     module = await import('../public/js/debtReceipts.js');
+    // Els textos es comproven en català, l'idioma de referència.
+    const i18n = await import('../public/js/i18n.js');
+    const catalan = fs.readFileSync(new URL('../public/lang/Language_ca.properties', import.meta.url), 'utf8');
+    i18n.setMessages('ca', i18n.parseProperties(catalan));
 });
 
 const receipt = (data, estat, amount = '97.38') => ({ data, import: amount, pagat: '0', estat, eliminable: true });
@@ -41,16 +46,16 @@ function parse(html) {
 }
 
 test('un rebut mensual es diu pel mes, no pel dia', () => {
-    assert.equal(module.receiptLabel('2026-10-08', 'MENSUAL'), 'octubre 2026');
+    assert.equal(module.receiptLabel('2026-10-08', 'MENSUAL'), 'octubre del 2026');
     // Tot de cop no té freqüència: també va pel mes.
-    assert.equal(module.receiptLabel('2026-03-31', undefined), 'març 2026');
+    assert.equal(module.receiptLabel('2026-03-31', undefined), 'març del 2026');
 });
 
 test('un rebut setmanal es diu pel dilluns de la setmana, i un de trimestral pels tres mesos', () => {
     // Dimecres 7 d'octubre de 2026: la setmana comença el dilluns 5.
-    assert.equal(module.receiptLabel('2026-10-07', 'SETMANAL'), `setmana del ${new Date(2026, 9, 5).toLocaleDateString('ca-ES')}`);
-    assert.equal(module.receiptLabel('2026-10-15', 'TRIMESTRAL'), 'octubre–desembre 2026');
-    assert.equal(module.receiptLabel('2026-11-15', 'TRIMESTRAL'), 'novembre 2026–gener 2027');
+    assert.equal(module.receiptLabel('2026-10-07', 'SETMANAL'), 'setmana del 05/10/2026');
+    assert.equal(module.receiptLabel('2026-10-15', 'TRIMESTRAL').replace(/[\u2009\u202f]/g, ' '), 'octubre del 2026 – desembre del 2026');
+    assert.equal(module.receiptLabel('2026-11-15', 'TRIMESTRAL').replace(/[\u2009\u202f]/g, ' '), 'novembre del 2026 – gener del 2027');
 });
 
 test('el rebut d\'aquest període "toca", amb les paraules de la freqüència', () => {
@@ -78,7 +83,7 @@ test('el desplegable comença pel que toca i no ofereix els rebuts trets', () =>
     assert.equal(options[0].value, '');
     assert.match(options[0].text, /El que toca/);
     assert.deepEqual(options.slice(1).map(option => option.value), ['2026-10-08', '2026-11-08', '2026-12-08']);
-    assert.match(options[1].text, /octubre 2026 · 97,38\s€ · pagat/);
+    assert.match(options[1].text, /octubre del 2026 · 97,38\s€ · pagat/);
     assert.ok(options.every(option => !option.selected));
 });
 
@@ -94,7 +99,7 @@ test('un rebut triat que ja no és al calendari surt igualment, perquè editar n
     const selected = options.filter(option => option.selected);
     assert.equal(selected.length, 1);
     assert.equal(selected[0].value, '2026-09-08');
-    assert.match(selected[0].text, /setembre 2026 · ja no és al calendari/);
+    assert.match(selected[0].text, /setembre del 2026 · ja no és al calendari/);
 });
 
 test('només hi ha rebut per triar als deutes a quotes', () => {

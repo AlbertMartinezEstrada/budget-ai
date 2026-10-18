@@ -2,19 +2,31 @@ import { getRecurringTransactions, getRecurringTransaction, createRecurringTrans
 import {
     categoryOptions, leafCategories, sectionOfCategory, EXPENSE_SECTIONS, INCOME_SECTIONS
 } from '../../categoryOptions.js';
+import { t, formatDate } from '../../i18n.js';
+
+/** El nom de cada freqüència; el codi és el que desa el backend. */
+const FREQUENCY_LABELS = {
+    DIARIA: 'frequency.daily',
+    SETMANAL: 'frequency.weekly',
+    MENSUAL: 'frequency.monthly',
+    TRIMESTRAL: 'frequency.quarterly',
+    ANUAL: 'frequency.yearly'
+};
+
+const frequencyLabel = (frequency) => FREQUENCY_LABELS[frequency] ? t(FREQUENCY_LABELS[frequency]) : (frequency || '');
 
 export async function initRecurring(container) {
     container.innerHTML = `
         <div class="page-header flex justify-between items-center mb-6">
-            <h2 class="text-2xl font-bold text-slate-800 dark:text-slate-100">Transacciones Recurrentes</h2>
+            <h2 class="text-2xl font-bold text-slate-800 dark:text-slate-100">${t('nav.recurring')}</h2>
             <div class="flex gap-2">
                 <button id="process-btn" class="bg-green-700 text-white px-4 py-2 rounded-lg hover:bg-green-800 flex items-center gap-2">
                     <span class="material-symbols-outlined">play_arrow</span>
-                    Procesar
+                    ${t('recurring.process')}
                 </button>
                 <button id="add-recurring-btn" class="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/90 flex items-center gap-2">
                     <span class="material-symbols-outlined">add</span>
-                    Nueva
+                    ${t('recurring.add')}
                 </button>
             </div>
         </div>
@@ -23,49 +35,45 @@ export async function initRecurring(container) {
         <!-- Modal -->
         <div id="recurring-modal" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-50">
             <div class="bg-white dark:bg-slate-800 rounded-xl p-6 w-full max-w-md">
-                <h3 class="text-xl font-bold mb-4" id="modal-title">Nueva Transacción Recurrente</h3>
+                <h3 class="text-xl font-bold mb-4" id="modal-title">${t('recurring.add-title')}</h3>
                 <form id="recurring-form" class="space-y-4">
                     <input type="hidden" id="recurring-id">
                     <div>
-                        <label class="block text-sm font-medium mb-1">Nombre</label>
+                        <label class="block text-sm font-medium mb-1" for="recurring-name">${t('common.name')}</label>
                         <input type="text" id="recurring-name" required class="w-full px-3 py-2 border rounded-lg">
                     </div>
                     <div>
-                        <label class="block text-sm font-medium mb-1">Tipo</label>
+                        <label class="block text-sm font-medium mb-1" for="recurring-type">${t('common.type')}</label>
                         <select id="recurring-type" required class="w-full px-3 py-2 border rounded-lg">
-                            <option value="EXPENSE">Gasto</option>
-                            <option value="INCOME">Ingreso</option>
+                            <option value="EXPENSE">${t('common.expense')}</option>
+                            <option value="INCOME">${t('common.income')}</option>
                         </select>
                     </div>
                     <div>
-                        <label class="block text-sm font-medium mb-1">Cantidad</label>
+                        <label class="block text-sm font-medium mb-1" for="recurring-amount">${t('common.amount')}</label>
                         <input type="number" id="recurring-amount" step="0.01" required class="w-full px-3 py-2 border rounded-lg">
                     </div>
                     <div>
-                        <label class="block text-sm font-medium mb-1">Frecuencia</label>
+                        <label class="block text-sm font-medium mb-1" for="recurring-frequency">${t('recurring.frequency')}</label>
                         <select id="recurring-frequency" required class="w-full px-3 py-2 border rounded-lg">
-                            <option value="DIARIA">Diaria</option>
-                            <option value="SETMANAL">Semanal</option>
-                            <option value="MENSUAL">Mensual</option>
-                            <option value="TRIMESTRAL">Trimestral</option>
-                            <option value="ANUAL">Anual</option>
+                            ${Object.keys(FREQUENCY_LABELS).map(frequency => `<option value="${frequency}">${frequencyLabel(frequency)}</option>`).join('')}
                         </select>
                     </div>
                     <div>
-                        <label class="block text-sm font-medium mb-1">Próxima Fecha</label>
+                        <label class="block text-sm font-medium mb-1" for="recurring-next-date">${t('recurring.next-date')}</label>
                         <input type="date" id="recurring-next-date" required class="w-full px-3 py-2 border rounded-lg">
                     </div>
                     <div>
-                        <label class="block text-sm font-medium mb-1">Categoría</label>
+                        <label class="block text-sm font-medium mb-1" for="recurring-category">${t('common.category')}</label>
                         <select id="recurring-category" required class="w-full px-3 py-2 border rounded-lg"></select>
                     </div>
                     <div>
-                        <label class="block text-sm font-medium mb-1">Descripción</label>
+                        <label class="block text-sm font-medium mb-1" for="recurring-description">${t('common.description')}</label>
                         <textarea id="recurring-description" class="w-full px-3 py-2 border rounded-lg" rows="2"></textarea>
                     </div>
                     <div class="flex gap-2 justify-end">
-                        <button type="button" id="cancel-btn" class="px-4 py-2 border rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700">Cancelar</button>
-                        <button type="submit" class="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/90">Guardar</button>
+                        <button type="button" id="cancel-btn" class="px-4 py-2 border rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700">${t('common.cancel')}</button>
+                        <button type="submit" class="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/90">${t('common.save')}</button>
                     </div>
                 </form>
             </div>
@@ -107,7 +115,7 @@ async function loadCategoriesSelect() {
  * s'ofereix (un bloc), el desplegable no en triï una altra sense dir res.
  */
 function fillCategorySelect(type, selected = null) {
-    document.getElementById('recurring-category').innerHTML = '<option value="">— Elige una categoría —</option>'
+    document.getElementById('recurring-category').innerHTML = `<option value="">${t('common.choose-category')}</option>`
         + categoryOptions(categories, {
             sections: type === 'INCOME' ? INCOME_SECTIONS : EXPENSE_SECTIONS,
             selected
@@ -120,24 +128,16 @@ async function loadRecurrings() {
         renderRecurrings(recurrings);
     } catch (error) {
         console.error('Error loading recurring transactions:', error);
-        document.getElementById('recurring-list').innerHTML = '<p class="text-red-600">Error al cargar transacciones recurrentes</p>';
+        document.getElementById('recurring-list').innerHTML = `<p class="text-red-600">${t('recurring.load-failed')}</p>`;
     }
 }
 
 function renderRecurrings(recurrings) {
     const container = document.getElementById('recurring-list');
     if (!recurrings || recurrings.length === 0) {
-        container.innerHTML = '<p class="text-gray-500 dark:text-slate-400 text-center py-8">No hay transacciones recurrentes</p>';
+        container.innerHTML = `<p class="text-gray-500 dark:text-slate-400 text-center py-8">${t('recurring.empty')}</p>`;
         return;
     }
-
-    const freqLabels = {
-        'DIARIA': 'Diaria',
-        'SETMANAL': 'Semanal',
-        'MENSUAL': 'Mensual',
-        'TRIMESTRAL': 'Trimestral',
-        'ANUAL': 'Anual'
-    };
 
     container.innerHTML = recurrings.map(item => `
         <div class="bg-white dark:bg-slate-800 rounded-xl p-4 shadow-sm border border-slate-200 dark:border-slate-700">
@@ -148,14 +148,14 @@ function renderRecurrings(recurrings) {
                     </div>
                     <div>
                         <h3 class="font-semibold">${escapeHtml(item.nom)}</h3>
-                        <span class="text-xs text-gray-500 dark:text-slate-400">${escapeHtml(freqLabels[item.frequencia] || item.frequencia)} • ${escapeHtml(item.proxima_data)}</span>
+                        <span class="text-xs text-gray-500 dark:text-slate-400">${escapeHtml(frequencyLabel(item.frequencia))} • ${formatDate(item.proxima_data)}</span>
                     </div>
                 </div>
                 <div class="flex gap-1">
-                    <button data-action="edit" data-id="${item.id}" class="p-1 hover:bg-gray-100 dark:hover:bg-slate-700 rounded" title="Editar">
+                    <button data-action="edit" data-id="${item.id}" class="p-1 hover:bg-gray-100 dark:hover:bg-slate-700 rounded" title="${t('common.edit')}">
                         <span class="material-symbols-outlined text-sm">edit</span>
                     </button>
-                    <button data-action="delete" data-id="${item.id}" class="p-1 hover:bg-red-50 text-red-600 rounded" title="Eliminar">
+                    <button data-action="delete" data-id="${item.id}" class="p-1 hover:bg-red-50 text-red-600 rounded" title="${t('common.delete')}">
                         <span class="material-symbols-outlined text-sm">delete</span>
                     </button>
                 </div>
@@ -164,7 +164,7 @@ function renderRecurrings(recurrings) {
                 <span class="text-xl font-bold ${item.tipus === 'INCOME' ? 'text-green-700' : 'text-red-600'}">
                     ${item.tipus === 'INCOME' ? '+' : '-'}${formatCurrency(item.import)}
                 </span>
-                <span class="text-xs ${item.activa ? 'text-green-700' : 'text-gray-500'}">${item.activa ? 'Activa' : 'Inactiva'}</span>
+                <span class="text-xs ${item.activa ? 'text-green-700' : 'text-gray-500'}">${t(item.activa ? 'recurring.active' : 'recurring.inactive')}</span>
             </div>
             ${budgetLine(item)}
         </div>
@@ -186,25 +186,23 @@ function budgetLine(item) {
         return `<p class="text-xs mt-2 text-amber-800 dark:text-amber-300">${escapeHtml(problem)}</p>`;
     }
     return `<p class="text-xs mt-2 text-gray-500 dark:text-slate-400">
-                ${escapeHtml(item.category.nom)} · cuenta ${formatCurrency(item.prorrateig_mensual)} al mes en el presupuesto
+                ${escapeHtml(t('recurring.counts', { category: item.category.nom, amount: formatCurrency(item.prorrateig_mensual) }))}
             </p>`;
 }
 
 function whyItDoesNotCount(item) {
-    if (!item.activa) return 'Inactiva: no cuenta en el presupuesto.';
-    if (!item.category) return 'Sin categoría: no cuenta en el presupuesto. Edítala y elige una.';
+    if (!item.activa) return t('recurring.problem-inactive');
+    if (!item.category) return t('recurring.problem-no-category');
     // Sense les categories carregades no es pot saber: val més no alarmar.
     if (categories.length === 0) return null;
 
     const name = item.category.nom;
     if (!leafCategories(categories).some(category => category.id === item.category.id)) {
-        return `«${name}» es un bloque: no cuenta en el presupuesto. Edítala y elige una de sus subcategorías.`;
+        return t('recurring.problem-block', { name });
     }
     const isIncomeCategory = sectionOfCategory(categories, item.category.id) === 'INCOME';
     if (isIncomeCategory !== (item.tipus === 'INCOME')) {
-        return isIncomeCategory
-            ? `«${name}» es de ingresos: un gasto ahí no cuenta en el presupuesto. Edítala y cambia la categoría.`
-            : `«${name}» es de gastos: un ingreso ahí no cuenta en el presupuesto. Edítala y cambia la categoría.`;
+        return t(isIncomeCategory ? 'recurring.problem-income-category' : 'recurring.problem-expense-category', { name });
     }
     return null;
 }
@@ -217,7 +215,7 @@ function openModal(recurring = null) {
     const today = new Date().toISOString().split('T')[0];
 
     if (recurring) {
-        title.textContent = 'Editar Transacción Recurrente';
+        title.textContent = t('recurring.edit-title');
         document.getElementById('recurring-id').value = recurring.id;
         document.getElementById('recurring-name').value = recurring.nom;
         document.getElementById('recurring-type').value = recurring.tipus;
@@ -227,7 +225,7 @@ function openModal(recurring = null) {
         fillCategorySelect(recurring.tipus, recurring.category?.id);
         document.getElementById('recurring-description').value = recurring.descripcio || '';
     } else {
-        title.textContent = 'Nueva Transacción Recurrente';
+        title.textContent = t('recurring.add-title');
         form.reset();
         document.getElementById('recurring-id').value = '';
         // Després del reset: abans la data es posava primer i el reset la
@@ -258,18 +256,18 @@ async function handleListClick(event) {
             // Abans es cridava http://localhost:8000 a pèl.
             openModal(await getRecurringTransaction(id));
         } catch (error) {
-            alert(error.message || 'Error al cargar transacción');
+            alert(error.message || t('recurring.load-one-failed'));
         }
         return;
     }
 
     if (button.dataset.action === 'delete') {
-        if (!confirm('¿Eliminar esta transacción recurrente?')) return;
+        if (!confirm(t('recurring.delete-confirm'))) return;
         try {
             await deleteRecurringTransaction(id);
             await loadRecurrings();
         } catch (error) {
-            alert(error.message || 'Error al eliminar');
+            alert(error.message || t('recurring.delete-failed'));
         }
     }
 }
@@ -300,16 +298,16 @@ async function handleSubmit(event) {
     } catch (error) {
         // El backend diu què no quadra (un bloc, una categoria de l'altre
         // sentit…): «Error al guardar» no ajudava a arreglar-ho.
-        alert(error.message || 'Error al guardar');
+        alert(error.message || t('recurring.save-failed'));
     }
 }
 
 async function handleProcess() {
     try {
         const result = await processRecurring();
-        alert(`Procesadas ${result.length || 0} transacciones`);
+        alert(t('recurring.processed', { count: result.length || 0 }));
         await loadRecurrings();
     } catch (error) {
-        alert('Error al procesar');
+        alert(error.message || t('recurring.process-failed'));
     }
 }

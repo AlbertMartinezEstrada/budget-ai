@@ -1,39 +1,40 @@
 import { getGoals, createGoal, updateGoal, deleteGoal, addAmountToGoal, formatCurrency, escapeHtml } from '../../api.js';
+import { t, formatDate, formatPercent } from '../../i18n.js';
 
 export async function initGoals(container) {
     container.innerHTML = `
         <div class="page-header flex justify-between items-center mb-6">
-            <h2 class="text-2xl font-bold text-slate-800 dark:text-slate-100">Objectius Financers</h2>
+            <h2 class="text-2xl font-bold text-slate-800 dark:text-slate-100">${t('nav.goals')}</h2>
             <button id="add-goal-btn" class="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/90 flex items-center gap-2">
                 <span class="material-symbols-outlined">add</span>
-                Nou Objectiu
+                ${t('goals.add')}
             </button>
         </div>
         <div id="goals-list" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            <div class="text-center py-8 text-slate-500 dark:text-slate-400">Carregant...</div>
+            <div class="text-center py-8 text-slate-500 dark:text-slate-400">${t('common.loading')}</div>
         </div>
 
         <!-- Modal -->
         <div id="goal-modal" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-50">
             <div class="bg-white dark:bg-slate-800 rounded-xl p-6 w-full max-w-md">
-                <h3 class="text-xl font-bold mb-4" id="modal-title">Nou Objectiu</h3>
+                <h3 class="text-xl font-bold mb-4" id="modal-title">${t('goals.add')}</h3>
                 <form id="goal-form" class="space-y-4">
                     <input type="hidden" id="goal-id">
                     <div>
-                        <label class="block text-sm font-medium mb-1">Nom</label>
+                        <label class="block text-sm font-medium mb-1" for="goal-name">${t('common.name')}</label>
                         <input type="text" id="goal-name" required class="w-full px-3 py-2 border rounded-lg">
                     </div>
                     <div>
-                        <label class="block text-sm font-medium mb-1">Quantitat Objectiu</label>
+                        <label class="block text-sm font-medium mb-1" for="goal-target">${t('goals.target')}</label>
                         <input type="number" id="goal-target" step="0.01" required class="w-full px-3 py-2 border rounded-lg">
                     </div>
                     <div>
-                        <label class="block text-sm font-medium mb-1">Data Target</label>
+                        <label class="block text-sm font-medium mb-1" for="goal-deadline">${t('goals.deadline')}</label>
                         <input type="date" id="goal-deadline" class="w-full px-3 py-2 border rounded-lg">
                     </div>
                     <div class="flex gap-2 justify-end">
-                        <button type="button" id="cancel-btn" class="px-4 py-2 border rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700">Cancelar</button>
-                        <button type="submit" class="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/90">Guardar</button>
+                        <button type="button" id="cancel-btn" class="px-4 py-2 border rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700">${t('common.cancel')}</button>
+                        <button type="submit" class="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/90">${t('common.save')}</button>
                     </div>
                 </form>
             </div>
@@ -58,7 +59,7 @@ async function loadGoals() {
     } catch (error) {
         console.error('Error carregant objectius:', error);
         document.getElementById('goals-list').innerHTML = `
-            <div class="text-center py-8 text-red-600">Error carregant objectius</div>
+            <div class="text-center py-8 text-red-600">${t('goals.load-failed')}</div>
         `;
     }
 }
@@ -66,7 +67,7 @@ async function loadGoals() {
 function renderGoals(goals) {
     const container = document.getElementById('goals-list');
     if (!goals || goals.length === 0) {
-        container.innerHTML = '<div class="text-center py-8 text-slate-500 dark:text-slate-400">No hi ha objectius</div>';
+        container.innerHTML = `<div class="text-center py-8 text-slate-500 dark:text-slate-400">${t('goals.empty')}</div>`;
         return;
     }
 
@@ -78,7 +79,7 @@ function renderGoals(goals) {
             <div class="bg-white dark:bg-slate-800 rounded-xl p-4 shadow-sm border">
                 <div class="flex justify-between items-start mb-2">
                     <h3 class="font-semibold">${escapeHtml(goal.nom)}</h3>
-                    <button data-action="delete" data-id="${goal.id}" class="text-red-600 hover:text-red-700">
+                    <button data-action="delete" data-id="${goal.id}" class="text-red-600 hover:text-red-700" title="${t('common.delete')}">
                         <span class="material-symbols-outlined">delete</span>
                     </button>
                 </div>
@@ -86,16 +87,16 @@ function renderGoals(goals) {
                 <div class="w-full bg-gray-200 dark:bg-slate-700 rounded-full h-2 mb-2">
                     <div class="bg-primary h-2 rounded-full" style="width: ${Math.min(progress, 100)}%"></div>
                 </div>
-                <div class="text-sm text-slate-500 dark:text-slate-400">${progress.toFixed(1)}% completat</div>
-                ${goal.data_objectiu ? `<div class="text-xs text-slate-500 mt-1">Data: ${escapeHtml(goal.data_objectiu)}</div>` : ''}
-                <button data-action="add-amount" data-id="${goal.id}" class="mt-2 text-sm text-primary hover:underline">Afegir quantitat</button>
+                <div class="text-sm text-slate-500 dark:text-slate-400">${escapeHtml(t('goals.progress', { percent: formatPercent(progress) }))}</div>
+                ${goal.data_objectiu ? `<div class="text-xs text-slate-500 mt-1">${escapeHtml(t('goals.deadline-on', { date: formatDate(goal.data_objectiu) }))}</div>` : ''}
+                <button data-action="add-amount" data-id="${goal.id}" class="mt-2 text-sm text-primary hover:underline">${t('goals.add-amount')}</button>
             </div>
         `;
     }).join('');
 }
 
 function openModal(goal = null) {
-    document.getElementById('modal-title').textContent = goal ? 'Editar Objectiu' : 'Nou Objectiu';
+    document.getElementById('modal-title').textContent = t(goal ? 'goals.edit-title' : 'goals.add');
     document.getElementById('goal-id').value = goal?.id || '';
     document.getElementById('goal-name').value = goal?.nom || '';
     document.getElementById('goal-target').value = goal?.quantitat_objectiu || '';
@@ -129,7 +130,7 @@ async function handleSubmit(event) {
         closeModal();
         loadGoals();
     } catch (error) {
-        alert('Error guardant objectiu: ' + error.message);
+        alert(t('goals.save-failed', { message: error.message }));
     }
 }
 
@@ -141,23 +142,23 @@ async function handleListClick(event) {
     if (!Number.isInteger(id)) return;
 
     if (button.dataset.action === 'delete') {
-        if (!confirm('Segur que vols eliminar aquest objectiu?')) return;
+        if (!confirm(t('goals.delete-confirm'))) return;
         try {
             await deleteGoal(id);
             await loadGoals();
         } catch (error) {
-            alert('Error eliminant objectiu: ' + error.message);
+            alert(t('goals.delete-failed', { message: error.message }));
         }
         return;
     }
 
     if (button.dataset.action === 'add-amount') {
-        const input = prompt('Quantitat a afegir:');
+        const input = prompt(t('goals.amount-prompt'));
         if (input === null) return;
 
         const amount = Number.parseFloat(input.replace(',', '.'));
         if (!Number.isFinite(amount) || amount <= 0) {
-            alert('Introdueix una quantitat positiva.');
+            alert(t('goals.amount-positive'));
             return;
         }
 
@@ -165,7 +166,7 @@ async function handleListClick(event) {
             await addAmountToGoal(id, amount);
             await loadGoals();
         } catch (error) {
-            alert(error.message || 'Error afegint la quantitat');
+            alert(error.message || t('goals.add-amount-failed'));
         }
     }
 }
