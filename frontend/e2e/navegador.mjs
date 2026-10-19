@@ -25,6 +25,10 @@ const PASSWORD = process.env.E2E_PASSWORD;
 const RESULTS_DIR = path.join(HERE, 'resultats');
 const SAMPLE_STATEMENT = path.join(HERE, '..', '..', 'test_bank_statement.csv');
 
+/** Els missatges del backend de cada idioma: han d'arribar en el de la pantalla. */
+const BACKEND_MESSAGES = Object.fromEntries(LANGUAGES.map(({ code }) => [code, parseProperties(fs.readFileSync(
+    path.join(HERE, '..', '..', 'backend-java', 'src', 'main', 'resources', 'i18n', `messages_${code}.properties`), 'utf8'))]));
+
 /** Cada vista, i el botó que obre el seu formulari si en té. */
 const VIEWS = [
     { view: 'dashboard' },
@@ -253,19 +257,36 @@ await waitForQuietNetwork();
 
 // ---- Importar l'extracte d'exemple per la pantalla ----
 
-/** Puja l'extracte i espera la revisió o l'avís que ja hi era. Torna quin dels dos. */
+/**
+ * Puja l'extracte i espera la revisió o l'avís que ja hi era. Torna quin dels
+ * dos. L'avís el diu el backend, i ha de ser en l'idioma de la pantalla: és la
+ * prova que la capçalera Accept-Language hi arriba.
+ */
 async function uploadSampleStatement() {
     await openView('upload', 'light');
     // El camp de fitxer està amagat sota la zona d'arrossegar: n'hi ha prou que hi
     // sigui. La vista el connecta quan ha carregat els comptes (openView ho espera).
     await page.setInputFiles('#file-input', SAMPLE_STATEMENT);
     await page.waitForSelector('#upload-btn:not([disabled])');
-    await page.click('#upload-btn');
-    await page.waitForFunction(() => !document.getElementById('review-section').classList.contains('hidden')
-        || /ja existeixen|❌/.test(document.getElementById('upload-status').textContent), null, { timeout: 30000 });
-    const status = (await page.textContent('#upload-status')).trim();
-    if (status.includes('❌')) fail(`pujar l'extracte: «${status}»`);
-    return (await page.isVisible('#review-section')) ? 'revisió' : 'ja hi era';
+    const [response] = await Promise.all([
+        page.waitForResponse(candidate => candidate.url().endsWith('/upload-csv'), { timeout: 30000 }),
+        page.click('#upload-btn')
+    ]);
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok() || !['review', 'info'].includes(result.status)) {
+        fail(`pujar l'extracte: ${response.status()} «${result.message || result.error || ''}»`);
+        return 'error';
+    }
+    if (result.status === 'review') {
+        await page.waitForSelector('#review-section:not(.hidden)');
+        return 'revisió';
+    }
+    const language = await page.evaluate(() => document.documentElement.lang);
+    const expected = BACKEND_MESSAGES[language]?.get('upload.all-exist');
+    if (result.message !== expected) fail(`l'avís del backend no és en l'idioma de la pantalla (${language}): «${result.message}»`);
+    await page.waitForFunction(message => document.getElementById('upload-status').textContent.includes(message),
+        result.message, { timeout: 10000 });
+    return 'ja hi era';
 }
 
 currentStep = 'importar';

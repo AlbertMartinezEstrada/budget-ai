@@ -136,10 +136,12 @@ export function escapeHtml(value) {
 
 // Totes les peticions han de portar la cookie de sessió. Com que el frontend
 // i el backend són a ports diferents, sense "credentials: include" el
-// navegador no l'enviaria.
+// navegador no l'enviaria. I l'idioma: els missatges d'error del backend
+// surten en el de la capçalera Accept-Language.
 export async function apiFetch(path, options = {}) {
+    const headers = { 'Accept-Language': getLanguage(), ...options.headers };
     try {
-        return await fetch(`${API_URL}${path}`, { credentials: 'include', ...options });
+        return await fetch(`${API_URL}${path}`, { credentials: 'include', ...options, headers });
     } catch (error) {
         // fetch només falla així quan no arriba a parlar amb el servidor. El
         // navegador ho diu com "Failed to fetch", que no diu res a ningú.

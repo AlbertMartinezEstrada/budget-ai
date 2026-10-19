@@ -187,17 +187,14 @@ public class CategoryHierarchyService {
         Tree tree = loadTree();
         String name = category.getName();
         if (tree.isGroup(category.getId())) {
-            throw new IllegalArgumentException("«" + name + "» és un bloc: tria una de les seves subcategories. "
-                    + "Un recurrent en un bloc es comptaria dues vegades al pressupost.");
+            throw new InvalidInputException("recurring.category-is-block", "name", name);
         }
         boolean income = tree.isIncome(category.getId());
         if (INCOME.equals(type) && !income) {
-            throw new IllegalArgumentException("Un ingrés recurrent ha d'anar a una categoria d'ingressos: "
-                    + "a «" + name + "» el pressupost no el comptaria.");
+            throw new InvalidInputException("recurring.income-needs-income-category", "name", name);
         }
         if (!INCOME.equals(type) && income) {
-            throw new IllegalArgumentException("Una despesa recurrent no pot anar a «" + name + "»: "
-                    + "és una categoria d'ingressos, i allà el pressupost només mira el que entra.");
+            throw new InvalidInputException("recurring.expense-in-income-category", "name", name);
         }
     }
 }

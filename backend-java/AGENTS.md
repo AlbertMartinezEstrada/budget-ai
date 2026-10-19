@@ -17,6 +17,7 @@ Dependencias que conviene conocer: `spring-boot-starter-security` y
 ```
 controller/   rutas HTTP
 service/      lógica de negocio
+i18n/         Messages: los mensajes para el usuario en cuatro idiomas
 repository/   Spring Data JPA
 model/        entidades
 security/     JwtService, filtro, cookies, credenciales, límite de intentos
@@ -28,8 +29,8 @@ migrations/   cambios de esquema para instalaciones existentes
 ## Comandos
 
 ```bash
-./gradlew test              # 61 unitarios, rápidos, sin Docker
-./gradlew integrationTest   # 26, requieren Docker
+./gradlew test              # 274 unitarios, rápidos, sin Docker
+./gradlew integrationTest   # 171, requieren Docker
 ./gradlew check             # ambos
 ./gradlew assemble          # empaquetar sin verificar
 ```
@@ -50,6 +51,36 @@ apuntando a una base de datos equivocada.
 
 **Toda la API requiere sesión** salvo `/auth/login` y `/auth/logout`. Si añades
 un endpoint, ya queda protegido por defecto: `anyRequest().authenticated()`.
+
+**Los mensajes para el usuario llevan clave, no texto.** Van en
+`src/main/resources/i18n/messages_ca.properties` (la referencia), `_es`, `_pt` y
+`_en`, con los valores como `{nombre}`, igual que los ficheros del frontend.
+Sale el idioma de la cabecera `Accept-Language`, que pone `apiFetch`; sin
+cabecera, o con un idioma que no está, el catalán (`spring.web.locale=ca`).
+
+```java
+throw new InvalidInputException("debts.name-missing");                    // 400
+throw new ConflictException("accounts.delete-has-transactions", "count", n); // 409
+throw new NotFoundException("not-found.account", id);                     // 404
+return Map.of("message", Messages.get("upload.all-exist"));               // respuesta normal
+return Map.of("error", Messages.forUser(exception));                      // un error capturado
+```
+
+- **Un texto nuevo va a los cuatro ficheros.** `MessagesTest` falla si falta en
+  alguno, si no lleva los mismos `{valores}`, si el código usa una clave que no
+  existe o si sobra alguna.
+- **Frases enteras en una clave.** Un mensaje dentro de otro («Línia 4 de
+  l'extracte: {reason}») se pasa como `Message` y se traduce en el mismo idioma;
+  el de una excepción capturada, con `Messages.reasonOf(exception)`.
+- **Con `"count"` numérico se elige el plural**: `clave.one` y `clave.other`.
+- **Los importes como `BigDecimal`**: salen con el formato del idioma (1.234,50 /
+  1,234.50). Un número de pagos o un identificador, como entero, sin puntos de
+  miles.
+- **`getMessage()` es siempre el catalán**: es lo que va al log y lo que miran
+  los tests con `hasMessageContaining`. Lo que llega al navegador pasa por
+  `Messages.forUser`, que ya hacen `ApiErrorHandler` y `ClientErrors`.
+- No se usa `MessageSource` de Spring: su `MessageFormat` trata el apóstrofo
+  como carácter especial y el catalán va lleno («L'import {0}» perdía el valor).
 
 **CORS está centralizado** en `config/CorsConfig`. No pongas `@CrossOrigin` en
 los controllers; los ocho lo tenían con `origins = "*"` y se quitó.

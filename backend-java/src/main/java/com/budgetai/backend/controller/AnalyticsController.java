@@ -5,6 +5,7 @@ import com.budgetai.backend.service.BudgetAdviceService;
 import com.budgetai.backend.service.BudgetReviewService;
 import com.budgetai.backend.service.DecisionsService;
 import com.budgetai.backend.service.GeneralAnalysisService;
+import com.budgetai.backend.service.InvalidInputException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
@@ -98,7 +99,7 @@ public class AnalyticsController {
         try {
             return YearMonth.parse(value.trim());
         } catch (DateTimeParseException exception) {
-            throw new IllegalArgumentException("El mes «" + value + "» no és vàlid: ha de ser AAAA-MM, com 2026-10.");
+            throw new InvalidInputException("months.invalid", "value", value);
         }
     }
 

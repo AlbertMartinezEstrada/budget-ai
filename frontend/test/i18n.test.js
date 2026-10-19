@@ -14,8 +14,8 @@ import {
  * Aquests tests vigilen el que no dona cap error i es veu malament: una clau
  * que falta en un idioma (surt la clau a la pantalla), un {valor} que una
  * traducció no porta, una clau que el codi demana i no existeix, i un text
- * escrit a mà en una vista ja traduïda (surt en català en tots els idiomes,
- * que és com estava abans: cada vista en el seu idioma).
+ * escrit a mà en una vista (surt igual en tots els idiomes, que és com estava
+ * abans: cada vista en el seu idioma).
  */
 
 const publicDir = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'public');
@@ -23,30 +23,6 @@ const read = (file) => fs.readFileSync(path.join(publicDir, file), 'utf8');
 const languageFile = (code) => `lang/Language_${code}.properties`;
 const catalogues = Object.fromEntries(LANGUAGES.map(({ code }) => [code, parseProperties(read(languageFile(code)))]));
 const reference = catalogues[REFERENCE_LANGUAGE];
-
-/** Les vistes i fitxers ja passats a claves: no hi pot quedar cap text escrit a mà. */
-const TRANSLATED_FILES = [
-    'index.html',
-    'js/app.js',
-    'js/api.js',
-    'js/features/auth/Login.js',
-    'js/features/settings/Settings.js',
-    'js/features/dashboard/Dashboard.js',
-    'js/features/accounts/Accounts.js',
-    'js/features/transfers/Transfers.js',
-    'js/transfers.js',
-    'js/features/goals/FinancialGoals.js',
-    'js/features/recurring/RecurringTransactions.js',
-    'js/features/categories/Categories.js',
-    'js/categoryOptions.js',
-    'js/features/debts/Debts.js',
-    'js/debtReceipts.js',
-    'js/features/transactions/TransactionList.js',
-    'js/features/transactions/SplitEditor.js',
-    'js/features/transactions/UnmarkedTransfers.js',
-    'js/features/upload/FileUploader.js',
-    'js/features/budgets/Budgets.js'
-];
 
 const PLURAL_SUFFIX = /\.(zero|one|two|few|many|other)$/;
 const placeholders = (text) => [...text.matchAll(/\{(\w+)\}/g)].map(match => match[1]).sort();
@@ -213,7 +189,7 @@ function handwrittenTexts(source) {
         return text.replace(/\$/g, '');
     };
     const isText = (text) => {
-        const cleaned = withoutInterpolations(text).replace(/Budget AI/g, '').trim();
+        const cleaned = withoutInterpolations(text).replace(/Budget AI/g, '').replace(/&[a-z]+;/g, '').trim();
         // Els noms d'icona (account_balance) i els codis (EUR, INCOME) no es tradueixen.
         return /[A-Za-zÀ-ÿ]{2,}/.test(cleaned) && !/^[a-z0-9_]+$/.test(cleaned) && !/^[A-Z0-9_]+$/.test(cleaned);
     };
@@ -236,9 +212,9 @@ function handwrittenTexts(source) {
     return found;
 }
 
-test('les vistes ja traduïdes no tenen cap text escrit a mà', () => {
-    const problems = TRANSLATED_FILES.flatMap(file =>
-        handwrittenTexts(stripComments(read(file))).map(text => `${file}: «${text.replace(/\s+/g, ' ').slice(0, 60)}»`));
+test('cap vista té textos escrits a mà', () => {
+    const problems = codeFiles.flatMap(file =>
+        handwrittenTexts(file.source).map(text => `${file.path}: «${text.replace(/\s+/g, ' ').slice(0, 60)}»`));
     assert.deepEqual(problems, [], 'passeu-los a una clau de lang/Language_ca.properties (i dels altres tres)');
 });
 
@@ -253,6 +229,7 @@ test('el detector de textos escrits a mà troba els casos que vigila', () => {
     assert.deepEqual(handwrittenTexts("<h3>${t('nav.debts')}</h3><span class=\"icon\">savings</span><b>Budget AI</b>"), []);
     assert.deepEqual(handwrittenTexts("<p>${escapeHtml(t('dashboard.load-failed', { message: error.message }))}</p>"), []);
     assert.deepEqual(handwrittenTexts('<span data-i18n="nav.debts">Deutes</span>'), []);
+    assert.deepEqual(handwrittenTexts('<label for="x">&nbsp;</label>'), []);
     // El codi entre dues plantilles no és text de la pàgina.
     assert.deepEqual(handwrittenTexts("`<div>${t('nav.debts')}</div>`; if (total > 0 && others.length) container.innerHTML = `<p>${t('nav.debts')}</p>`"), []);
 });

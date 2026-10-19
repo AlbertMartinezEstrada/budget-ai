@@ -76,7 +76,7 @@ public class TransactionPartService {
     @Transactional
     public Transaction replace(Long transactionId, List<TransactionPart> requested) {
         Transaction transaction = transactionRepository.findById(transactionId)
-                .orElseThrow(() -> new NotFoundException("el moviment", transactionId));
+                .orElseThrow(() -> new NotFoundException("not-found.transaction", transactionId));
         List<TransactionPart> parts = validate(transaction, requested);
 
         partRepository.deleteAll(partRepository.findByTransactions(List.of(transactionId)));
@@ -103,8 +103,7 @@ public class TransactionPartService {
         List<TransactionPart> wanted = requested != null ? requested : List.of();
         if (wanted.isEmpty()) return List.of();
         if (wanted.size() == 1) {
-            throw new IllegalArgumentException(
-                    "Per dividir-lo calen almenys dues parts. Per canviar-ne la categoria, edita el moviment.");
+            throw new InvalidInputException("split.at-least-two");
         }
 
         List<TransactionPart> parts = new ArrayList<>();
@@ -143,25 +142,24 @@ public class TransactionPartService {
 
     private static BigDecimal validAmount(BigDecimal amount) {
         if (amount == null || amount.signum() <= 0) {
-            throw new IllegalArgumentException("Cada part ha de tenir un import més gran que zero.");
+            throw new InvalidInputException("split.positive-amount");
         }
         // NUMERIC(15,2) arrodoniria el tercer decimal en silenci, i les parts
         // que han passat la comprovació de la suma deixarien de sumar el total.
         if (amount.stripTrailingZeros().scale() > 2) {
-            throw new IllegalArgumentException("Els imports de les parts porten com a molt dos decimals.");
+            throw new InvalidInputException("split.two-decimals");
         }
         return amount;
     }
 
     private Category leafOf(Category reference) {
         if (reference == null || reference.getId() == null) {
-            throw new IllegalArgumentException("Cada part ha de tenir una categoria.");
+            throw new InvalidInputException("split.category-missing");
         }
         Category category = categoryRepository.findById(reference.getId())
-                .orElseThrow(() -> new IllegalArgumentException("La categoria triada ja no existeix."));
+                .orElseThrow(() -> new InvalidInputException("common.category-gone"));
         if (hierarchyService.isGroup(category.getId())) {
-            throw new IllegalArgumentException("La categoria \"" + category.getName()
-                    + "\" és un grup: tria'n una de concreta.");
+            throw new InvalidInputException("common.category-is-group", "name", category.getName());
         }
         return category;
     }
@@ -170,8 +168,7 @@ public class TransactionPartService {
         int comparison = partsTotal.compareTo(transactionAmount);
         if (comparison == 0) return;
         BigDecimal difference = partsTotal.subtract(transactionAmount).abs();
-        throw new IllegalArgumentException("Les parts sumen " + partsTotal.toPlainString()
-                + " € i el moviment és de " + transactionAmount.toPlainString() + " €: "
-                + (comparison < 0 ? "en falten " : "en sobren ") + difference.toPlainString() + " €.");
+        throw new InvalidInputException(comparison < 0 ? "split.total-short" : "split.total-over",
+                "parts", partsTotal, "total", transactionAmount, "difference", difference);
     }
 }

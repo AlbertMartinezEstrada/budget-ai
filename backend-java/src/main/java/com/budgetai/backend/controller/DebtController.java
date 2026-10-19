@@ -1,5 +1,6 @@
 package com.budgetai.backend.controller;
 
+import com.budgetai.backend.i18n.Messages;
 import com.budgetai.backend.model.Debt;
 import com.budgetai.backend.service.DebtService;
 import com.fasterxml.jackson.annotation.JsonFormat;
@@ -76,7 +77,7 @@ public class DebtController {
     public ResponseEntity<?> delete(@PathVariable Long id) {
         return respond(() -> {
             debtService.delete(id);
-            return Map.of("message", "Deute esborrat. Els moviments es queden, sense vincle.");
+            return Map.of("message", Messages.get("debts.deleted"));
         });
     }
 
@@ -89,7 +90,7 @@ public class DebtController {
         try {
             return ResponseEntity.ok(action.get());
         } catch (IllegalArgumentException exception) {
-            return ResponseEntity.badRequest().body(Map.of("error", exception.getMessage()));
+            return ResponseEntity.badRequest().body(Map.of("error", Messages.forUser(exception)));
         }
     }
 }

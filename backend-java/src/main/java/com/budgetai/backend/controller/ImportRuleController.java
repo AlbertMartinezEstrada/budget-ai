@@ -3,6 +3,7 @@ package com.budgetai.backend.controller;
 import com.budgetai.backend.model.ImportRule;
 import com.budgetai.backend.repository.AccountRepository;
 import com.budgetai.backend.repository.ImportRuleRepository;
+import com.budgetai.backend.service.InvalidInputException;
 import com.budgetai.backend.service.NotFoundException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -30,12 +31,12 @@ public class ImportRuleController {
     @PostMapping
     public ResponseEntity<?> create(@RequestBody ImportRule rule) {
         if (rule.getPattern() == null || rule.getPattern().isBlank()) {
-            return ResponseEntity.badRequest().body("El patró no pot estar buit.");
+            throw new InvalidInputException("rules.pattern-empty");
         }
         if (rule.getTransferAccount() != null) {
             Long accountId = rule.getTransferAccount().getId();
             rule.setTransferAccount(accountRepository.findById(accountId)
-                    .orElseThrow(() -> new NotFoundException("el compte", accountId)));
+                    .orElseThrow(() -> new NotFoundException("not-found.account", accountId)));
             // Si un traspàs compta ho decideixen els comptes, no la regla.
             rule.setMarksExcluded(false);
         }
@@ -44,7 +45,7 @@ public class ImportRuleController {
 
     @DeleteMapping("/{id}")
     public ResponseEntity<?> delete(@PathVariable Long id) {
-        if (!ruleRepository.existsById(id)) throw new NotFoundException("la regla", id);
+        if (!ruleRepository.existsById(id)) throw new NotFoundException("not-found.rule", id);
 
         ruleRepository.deleteById(id);
         return ResponseEntity.noContent().build();

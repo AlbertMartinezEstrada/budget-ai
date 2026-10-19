@@ -94,16 +94,16 @@ public class RecurringTransactionService {
                     requireValid(recurring);
                     return recurringTransactionRepository.save(recurring);
                 })
-                .orElseThrow(() -> new NotFoundException("el moviment recurrent", id));
+                .orElseThrow(() -> new NotFoundException("not-found.recurring", id));
     }
 
     /** La categoria de debò: de la petició només en arriba l'id. */
     private Category storedCategory(Category requested) {
         if (requested.getId() == null) {
-            throw new IllegalArgumentException("Falta la categoria");
+            throw new InvalidInputException("common.category-missing");
         }
         return categoryRepository.findById(requested.getId())
-                .orElseThrow(() -> new NotFoundException("la categoria", requested.getId()));
+                .orElseThrow(() -> new NotFoundException("not-found.category", requested.getId()));
     }
 
     /**
@@ -116,22 +116,22 @@ public class RecurringTransactionService {
      */
     private void requireValid(RecurringTransaction recurring) {
         if (recurring.getName() == null || recurring.getName().isBlank()) {
-            throw new IllegalArgumentException("Falta el nom");
+            throw new InvalidInputException("common.name-missing");
         }
         if (recurring.getType() == null || !TYPES.contains(recurring.getType())) {
-            throw new IllegalArgumentException("El tipus ha de ser despesa o ingrés");
+            throw new InvalidInputException("recurring.type-invalid");
         }
         if (recurring.getAmount() == null || recurring.getAmount().signum() <= 0) {
-            throw new IllegalArgumentException("L'import ha de ser més gran que zero");
+            throw new InvalidInputException("common.amount-positive");
         }
         if (recurring.getFrequency() == null || !FREQUENCIES.contains(recurring.getFrequency())) {
-            throw new IllegalArgumentException("Freqüència desconeguda");
+            throw new InvalidInputException("common.frequency-unknown");
         }
         if (recurring.getNextDate() == null) {
-            throw new IllegalArgumentException("Falta la data del proper càrrec");
+            throw new InvalidInputException("recurring.next-date-missing");
         }
         if (recurring.getCategory() == null) {
-            throw new IllegalArgumentException("Falta la categoria: sense, el recurrent no compta al pressupost");
+            throw new InvalidInputException("recurring.category-required");
         }
         hierarchyService.requireRecurringCategory(recurring.getCategory(), recurring.getType());
     }

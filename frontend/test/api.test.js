@@ -137,6 +137,23 @@ test('una resposta buida o en HTML es descriu pel codi', () => {
     assert.ok(!api.describeError(502, '<html>').includes('<'));
 });
 
+test('cada petició diu al backend en quin idioma ha de respondre', async () => {
+    const realFetch = global.fetch;
+    const requests = [];
+    global.fetch = async (url, options) => { requests.push(options); return { ok: true }; };
+    try {
+        useLanguageFromDisk('pt');
+        await api.apiFetch('/gastos', { method: 'POST', headers: { 'Content-Type': 'application/json' } });
+        assert.equal(requests[0].headers['Accept-Language'], 'pt');
+        // Les capçaleres de qui crida es conserven, i la cookie hi continua anant.
+        assert.equal(requests[0].headers['Content-Type'], 'application/json');
+        assert.equal(requests[0].credentials, 'include');
+    } finally {
+        global.fetch = realFetch;
+        useLanguageFromDisk('ca');
+    }
+});
+
 test('sense connexió amb el backend, el missatge ho diu', async () => {
     const realFetch = global.fetch;
     global.fetch = async () => { throw new TypeError('Failed to fetch'); };

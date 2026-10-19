@@ -146,9 +146,9 @@ public class FixedCostService {
 
     private RecurringTransaction findFixedCost(Long id) {
         RecurringTransaction recurring = recurringRepository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("No existeix el cost fix " + id));
+                .orElseThrow(() -> new NotFoundException("not-found.fixed-cost", id));
         if (!isFixedCost(recurring, hierarchyService.loadTree())) {
-            throw new IllegalArgumentException("El recurrent " + id + " no és un cost fix");
+            throw new InvalidInputException("fixed-costs.not-fixed", "id", id);
         }
         return recurring;
     }
@@ -164,7 +164,7 @@ public class FixedCostService {
         if (request.getFrequency() != null) target.setFrequency(request.getFrequency().toUpperCase());
         if (request.getCategory() != null && request.getCategory().getId() != null) {
             Category category = categoryRepository.findById(request.getCategory().getId())
-                    .orElseThrow(() -> new IllegalArgumentException("No existeix la categoria"));
+                    .orElseThrow(() -> new InvalidInputException("common.category-gone"));
             hierarchyService.requireRecurringCategory(category, "EXPENSE");
             target.setCategory(category);
         }
@@ -172,16 +172,16 @@ public class FixedCostService {
 
     private static void requireComplete(RecurringTransaction fixedCost) {
         if (fixedCost.getName() == null || fixedCost.getName().isBlank()) {
-            throw new IllegalArgumentException("Falta el nom");
+            throw new InvalidInputException("common.name-missing");
         }
         if (fixedCost.getCategory() == null) {
-            throw new IllegalArgumentException("Falta la categoria");
+            throw new InvalidInputException("common.category-missing");
         }
         if (fixedCost.getAmount() == null || fixedCost.getAmount().signum() < 0) {
-            throw new IllegalArgumentException("L'import ha de ser positiu");
+            throw new InvalidInputException("common.amount-not-negative");
         }
         if (fixedCost.getFrequency() == null || !FREQUENCIES.contains(fixedCost.getFrequency())) {
-            throw new IllegalArgumentException("Freqüència desconeguda");
+            throw new InvalidInputException("common.frequency-unknown");
         }
     }
 

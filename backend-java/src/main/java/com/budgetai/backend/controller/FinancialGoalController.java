@@ -1,7 +1,9 @@
 package com.budgetai.backend.controller;
 
+import com.budgetai.backend.i18n.Messages;
 import com.budgetai.backend.model.FinancialGoal;
 import com.budgetai.backend.service.FinancialGoalService;
+import com.budgetai.backend.service.InvalidInputException;
 import com.budgetai.backend.service.NotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -30,7 +32,7 @@ public class FinancialGoalController {
     public ResponseEntity<FinancialGoal> getGoalById(@PathVariable Long id) {
         return financialGoalService.getGoalById(id)
                 .map(ResponseEntity::ok)
-                .orElseThrow(() -> new NotFoundException("l'objectiu", id));
+                .orElseThrow(() -> new NotFoundException("not-found.goal", id));
     }
 
     @PostMapping
@@ -49,7 +51,7 @@ public class FinancialGoalController {
     public ResponseEntity<FinancialGoal> addToGoal(@PathVariable Long id, @RequestBody Map<String, BigDecimal> payload) {
         BigDecimal amount = payload.get("amount");
         if (amount == null || amount.signum() <= 0) {
-            throw new IllegalArgumentException("La quantitat ha de ser més gran que zero.");
+            throw new InvalidInputException("common.amount-positive");
         }
         return ResponseEntity.ok(financialGoalService.addToGoal(id, amount));
     }
@@ -57,6 +59,6 @@ public class FinancialGoalController {
     @DeleteMapping("/{id}")
     public ResponseEntity<?> deleteGoal(@PathVariable Long id) {
         financialGoalService.deleteGoal(id);
-        return ResponseEntity.ok(Map.of("message", "Goal deleted successfully"));
+        return ResponseEntity.ok(Map.of("message", Messages.get("goals.deleted")));
     }
 }

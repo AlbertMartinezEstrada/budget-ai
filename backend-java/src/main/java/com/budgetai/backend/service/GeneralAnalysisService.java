@@ -122,12 +122,11 @@ public class GeneralAnalysisService {
             if (to == null || to.isAfter(current)) to = current;
             if (from == null) from = to;
             if (from.isAfter(to)) {
-                throw new IllegalArgumentException("El primer mes (" + from + ") és posterior a l'últim (" + to + ").");
+                throw new InvalidInputException("months.reversed", "from", from, "to", to);
             }
             Range range = new Range(from, to);
             if (range.months() > MAX_MONTHS) {
-                throw new IllegalArgumentException("Com a molt es poden mirar " + MAX_MONTHS
-                        + " mesos, i se n'han demanat " + range.months() + ".");
+                throw new InvalidInputException("months.too-many-to-show", "max", MAX_MONTHS, "requested", range.months());
             }
             return range;
         }
@@ -440,7 +439,7 @@ public class GeneralAnalysisService {
         Range range = Range.of(from, to, current);
         CategoryHierarchyService.Tree tree = hierarchyService.loadTree();
         if (categoryId != null && !tree.byId().containsKey(categoryId)) {
-            throw new NotFoundException("la categoria", categoryId);
+            throw new NotFoundException("not-found.category", categoryId);
         }
         Set<Long> ids = categoryId != null ? withDescendants(tree, categoryId) : Set.of();
         MoneyFlows flows = new MoneyFlows(tree);

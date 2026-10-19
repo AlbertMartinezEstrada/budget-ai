@@ -1,11 +1,13 @@
+import { t, formatMonth, formatMonthRange, formatDate } from './i18n.js';
+
 /**
  * La pestanya General de l'anàlisi (GET /analytics/general), sense DOM: els
  * períodes, les comparacions i els colors dels gràfics. El que pinta és a
- * features/analytics/Analytics.js.
+ * features/analytics/General.js.
+ *
+ * Els noms (label) són claus de lang/Language_*.properties: la vista els passa
+ * per t().
  */
-
-const MONTHS = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
-    'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
 
 const pad = (month) => String(month).padStart(2, '0');
 const toPeriod = (year, month) => `${year}-${pad(month)}`;
@@ -19,11 +21,14 @@ export function monthsBefore(period, months) {
 }
 
 export const PERIOD_KINDS = [
-    { id: 'mes', label: 'Mes' },
-    { id: 'trimestre', label: 'Trimestre' },
-    { id: 'any', label: 'Año' },
-    { id: 'ultims12', label: 'Últimos 12 meses' }
+    { id: 'mes', label: 'general.period-month' },
+    { id: 'trimestre', label: 'general.period-quarter' },
+    { id: 'any', label: 'general.period-year' },
+    { id: 'ultims12', label: 'general.period-last-12' }
 ];
+
+// Una clau per trimestre: el número s'escriu diferent en cada un (1r, 2n, 3r, 4t; 1.er, 2.º).
+const QUARTER_KEYS = ['general.quarter-1', 'general.quarter-2', 'general.quarter-3', 'general.quarter-4'];
 
 /**
  * Les opcions del segon desplegable segons el tipus de període, de la més
@@ -36,7 +41,7 @@ export function periodOptions(kind, today = new Date()) {
         return Array.from({ length: 24 }, (unused, index) => {
             const period = monthsBefore(toPeriod(year, month), index);
             const [optionYear, optionMonth] = parse(period);
-            return { value: period, label: `${MONTHS[optionMonth - 1]} ${optionYear}` };
+            return { value: period, label: formatMonth(optionYear, optionMonth) };
         });
     }
     if (kind === 'trimestre') {
@@ -45,7 +50,7 @@ export function periodOptions(kind, today = new Date()) {
             const absolute = year * 4 + (quarter - 1) - index;
             const optionYear = Math.floor(absolute / 4);
             const optionQuarter = (absolute % 4) + 1;
-            return { value: `${optionYear}-T${optionQuarter}`, label: `${optionQuarter}.º trimestre ${optionYear}` };
+            return { value: `${optionYear}-T${optionQuarter}`, label: t(QUARTER_KEYS[optionQuarter - 1], { year: optionYear }) };
         });
     }
     if (kind === 'any') {
@@ -69,26 +74,21 @@ export function periodRange(kind, value, today = new Date()) {
     return { from: monthsBefore(current, 11), to: current };
 }
 
-/** «octubre 2026», «jul–sep 2026», «nov 2025 – oct 2026». */
+/** «octubre de 2026», «julio–septiembre de 2026», «2025» (un any sencer). */
 export function rangeLabel(from, to) {
     const [fromYear, fromMonth] = parse(from);
     const [toYear, toMonth] = parse(to);
-    if (from === to) return `${MONTHS[fromMonth - 1]} ${fromYear}`;
-    const short = (month) => MONTHS[month - 1].slice(0, 3);
-    if (fromYear === toYear) {
-        return fromMonth === 1 && toMonth === 12
-            ? String(fromYear)
-            : `${short(fromMonth)}–${short(toMonth)} ${fromYear}`;
-    }
-    return `${short(fromMonth)} ${fromYear} – ${short(toMonth)} ${toYear}`;
+    if (from === to) return formatMonth(fromYear, fromMonth);
+    if (fromYear === toYear && fromMonth === 1 && toMonth === 12) return String(fromYear);
+    return formatMonthRange(fromYear, fromMonth, toYear, toMonth);
 }
 
 /** Les quatre xifres de dalt i si pujar és bo o dolent en cadascuna. */
 export const SUMMARY_METRICS = [
-    { key: 'total_income', label: 'Ingresos', upIsGood: true },
-    { key: 'total_expense', label: 'Gastos', upIsGood: false },
-    { key: 'total_savings', label: 'Ahorrado', upIsGood: true },
-    { key: 'unassigned', label: 'Sin destinar', upIsGood: true }
+    { key: 'total_income', label: 'general.income', upIsGood: true },
+    { key: 'total_expense', label: 'general.expense', upIsGood: false },
+    { key: 'total_savings', label: 'general.saved', upIsGood: true },
+    { key: 'unassigned', label: 'general.unassigned', upIsGood: true }
 ];
 
 /**
@@ -138,23 +138,23 @@ export function structureShares(month) {
 }
 
 export const STRUCTURE_SERIES = [
-    { key: 'fixos', label: 'Fijos' },
-    { key: 'variables', label: 'Variables' },
-    { key: 'estalvi', label: 'Ahorro' },
-    { key: 'sense_destinar', label: 'Sin destinar' }
+    { key: 'fixos', label: 'general.fixed' },
+    { key: 'variables', label: 'general.variable' },
+    { key: 'estalvi', label: 'general.savings' },
+    { key: 'sense_destinar', label: 'general.unassigned' }
 ];
 
 export const EVOLUTION_SERIES = [
-    { key: 'total_income', label: 'Ingresos' },
-    { key: 'total_expense', label: 'Gastos' },
-    { key: 'total_savings', label: 'Ahorrado' }
+    { key: 'total_income', label: 'general.income' },
+    { key: 'total_expense', label: 'general.expense' },
+    { key: 'total_savings', label: 'general.saved' }
 ];
 
 /**
  * Els colors dels gràfics: les quatre primeres posicions de la paleta
  * categòrica, en aquest ordre (validat per a daltonisme contra el blanc i
  * contra la superfície fosca de l'aplicació). Cada sèrie té sempre el mateix
- * color: el que és Ingresos és blau a tot arreu.
+ * color: els ingressos són blaus a tot arreu.
  */
 export function chartTheme(dark) {
     return dark
@@ -192,10 +192,10 @@ export function trimEmptyLeading(months, keys) {
     return first === -1 ? [] : list.slice(first);
 }
 
-/** «2026-10» → «oct 26», per als eixos. */
+/** «2026-10» → «oct 26», «Oct 26», per als eixos. */
 export function axisMonth(period) {
     const [year, month] = parse(period);
-    return `${MONTHS[month - 1].slice(0, 3)} ${String(year).slice(-2)}`;
+    return formatDate(new Date(year, month - 1, 1), { month: 'short', year: '2-digit' });
 }
 
 /** Fins on arriba l'eix de l'estructura: el 100 %, llevat que algun mes s'hi passi. */

@@ -96,7 +96,7 @@ public class BudgetService {
                     if (updatedBudget.getActive() != null) budget.setActive(updatedBudget.getActive());
                     return budgetRepository.save(budget);
                 })
-                .orElseThrow(() -> new NotFoundException("el pressupost", id));
+                .orElseThrow(() -> new NotFoundException("not-found.budget", id));
     }
 
     @Transactional
@@ -179,23 +179,23 @@ public class BudgetService {
      */
     @Transactional
     public Map<String, Object> applyChanges(YearMonth target, List<BudgetChange> changes) {
-        if (target == null) throw new IllegalArgumentException("Falta el mes al qual aplicar els canvis.");
-        if (changes == null || changes.isEmpty()) throw new IllegalArgumentException("No hi ha cap canvi per aplicar.");
+        if (target == null) throw new InvalidInputException("budgets.apply-no-month");
+        if (changes == null || changes.isEmpty()) throw new InvalidInputException("budgets.apply-no-changes");
 
         CategoryHierarchyService.Tree tree = hierarchyService.loadTree();
         for (BudgetChange change : changes) {
             if (change.categoryId() == null || !tree.byId().containsKey(change.categoryId())) {
-                throw new NotFoundException("la categoria", change.categoryId());
+                throw new NotFoundException("not-found.category", change.categoryId());
             }
             if ((change.amount() == null) == (change.percentage() == null)) {
-                throw new IllegalArgumentException("Cada canvi porta un import o un percentatge, i només un.");
+                throw new InvalidInputException("budgets.amount-or-percent");
             }
             if (change.amount() != null && change.amount().signum() < 0) {
-                throw new IllegalArgumentException("Un import de pla no pot ser negatiu.");
+                throw new InvalidInputException("budgets.negative-plan");
             }
             if (change.percentage() != null
                     && (change.percentage().signum() < 0 || change.percentage().compareTo(BigDecimal.valueOf(100)) > 0)) {
-                throw new IllegalArgumentException("Un percentatge ha de ser entre 0 i 100.");
+                throw new InvalidInputException("budgets.percent-range");
             }
         }
 

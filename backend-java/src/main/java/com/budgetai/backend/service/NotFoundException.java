@@ -1,5 +1,8 @@
 package com.budgetai.backend.service;
 
+import com.budgetai.backend.i18n.Message;
+import com.budgetai.backend.i18n.Translatable;
+
 /**
  * El que es demana no existeix: un moviment, un compte, un deute...
  *
@@ -11,13 +14,22 @@ package com.budgetai.backend.service;
  * El cas habitual és haver-ho esborrat des d'una altra pestanya, i per això el
  * missatge suggereix recarregar.
  */
-public class NotFoundException extends RuntimeException {
+public class NotFoundException extends RuntimeException implements Translatable {
+
+    private final Message message;
 
     /**
-     * @param what amb article: "el moviment", "el compte", "l'objectiu"
+     * @param key una clau not-found.* per cosa: la frase sencera porta l'article
+     *            («No existeix el compte 12», «No existe la cuenta 12»), que
+     *            canvia d'un idioma a l'altre
      */
-    public NotFoundException(String what, Object id) {
-        super("No existeix " + what + " " + id + ". Potser s'ha esborrat des d'una altra pestanya: "
-                + "recarrega la pàgina.");
+    public NotFoundException(String key, Object id) {
+        super(Message.of(key, "id", id).toString());
+        this.message = Message.of(key, "id", id);
+    }
+
+    @Override
+    public Message message() {
+        return message;
     }
 }

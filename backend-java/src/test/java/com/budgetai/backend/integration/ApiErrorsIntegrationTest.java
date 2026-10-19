@@ -105,7 +105,7 @@ class ApiErrorsIntegrationTest extends AbstractIntegrationTest {
         mockMvc.perform(put("/gastos/" + transactionId + "/parts").cookie(session)
                         .contentType(MediaType.APPLICATION_JSON).content(parts))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message", containsString("en falten 50.00 €")));
+                .andExpect(jsonPath("$.message", containsString("en falten 50,00 €")));
     }
 
     @Test
@@ -115,6 +115,27 @@ class ApiErrorsIntegrationTest extends AbstractIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON).content("{\"nom\":\"Revolut\"}"))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.message", containsString("No existeix el compte 999999")));
+    }
+
+    @Test
+    @DisplayName("L'error surt en l'idioma de la capçalera Accept-Language; sense idioma conegut, en català")
+    void errorsComeInTheRequestLanguage() throws Exception {
+        mockMvc.perform(put("/accounts/999999").cookie(session).header("Accept-Language", "es")
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"nom\":\"Revolut\"}"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.message", containsString("No existe la cuenta 999999")));
+        mockMvc.perform(put("/accounts/999999").cookie(session).header("Accept-Language", "fr-FR,fr;q=0.9")
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"nom\":\"Revolut\"}"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.message", containsString("No existeix el compte 999999")));
+
+        // Els imports, amb el format de l'idioma.
+        String parts = "[{\"import\":300,\"category\":{\"id\":" + altresId() + "}},"
+                + "{\"import\":150,\"category\":{\"id\":" + altresId() + "}}]";
+        mockMvc.perform(put("/gastos/" + transactionId + "/parts").cookie(session).header("Accept-Language", "en")
+                        .contentType(MediaType.APPLICATION_JSON).content(parts))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message", containsString("€50.00 short")));
     }
 
     @Test

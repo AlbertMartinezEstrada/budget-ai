@@ -4,6 +4,8 @@ import {
     frequencyLabel, recurringGroups, trendText
 } from '../../decisions.js';
 import { chartTheme } from '../../generalAnalysis.js';
+import { appliedText } from '../../budgetReview.js';
+import { t } from '../../i18n.js';
 
 /**
  * La pestanya Decisiones de l'anàlisi: provar un canvi abans d'aplicar-lo,
@@ -17,13 +19,13 @@ import { chartTheme } from '../../generalAnalysis.js';
 const card = 'bg-white dark:bg-slate-800 rounded-xl p-4 shadow-sm border border-slate-200 dark:border-slate-700';
 
 export async function initDecisions(container) {
-    container.innerHTML = '<p class="text-sm text-slate-500">Cargando…</p>';
+    container.innerHTML = `<p class="text-sm text-slate-500">${t('common.loading')}</p>`;
     let data;
     try {
         data = await getDecisions();
     } catch (error) {
         container.innerHTML = `<div class="p-3 rounded-lg text-sm bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-300">
-            No se ha podido cargar: ${escapeHtml(error.message)}</div>`;
+            ${escapeHtml(t('decisions.load-failed', { message: error.message }))}</div>`;
         return;
     }
 
@@ -47,30 +49,35 @@ function simulatorCard(data) {
     const target = monthName(data.mes_desti);
     const saving = simulator.estalvi_mensual;
 
-    const savingLine = saving === null || saving === undefined
-        ? 'Todavía no hay meses cerrados con movimientos para saber cuánto ahorras.'
-        : `Ahora ahorras de media ${formatCurrency(saving)} al mes${Number(simulator.estalvi_pla) > 0
-            ? ` (el plan es ${formatCurrency(simulator.estalvi_pla)})` : ''}.`;
+    let savingLine;
+    if (saving === null || saving === undefined) {
+        savingLine = t('decisions.no-saving-data');
+    } else if (Number(simulator.estalvi_pla) > 0) {
+        savingLine = t('decisions.saving-now-plan', {
+            amount: formatCurrency(saving), plan: formatCurrency(simulator.estalvi_pla)
+        });
+    } else {
+        savingLine = t('decisions.saving-now', { amount: formatCurrency(saving) });
+    }
 
     return `
         <div class="${card}" id="simulator">
-            <h3 class="text-lg font-semibold mb-1">¿Y si…?</h3>
+            <h3 class="text-lg font-semibold mb-1">${t('decisions.what-if')}</h3>
             <p class="text-xs text-slate-500 dark:text-slate-400 mb-3">
-                Cambia lo que planeas gastar en cada partida y mira qué pasa con el ahorro y con tus metas.
-                Lo que recortas va a ahorro; lo que subes sale de él. ${escapeHtml(savingLine)}
+                ${t('decisions.what-if-hint')} ${escapeHtml(savingLine)}
             </p>
             ${items.length === 0
-                ? '<p class="text-sm text-slate-500">No hay gastos variables con plan ni con gasto todavía.</p>'
+                ? `<p class="text-sm text-slate-500">${t('decisions.no-items')}</p>`
                 : `
             <div class="table-responsive">
                 <table class="table w-full text-sm">
                     <thead>
                         <tr>
-                            <th class="text-left">Partida</th>
-                            <th class="text-right">Plan ahora</th>
-                            <th class="text-right">Gastas de media</th>
-                            <th class="text-right">Nuevo</th>
-                            <th class="text-right">Cambio</th>
+                            <th class="text-left">${t('decisions.item')}</th>
+                            <th class="text-right">${t('decisions.plan-now')}</th>
+                            <th class="text-right">${t('decisions.average')}</th>
+                            <th class="text-right">${t('decisions.new')}</th>
+                            <th class="text-right">${t('decisions.change')}</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -80,13 +87,13 @@ function simulatorCard(data) {
                                     <span class="font-medium">${escapeHtml(item.nom)}</span>
                                     <span class="text-xs text-slate-500 dark:text-slate-400">${escapeHtml(item.bloc || '')}</span>
                                 </td>
-                                <td class="text-right whitespace-nowrap">${item.te_pla_propi ? formatCurrency(item.pla) : '<span class="text-xs text-slate-500">sin plan</span>'}</td>
+                                <td class="text-right whitespace-nowrap">${item.te_pla_propi ? formatCurrency(item.pla) : `<span class="text-xs text-slate-500">${t('decisions.no-plan')}</span>`}</td>
                                 <td class="text-right whitespace-nowrap">${formatCurrency(item.mitjana_real)}</td>
                                 <td class="text-right">
                                     <input type="number" min="0" step="5" inputmode="decimal"
                                            class="sim-input w-24 px-2 py-1 border rounded text-right bg-white text-slate-900 dark:bg-slate-700 dark:text-slate-100 dark:border-slate-600"
                                            data-category="${item.categoria_id}" value="${startingValue(item)}"
-                                           aria-label="Nuevo plan para ${escapeHtml(item.nom)}">
+                                           aria-label="${escapeHtml(t('decisions.new-plan-label', { name: item.nom }))}">
                                 </td>
                                 <td class="text-right whitespace-nowrap" data-sim-change="${item.categoria_id}">—</td>
                             </tr>`).join('')}
@@ -97,8 +104,8 @@ function simulatorCard(data) {
             ${goalsBlock(data.metes)}
             ${items.length === 0 ? '' : `
             <div class="flex flex-wrap items-center justify-end gap-3 mt-4" id="sim-footer">
-                <button type="button" class="btn btn-outline" id="sim-reset">Volver a los importes de ahora</button>
-                <button type="button" class="btn btn-primary" id="sim-apply" disabled>Aplicar estos importes a ${escapeHtml(target)}</button>
+                <button type="button" class="btn btn-outline" id="sim-reset">${t('decisions.reset')}</button>
+                <button type="button" class="btn btn-primary" id="sim-apply" disabled>${escapeHtml(t('decisions.apply', { month: target }))}</button>
             </div>
             <p class="text-sm mt-2 hidden" id="sim-result" role="status"></p>`}
         </div>
@@ -108,12 +115,12 @@ function simulatorCard(data) {
 function goalsBlock(goals) {
     if (!goals || goals.length === 0) {
         return `<p class="text-xs text-slate-500 dark:text-slate-400 mt-4">
-            Sin metas pendientes. <a href="#goals" class="underline">Crea una en Metas</a> para ver cuándo llegas.</p>`;
+            ${t('decisions.no-goals')} <a href="#goals" class="underline">${t('decisions.go-to-goals')}</a></p>`;
     }
     return `
         <div class="mt-5">
-            <h4 class="font-semibold mb-1">Tus metas</h4>
-            <p class="text-xs text-slate-500 dark:text-slate-400 mb-2">Cada una, como si todo lo que ahorras al mes fuera a ella.</p>
+            <h4 class="font-semibold mb-1">${t('decisions.your-goals')}</h4>
+            <p class="text-xs text-slate-500 dark:text-slate-400 mb-2">${t('decisions.goals-hint')}</p>
             <ul class="space-y-3">
                 ${goals.map(goal => {
                     const target = Number.parseFloat(goal.objectiu) || 0;
@@ -122,8 +129,12 @@ function goalsBlock(goals) {
                         <div class="flex flex-wrap justify-between gap-2 text-sm">
                             <span class="font-medium">${escapeHtml(goal.nom)}</span>
                             <span class="text-slate-500 dark:text-slate-400">
-                                ${formatCurrency(goal.actual)} de ${formatCurrency(goal.objectiu)} · faltan ${formatCurrency(goal.falta)}
-                                ${goal.data_objectiu ? ` · para ${escapeHtml(monthName(String(goal.data_objectiu).slice(0, 7)))}` : ''}
+                                ${escapeHtml(t('decisions.goal-progress', {
+                                    current: formatCurrency(goal.actual), target: formatCurrency(goal.objectiu),
+                                    missing: formatCurrency(goal.falta)
+                                }))}${goal.data_objectiu
+                                    ? ` · ${escapeHtml(t('decisions.goal-deadline', { month: monthName(String(goal.data_objectiu).slice(0, 7)) }))}`
+                                    : ''}
                             </span>
                         </div>
                         <div class="h-2 bg-slate-100 dark:bg-slate-700 rounded-full mt-1">
@@ -158,11 +169,17 @@ function setUpSimulator(container, data) {
 
         const effect = container.querySelector('#sim-effect');
         if (effect) {
-            effect.textContent = result.extraMonthly > 0
-                ? `Ahorrarías ${formatCurrency(result.extraMonthly)} más al mes: ${formatCurrency(result.extraYearly)} al año.`
-                : result.extraMonthly < 0
-                    ? `Ahorrarías ${formatCurrency(-result.extraMonthly)} menos al mes: ${formatCurrency(-result.extraYearly)} al año.`
-                    : 'Cambia algún importe para ver el efecto.';
+            if (result.extraMonthly > 0) {
+                effect.textContent = t('decisions.effect-more', {
+                    amount: formatCurrency(result.extraMonthly), yearly: formatCurrency(result.extraYearly)
+                });
+            } else if (result.extraMonthly < 0) {
+                effect.textContent = t('decisions.effect-less', {
+                    amount: formatCurrency(-result.extraMonthly), yearly: formatCurrency(-result.extraYearly)
+                });
+            } else {
+                effect.textContent = t('decisions.effect-none');
+            }
         }
 
         const monthlySaving = Number.parseFloat(simulator.estalvi_mensual) || 0;
@@ -170,13 +187,16 @@ function setUpSimulator(container, data) {
             const element = container.querySelector(`[data-goal="${goal.id}"] [data-goal-projection]`);
             if (!element) continue;
             const comparison = goalComparison(goal, monthlySaving, result.extraMonthly);
-            const onTime = (projection) => projection.onTime === null ? ''
-                : projection.onTime ? ' · a tiempo' : ' · tarde';
-            let text = `Ahora: ${projectionText(comparison.now)}${onTime(comparison.now)}.`;
+            // «hi arribes en 6 mesos (abril del 2027) · a temps»
+            const describe = (projection) => projectionText(projection) + (projection.onTime === null ? ''
+                : ` · ${t(projection.onTime ? 'decisions.on-time' : 'decisions.late')}`);
+            let text = t('decisions.now', { projection: describe(comparison.now) });
             if (result.extraMonthly !== 0) {
                 const sooner = comparison.monthsSooner;
-                text += ` Con los cambios: ${projectionText(comparison.simulated)}${onTime(comparison.simulated)}`
-                    + (sooner > 0 ? `, ${sooner} ${sooner === 1 ? 'mes' : 'meses'} antes.` : sooner < 0 ? `, ${-sooner} ${sooner === -1 ? 'mes' : 'meses'} más tarde.` : '.');
+                const projection = describe(comparison.simulated);
+                if (sooner > 0) text += ' ' + t('decisions.sooner', { projection, count: sooner });
+                else if (sooner < 0) text += ' ' + t('decisions.later', { projection, count: -sooner });
+                else text += ' ' + t('decisions.with-changes', { projection });
             }
             element.textContent = text;
             element.className = `text-xs mt-1 ${comparison.simulated.onTime === false ? 'text-red-700 dark:text-red-300' : 'text-slate-600 dark:text-slate-300'}`;
@@ -198,22 +218,18 @@ function setUpSimulator(container, data) {
         const changes = simulationChanges(items, values());
         const target = monthName(data.mes_desti);
         const source = monthName(data.periode);
-        if (!confirm(`Se copiará a ${target} el plan de ${source} (lo que ya tengas en ${target} no se toca) `
-            + `y se cambiarán ${changes.length} ${changes.length === 1 ? 'partida' : 'partidas'}. ¿Seguimos?`)) return;
+        if (!confirm(t('decisions.apply-confirm', { target, source, count: changes.length }))) return;
 
         applyButton.disabled = true;
         const result = container.querySelector('#sim-result');
         try {
             const applied = await applyBudgetChanges(data.mes_desti, changes);
-            const skipped = applied.omesos || [];
-            result.textContent = `Hecho: ${applied.aplicats} ${applied.aplicats === 1 ? 'cambio' : 'cambios'} en ${target}`
-                + (applied.copiats > 0 ? ` y ${applied.copiats} copiados de ${source}` : '') + '.'
-                + (skipped.length > 0 ? ` No se ha tocado ${skipped.join(', ')}: tiene un presupuesto de más de un mes.` : '');
+            result.textContent = appliedText(applied, target);
             result.className = 'text-sm mt-2 text-emerald-700 dark:text-emerald-300';
             container.querySelector('#sim-footer').classList.add('hidden');
             inputs.forEach(input => { input.disabled = true; });
         } catch (error) {
-            result.textContent = `No se ha aplicado nada: ${error.message}`;
+            result.textContent = t('analysis.apply-failed', { message: error.message });
             result.className = 'text-sm mt-2 text-red-700 dark:text-red-300';
             applyButton.disabled = false;
         }
@@ -228,19 +244,19 @@ function recurringCard(recurring) {
     const groups = recurringGroups(recurring?.partides);
     return `
         <div class="${card}" id="recurring-review">
-            <h3 class="text-lg font-semibold mb-1">Lo fijo, al año</h3>
+            <h3 class="text-lg font-semibold mb-1">${t('decisions.fixed-yearly')}</h3>
             <p class="text-xs text-slate-500 dark:text-slate-400 mb-3">
-                Tus recurrentes pasados a lo que cuestan en un año: 13 € al mes no parecen nada; 156 € al año ya hacen pensar.
-                Se cambian o se dan de baja en <a href="#recurring" class="underline">Recurrentes</a>.
+                ${escapeHtml(t('decisions.fixed-yearly-hint', { monthly: formatCurrency(13), yearly: formatCurrency(156) }))}
+                <a href="#recurring" class="underline">${t('decisions.fixed-yearly-link')}</a>.
             </p>
-            ${groups.length === 0 ? '<p class="text-sm text-slate-500">Sin recurrentes de gasto.</p>' : `
-            <div class="text-2xl font-bold">${formatCurrency(recurring.total_anual)} <span class="text-sm font-normal text-slate-500 dark:text-slate-400">al año</span></div>
-            <div class="text-xs text-slate-500 dark:text-slate-400 mb-3">${formatCurrency(recurring.total_mensual)} al mes</div>
+            ${groups.length === 0 ? `<p class="text-sm text-slate-500">${t('decisions.no-recurring')}</p>` : `
+            <div class="text-2xl font-bold">${formatCurrency(recurring.total_anual)} <span class="text-sm font-normal text-slate-500 dark:text-slate-400">${t('decisions.per-year')}</span></div>
+            <div class="text-xs text-slate-500 dark:text-slate-400 mb-3">${escapeHtml(t('decisions.monthly-total', { amount: formatCurrency(recurring.total_mensual) }))}</div>
             <div class="space-y-3">
                 ${groups.map(group => `
                     <div data-recurring-group="${escapeHtml(group.bloc)}">
                         <div class="flex justify-between text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                            <span>${escapeHtml(group.bloc)}</span><span>${formatCurrency(group.anual)}/año</span>
+                            <span>${escapeHtml(group.bloc)}</span><span>${escapeHtml(t('decisions.per-year-short', { amount: formatCurrency(group.anual) }))}</span>
                         </div>
                         <ul class="text-sm divide-y divide-slate-100 dark:divide-slate-700">
                             ${group.partides.map(item => `<li class="flex justify-between gap-3 py-1">
@@ -262,19 +278,17 @@ function trendsCard(trends) {
     const theme = chartTheme(document.documentElement.classList.contains('dark'));
     return `
         <div class="${card}" id="trends">
-            <h3 class="text-lg font-semibold mb-1">Lo que está subiendo</h3>
-            <p class="text-xs text-slate-500 dark:text-slate-400 mb-3">
-                Gastos variables que han subido tres meses seguidos y ya están claramente por encima de lo que eran.
-            </p>
+            <h3 class="text-lg font-semibold mb-1">${t('decisions.rising')}</h3>
+            <p class="text-xs text-slate-500 dark:text-slate-400 mb-3">${t('decisions.rising-hint')}</p>
             ${!trends || trends.length === 0
-                ? '<p class="text-sm text-slate-500">Nada se dispara: ningún gasto variable ha subido tres meses seguidos.</p>'
+                ? `<p class="text-sm text-slate-500">${t('decisions.nothing-rising')}</p>`
                 : `<ul class="space-y-3">
                 ${trends.map(trend => {
                     const months = trend.mesos || [];
                     const max = Math.max(...months.map(month => Number.parseFloat(month.real) || 0), 1);
                     return `<li data-trend="${trend.categoria_id}" class="flex items-end gap-3">
                         <div class="flex items-end gap-0.5 h-10" role="img"
-                             aria-label="${escapeHtml(months.map(month => `${month.periode}: ${formatCurrency(month.real)}`).join(', '))}">
+                             aria-label="${escapeHtml(months.map(month => `${monthName(month.periode)}: ${formatCurrency(month.real)}`).join(', '))}">
                             ${months.map((month, index) => {
                                 const height = Math.max(2, ((Number.parseFloat(month.real) || 0) / max) * 40);
                                 // Els tres últims, els que pugen, en color; els d'abans, apagats.

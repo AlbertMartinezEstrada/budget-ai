@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 
 // decisions.js fa servir formatCurrency d'api.js, que llegeix window en carregar-se.
 global.window = {
@@ -15,6 +16,10 @@ let module;
 
 test.before(async () => {
     module = await import('../public/js/decisions.js');
+    // Els textos es comproven en castellà, l'idioma en què es va escriure la vista.
+    const i18n = await import('../public/js/i18n.js');
+    const spanish = fs.readFileSync(new URL('../public/lang/Language_es.properties', import.meta.url), 'utf8');
+    i18n.setMessages('es', i18n.parseProperties(spanish));
 });
 
 const TODAY = new Date(2026, 9, 14);
@@ -60,7 +65,8 @@ test('amb la simulació, la meta arriba abans', () => {
     assert.equal(comparison.simulated.months, 6);
     assert.equal(comparison.monthsSooner, 3);
     assert.equal(comparison.simulated.onTime, true);
-    assert.equal(module.projectionText(comparison.simulated), 'llegas en abril 2027 (6 meses)');
+    assert.equal(module.projectionText(comparison.simulated), 'llegas en abril de 2027 (6 meses)');
+    assert.equal(module.projectionText({ months: 1, period: '2026-11' }), 'llegas en noviembre de 2026 (1 mes)');
     assert.equal(module.projectionText({ months: null }), 'no llegas: ahorrando esto no se acaba nunca');
     assert.equal(module.projectionText({ months: 0 }), 'ya la tienes');
 });
@@ -92,6 +98,6 @@ test('el que puja, en una frase', () => {
     equalText(module.trendText({ abans: '42.33', ultim: '95', increment_percent: 124 }),
         'de 42,33 € a 95,00 € al mes (+124 %)');
     equalText(module.trendText({ abans: '0', ultim: '30', increment_percent: null }), 'de 0,00 € a 30,00 € al mes');
-    assert.equal(module.monthName('2027-03'), 'marzo 2027');
+    assert.equal(module.monthName('2027-03'), 'marzo de 2027');
     assert.equal(module.monthsAfter(new Date(2026, 10, 1), 2), '2027-01');
 });

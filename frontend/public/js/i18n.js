@@ -183,11 +183,21 @@ export function formatNumber(value, options = {}) {
         .format(Number.isFinite(number) ? number : 0);
 }
 
-/** Un percentatge que ja ve en tant per cent (12.5 → «12,5 %» en català, «12.5%» en anglès). */
-export function formatPercent(value, fractionDigits = 1) {
+/**
+ * Un percentatge que ja ve en tant per cent (12.5 → «12,5 %» en català, «12.5%» en anglès).
+ *
+ * @param minimumFractionDigits menys decimals que fractionDigits si el número
+ *        no en té: amb (27.5, 1, 0), «27,5 %», però «10 %» i no «10,0 %»
+ */
+export function formatPercent(value, fractionDigits = 1, minimumFractionDigits = fractionDigits) {
     return formatNumber(Number(value) / 100, {
-        style: 'percent', minimumFractionDigits: fractionDigits, maximumFractionDigits: fractionDigits
+        style: 'percent', minimumFractionDigits, maximumFractionDigits: fractionDigits
     });
+}
+
+/** Una llista amb la conjunció de l'idioma: «Oci, Llar i Roba», «Leisure, Home and Clothes». */
+export function formatList(items) {
+    return new Intl.ListFormat(getLocale(), { type: 'conjunction' }).format((items || []).map(String));
 }
 
 /**

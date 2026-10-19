@@ -38,8 +38,7 @@ public class SettingsService {
     public Settings updateSettings(Settings settings) {
         // Un idioma que el frontend no té deixaria la interfície sense textos.
         if (settings.getLanguage() != null && !LANGUAGES.contains(settings.getLanguage())) {
-            throw new IllegalArgumentException("L'idioma «" + settings.getLanguage()
-                    + "» no existeix. Ha de ser ca, es, pt o en.");
+            throw new InvalidInputException("settings.language-invalid", "language", settings.getLanguage());
         }
         Optional<Settings> existing = settingsRepository.findFirstBy();
         if (existing.isPresent()) {

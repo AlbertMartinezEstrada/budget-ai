@@ -166,7 +166,7 @@ class PersistenceIntegrationTest extends AbstractIntegrationTest {
         // forana i arribava a la interfície com un 500 sense explicació.
         assertThatThrownBy(() -> accountService.deleteAccount(id))
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("1 moviments");
+                .hasMessageContaining("1 moviment associat");
 
         assertThat(accountRepository.findById(id)).isPresent();
     }

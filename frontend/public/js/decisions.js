@@ -1,4 +1,5 @@
 import { formatCurrency } from './api.js';
+import { t, formatMonth, formatPercent } from './i18n.js';
 
 /**
  * La pestanya Decisiones de l'anàlisi (GET /analytics/decisions), sense DOM:
@@ -7,17 +8,14 @@ import { formatCurrency } from './api.js';
  * s'escriu.
  */
 
-const MONTHS = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
-    'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
-
 const number = (value) => Number.parseFloat(value) || 0;
-// «|| 0» perquè -0 no surti com a «−0.00 €».
+// «|| 0» perquè -0 no surti com a «−0,00 €».
 const round2 = (value) => (Math.round(value * 100) / 100) || 0;
 
-/** «2027-03» → «marzo 2027». */
+/** «2027-03» → «març del 2027», «March 2027». */
 export function monthName(period) {
     const [year, month] = String(period).split('-').map(Number);
-    return MONTHS[month - 1] ? `${MONTHS[month - 1]} ${year}` : String(period);
+    return Number.isInteger(month) && month >= 1 && month <= 12 ? formatMonth(year, month) : String(period);
 }
 
 /** El període «AAAA-MM» n mesos després d'una data. */
@@ -80,11 +78,11 @@ export function goalComparison(goal, monthlySaving, extraMonthly, today = new Da
     return { now, simulated, monthsSooner };
 }
 
-/** «llegas en marzo 2027 (5 meses)», o que no s'hi arriba. */
+/** «hi arribes en 5 mesos (març del 2027)», o que no s'hi arriba. */
 export function projectionText(projection) {
-    if (projection.months === null) return 'no llegas: ahorrando esto no se acaba nunca';
-    if (projection.months === 0) return 'ya la tienes';
-    return `llegas en ${monthName(projection.period)} (${projection.months} ${projection.months === 1 ? 'mes' : 'meses'})`;
+    if (projection.months === null) return t('decisions.never');
+    if (projection.months === 0) return t('decisions.already');
+    return t('decisions.reach', { count: projection.months, month: monthName(projection.period) });
 }
 
 /**
@@ -106,18 +104,25 @@ export function simulationChanges(items, values) {
         });
 }
 
-/** «al mes», «cada 3 meses»… */
+const FREQUENCY_KEYS = {
+    DIARIA: 'decisions.per-day',
+    SETMANAL: 'decisions.per-week',
+    MENSUAL: 'decisions.per-month',
+    TRIMESTRAL: 'decisions.per-quarter',
+    ANUAL: 'decisions.per-year'
+};
+
+/** «al mes», «cada 3 mesos»… */
 export function frequencyLabel(frequency) {
-    return {
-        DIARIA: 'al día', SETMANAL: 'a la semana', MENSUAL: 'al mes', TRIMESTRAL: 'cada 3 meses', ANUAL: 'al año'
-    }[String(frequency || '').toUpperCase()] || '';
+    const key = FREQUENCY_KEYS[String(frequency || '').toUpperCase()];
+    return key ? t(key) : '';
 }
 
 /** Els recurrents per blocs (Subscripcions, Llar…), el bloc que més costa primer. */
 export function recurringGroups(items) {
     const groups = new Map();
     for (const item of items || []) {
-        const name = item.bloc || 'Sin categoría';
+        const name = item.bloc || t('decisions.no-category');
         if (!groups.has(name)) groups.set(name, { bloc: name, anual: 0, partides: [] });
         const group = groups.get(name);
         group.partides.push(item);
@@ -126,9 +131,12 @@ export function recurringGroups(items) {
     return [...groups.values()].sort((first, second) => second.anual - first.anual);
 }
 
-/** «de 42.33 € a 95.00 € al mes (+124 %)». */
+/** «de 42,33 € a 95,00 € al mes (+124 %)». */
 export function trendText(trend) {
-    const percent = trend.increment_percent !== null && trend.increment_percent !== undefined
-        ? ` (+${Number(trend.increment_percent)} %)` : '';
-    return `de ${formatCurrency(trend.abans)} a ${formatCurrency(trend.ultim)} al mes${percent}`;
+    const before = formatCurrency(trend.abans);
+    const last = formatCurrency(trend.ultim);
+    if (trend.increment_percent === null || trend.increment_percent === undefined) {
+        return t('decisions.trend', { before, last });
+    }
+    return t('decisions.trend-percent', { before, last, percent: formatPercent(trend.increment_percent, 1, 0) });
 }

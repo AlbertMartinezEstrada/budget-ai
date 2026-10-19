@@ -306,8 +306,9 @@ public final class RepaymentSchedule {
     public static void requireReasonableCount(BigDecimal amount, BigDecimal installment) {
         BigDecimal count = amount.divide(installment, 0, RoundingMode.CEILING);
         if (count.compareTo(BigDecimal.valueOf(MAX_INSTALLMENTS)) > 0) {
-            throw new IllegalArgumentException("Amb aquesta quota serien " + count.toPlainString()
-                    + " pagaments. Posa'n una de més gran (màxim " + MAX_INSTALLMENTS + " pagaments).");
+            // Enter: un BigDecimal sortiria amb punt de milers, «10.000 pagaments».
+            throw new InvalidInputException("debts.too-many-installments",
+                    "payments", count.toBigInteger(), "max", MAX_INSTALLMENTS);
         }
     }
 

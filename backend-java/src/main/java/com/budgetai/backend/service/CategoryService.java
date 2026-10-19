@@ -46,7 +46,7 @@ public class CategoryService {
     @Transactional
     public Category update(Long id, Category changes) {
         Category category = categoryRepository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("Categoria no trobada: " + id));
+                .orElseThrow(() -> new NotFoundException("not-found.category", id));
 
         if (changes.getName() != null) category.setName(changes.getName());
 
@@ -83,14 +83,13 @@ public class CategoryService {
         if (parentId == null) return;
 
         if (ownId != null && parentId.equals(ownId)) {
-            throw new IllegalArgumentException("Una categoria no pot ser el seu propi grup");
+            throw new InvalidInputException("categories.own-group");
         }
         if (categoryRepository.findById(parentId).isEmpty()) {
-            throw new IllegalArgumentException("El grup indicat no existeix: " + parentId);
+            throw new InvalidInputException("categories.group-missing", "id", parentId);
         }
         if (ownId != null && hierarchyService.loadTree().leafIdsOf(ownId).contains(parentId)) {
-            throw new IllegalArgumentException(
-                    "No es pot posar una subcategoria com a grup de la seva pròpia categoria");
+            throw new InvalidInputException("categories.group-inside-itself");
         }
     }
 
@@ -100,12 +99,10 @@ public class CategoryService {
         // esborrar la categoria fallaria per la clau forana amb un error intern.
         long used = transactionRepository.countByCategoryId(id) + transactionPartRepository.countByCategory(id);
         if (used > 0) {
-            throw new IllegalStateException(
-                    "No es pot esborrar la categoria: té " + used + " moviments associats");
+            throw new ConflictException("categories.delete-has-transactions", "count", used);
         }
         if (!categoryRepository.findByParentId(id).isEmpty()) {
-            throw new IllegalStateException(
-                    "No es pot esborrar la categoria: té subcategories. Mou-les o esborra-les abans.");
+            throw new ConflictException("categories.delete-has-children");
         }
         categoryRepository.deleteById(id);
     }

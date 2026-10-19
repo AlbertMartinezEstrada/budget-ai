@@ -1,5 +1,6 @@
 package com.budgetai.backend.controller;
 
+import com.budgetai.backend.i18n.Messages;
 import com.budgetai.backend.security.AuthCookies;
 import com.budgetai.backend.security.JwtService;
 import com.budgetai.backend.security.LocalCredentials;
@@ -42,8 +43,8 @@ public class AuthController {
     public ResponseEntity<?> login(@RequestBody LoginRequest request) {
         if (throttle.isLocked()) {
             return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
-                    .body(Map.of("error", "Massa intents fallits. Torna-ho a provar d'aquí a "
-                            + Math.max(1, throttle.remainingLock().toSeconds()) + " segons."));
+                    .body(Map.of("error", Messages.get("auth.too-many-attempts",
+                            "seconds", Math.max(1, throttle.remainingLock().toSeconds()))));
         }
 
         boolean userMatches = credentials.getUsername().equals(request.username());
@@ -59,7 +60,7 @@ public class AuthController {
             // Un sol missatge per als dos casos: dir quin ha fallat és regalar
             // mitja credencial.
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(Map.of("error", "Usuari o contrasenya incorrectes"));
+                    .body(Map.of("error", Messages.get("auth.wrong-credentials")));
         }
 
         throttle.recordSuccess();
@@ -75,7 +76,7 @@ public class AuthController {
     public ResponseEntity<?> logout() {
         return ResponseEntity.ok()
                 .header(HttpHeaders.SET_COOKIE, AuthCookies.expired(secureCookie))
-                .body(Map.of("message", "Sessió tancada"));
+                .body(Map.of("message", Messages.get("auth.logged-out")));
     }
 
     /**

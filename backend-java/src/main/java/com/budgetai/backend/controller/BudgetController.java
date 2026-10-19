@@ -1,9 +1,11 @@
 package com.budgetai.backend.controller;
 
+import com.budgetai.backend.i18n.Messages;
 import com.budgetai.backend.model.Budget;
 import com.budgetai.backend.model.MonthlyIncome;
 import com.budgetai.backend.service.BudgetService;
 import com.budgetai.backend.service.IncomeBaseService;
+import com.budgetai.backend.service.InvalidInputException;
 import com.budgetai.backend.service.NotFoundException;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -92,7 +94,7 @@ public class BudgetController {
     @PostMapping("/apply-changes")
     public Map<String, Object> applyChanges(@RequestBody ChangesRequest request) {
         if (request.period() == null || !isValidPeriod(request.period())) {
-            throw new IllegalArgumentException("El mes ha de ser AAAA-MM, com 2026-11.");
+            throw new InvalidInputException("months.format");
         }
         return budgetService.applyChanges(YearMonth.parse(request.period()), request.changes());
     }
@@ -113,10 +115,10 @@ public class BudgetController {
     public ResponseEntity<?> setMonthlyIncome(@PathVariable String period,
                                               @RequestBody MonthlyIncome body) {
         if (!isValidPeriod(period)) {
-            return ResponseEntity.badRequest().body(Map.of("error", "El període ha de ser YYYY-MM"));
+            return ResponseEntity.badRequest().body(Map.of("error", Messages.get("months.format")));
         }
         if (body.getAmount() == null || body.getAmount().signum() < 0) {
-            return ResponseEntity.badRequest().body(Map.of("error", "L'import ha de ser positiu"));
+            return ResponseEntity.badRequest().body(Map.of("error", Messages.get("common.amount-not-negative")));
         }
         return ResponseEntity.ok(
                 budgetService.setMonthlySalary(period, body.getAmount(), body.getNotes()));
@@ -125,10 +127,10 @@ public class BudgetController {
     @DeleteMapping("/monthly-income/{period}")
     public ResponseEntity<?> deleteMonthlyIncome(@PathVariable String period) {
         if (!isValidPeriod(period)) {
-            return ResponseEntity.badRequest().body(Map.of("error", "El període ha de ser YYYY-MM"));
+            return ResponseEntity.badRequest().body(Map.of("error", Messages.get("months.format")));
         }
         budgetService.clearMonthlySalary(period);
-        return ResponseEntity.ok(Map.of("message", "Sou del mes esborrat; s'aplicarà el per defecte"));
+        return ResponseEntity.ok(Map.of("message", Messages.get("budgets.salary-cleared")));
     }
 
     /** "2026-13" passa el patró però no és cap mes, i el servei el necessita llegir. */
@@ -146,7 +148,7 @@ public class BudgetController {
     public ResponseEntity<Budget> getBudgetById(@PathVariable Long id) {
         return budgetService.getBudgetById(id)
                 .map(ResponseEntity::ok)
-                .orElseThrow(() -> new NotFoundException("el pressupost", id));
+                .orElseThrow(() -> new NotFoundException("not-found.budget", id));
     }
 
     @PostMapping
@@ -164,6 +166,6 @@ public class BudgetController {
     @DeleteMapping("/{id}")
     public ResponseEntity<?> deleteBudget(@PathVariable Long id) {
         budgetService.deleteBudget(id);
-        return ResponseEntity.ok(Map.of("message", "Budget deleted successfully"));
+        return ResponseEntity.ok(Map.of("message", Messages.get("budgets.deleted")));
     }
 }
