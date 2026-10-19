@@ -40,7 +40,9 @@ diferencia es solo si la contraseña en claro llega a tocar el disco.
 | Variable | Por defecto | Qué hace |
 |---|---|---|
 | `AUTH_SESSION_DURATION` | `P7D` (7 días) | Cuánto dura la sesión |
-| `AUTH_MAX_LOGIN_ATTEMPTS` | `5` | Intentos fallidos antes de bloquear |
+| `AUTH_MAX_LOGIN_ATTEMPTS` | `5` | Intentos fallidos seguidos desde una misma IP antes de bloquearla |
+| `AUTH_GLOBAL_MAX_LOGIN_FAILURES` | `50` | Intentos fallidos entre todas las IP que bloquean el login para todos… |
+| `AUTH_GLOBAL_LOGIN_FAILURES_WINDOW` | `PT10M` (10 minutos) | …si llegan en este rato |
 | `AUTH_LOGIN_LOCK_DURATION` | `PT1M` (1 minuto) | Duración del primer bloqueo |
 | `AUTH_LOGIN_LOCK_MAX_DURATION` | `PT15M` (15 minutos) | Hasta dónde crece el bloqueo |
 | `AUTH_SECURE_COOKIE` | `false` | Ponlo a `true` **solo si sirves por HTTPS** |
@@ -49,10 +51,10 @@ Hasta octubre de 2026 `docker-compose.yml` no pasaba ninguna de estas opciones
 al backend, y ponerlas en el `.env` no hacía nada. Ahora sí.
 
 Cada bloqueo seguido dura el doble que el anterior (1, 2, 4, 8 minutos…) hasta
-el máximo, y un login correcto lo reinicia. Con un minuto fijo se podían probar
-unas 7.200 contraseñas al día desde cualquier aparato de la wifi; con el máximo
-de 15 minutos, unas 480. Quien se equivoca escribiéndola solo espera el primer
-minuto.
+el máximo, y un login correcto desde esa IP lo reinicia. Con un minuto fijo se
+podían probar unas 7.200 contraseñas al día desde cualquier aparato de la wifi;
+con el máximo de 15 minutos, unas 480. Quien se equivoca escribiéndola solo
+espera el primer minuto.
 
 ## Cómo funciona
 
@@ -116,10 +118,31 @@ pantalla de entrada. El identificador de las sesiones no sale de la API.
 - **Tiempo de respuesta constante.** La comprobación de la contraseña se
   ejecuta aunque el usuario no coincida, para que el tiempo no delate cuál de
   los dos campos ha fallado.
-- **Límite de intentos.** Cinco fallos seguidos bloquean el login un minuto. Es
-  un contador en memoria y global, no por IP: con un solo usuario no tiene
-  sentido distinguir quién prueba, y contar por IP solo serviría para que un
-  atacante las rotase. Reiniciar el backend limpia el contador.
+- **Límite de intentos, por IP y para todos.** Cinco fallos seguidos desde una
+  IP bloquean esa IP, y el bloqueo crece con cada ronda; desde el móvil o el PC
+  se sigue pudiendo entrar. Hasta octubre de 2026 el contador era uno para todo
+  el backend, y cualquiera de la wifi podía dejarte fuera a propósito. Como
+  solo por IP no frenaría a quien vaya cambiando de dirección, hay además un
+  límite para todos, mucho más alto: 50 fallos entre todas las IP en 10 minutos
+  cierran el login para todo el mundo, con el mismo bloqueo que crece. En el
+  día a día no se llega.
+
+  - **La IP es la de la conexión**, nunca la cabecera `X-Forwarded-For`: no hay
+    proxy delante y cualquiera podría inventársela para empezar de cero en cada
+    intento. Si algún día se pone uno (Caddy, en el servidor), hay que decirle a
+    Spring cuál es de confianza (`server.forward-headers-strategy=native` y
+    `server.tomcat.remoteip.internal-proxies` con su IP y nada más): las redes
+    privadas que acepta por defecto incluyen la wifi de casa.
+  - **Una IPv6 cuenta por su bloque /64**, que es lo que tiene una sola
+    conexión: contándolas una a una, bastaría con cambiar los últimos dígitos.
+  - **Memoria acotada.** Como mucho se recuerdan 10.000 direcciones, y una que
+    lleva una hora sin fallar ni estar bloqueada se olvida. Reiniciar el backend
+    lo limpia todo.
+  - **Con Docker Desktop (Windows o Mac) el backend puede ver todas las
+    conexiones con la misma IP**, la de Docker; entonces el límite por IP se
+    comporta como el de antes, para todos. Cada intento fallido sale en el log
+    con la IP que se ha contado (`docker compose logs backend`), y así se ve
+    cuál llega. En un Linux, como el servidor, llega la de verdad.
 
 ## Limitaciones conocidas
 

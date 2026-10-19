@@ -31,8 +31,8 @@ docker compose logs -f backend        # logs
 scripts\backup.bat                    # copia de la base de datos (backup.sh fuera de Windows)
 scripts/migrate.sh                    # aplica las migraciones pendientes (copia antes; --estat para ver cuáles)
 
-cd backend-java && ./gradlew test              # 283 unitarios, sin Docker
-cd backend-java && ./gradlew integrationTest   # 179, requieren Docker
+cd backend-java && ./gradlew test              # 290 unitarios, sin Docker
+cd backend-java && ./gradlew integrationTest   # 181, requieren Docker
 cd frontend && npm test                        # 119
 cd frontend && npm run test:navegador          # todas las vistas en un navegador (ver abajo)
 ```
