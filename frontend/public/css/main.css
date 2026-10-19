@@ -18,20 +18,22 @@
     --text-secondary: #6b7280; /* Gray 500 */
     --text-inverse: #f9fafb; /* Gray 50 */
 
-    /* Bordes i Ombres */
+    /* Bordes i Ombres. Les mides porten --app- davant: Tailwind 4 fa servir
+       --radius-lg, --shadow-sm… per a les seves classes, i amb el mateix nom
+       aquestes les trepitjaven (rounded-lg sortia amb 1rem i no amb 0.5rem). */
     --border-color: #e5e7eb; /* Gray 200 */
-    --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    --app-shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+    --app-shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
 
     /* Espaiat */
-    --spacing-xs: 0.5rem;
-    --spacing-sm: 1rem;
-    --spacing-md: 1.5rem;
-    --spacing-lg: 2rem;
+    --app-spacing-xs: 0.5rem;
+    --app-spacing-sm: 1rem;
+    --app-spacing-md: 1.5rem;
+    --app-spacing-lg: 2rem;
 
     /* Radi */
-    --radius-md: 0.5rem;
-    --radius-lg: 1rem;
+    --app-radius-md: 0.5rem;
+    --app-radius-lg: 1rem;
 }
 
 /* Tema fosc. El selector de tema ja posava la classe "dark" a <html>, però
@@ -54,8 +56,8 @@ html.dark {
     --text-inverse: #0f172a;
 
     --border-color: #334155;  /* Slate 700 */
-    --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.4);
-    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.5);
+    --app-shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.4);
+    --app-shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.5);
 }
 
 * {

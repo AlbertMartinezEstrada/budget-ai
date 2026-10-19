@@ -27,13 +27,13 @@ export async function initBudgetReview(container) {
         <div class="flex flex-wrap items-end gap-3 mb-4">
             <div>
                 <label class="block text-xs text-slate-500 dark:text-slate-400 mb-1" for="review-month">${t('common.month')}</label>
-                <select id="review-month" class="pl-3 pr-10 py-2 border rounded-lg">
+                <select id="review-month" class="pl-3 pr-10 py-2 border rounded-2xl">
                     ${months.map(period => `<option value="${period}">${escapeHtml(monthLabel(period))}</option>`).join('')}
                 </select>
             </div>
             <div>
                 <label class="block text-xs text-slate-500 dark:text-slate-400 mb-1" for="review-length">${t('review.history')}</label>
-                <select id="review-length" class="pl-3 pr-10 py-2 border rounded-lg">
+                <select id="review-length" class="pl-3 pr-10 py-2 border rounded-2xl">
                     <option value="6">${escapeHtml(t('review.last-months', { count: 6 }))}</option>
                     <option value="12">${escapeHtml(t('review.last-months', { count: 12 }))}</option>
                 </select>
@@ -58,7 +58,7 @@ export async function initBudgetReview(container) {
             content.innerHTML = renderReview(review, advice);
             if (advice) setUpProposals(content, advice);
         } catch (error) {
-            content.innerHTML = `<div class="p-3 rounded-lg text-sm bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-300">${escapeHtml(t('review.load-failed', { message: error.message }))}</div>`;
+            content.innerHTML = `<div class="p-3 rounded-2xl text-sm bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-300">${escapeHtml(t('review.load-failed', { message: error.message }))}</div>`;
         }
     };
 
@@ -80,12 +80,12 @@ function renderReview(review, advice) {
             ${orderedSections(month).map(sectionCard).join('')}
         </div>
         ${advice ? forecastCard(advice) + proposalsCard(advice) : ''}
-        <div class="bg-white dark:bg-slate-800 rounded-xl p-4 shadow-sm border border-slate-200 dark:border-slate-700">
+        <div class="bg-white dark:bg-slate-800 rounded-3xl p-4 shadow-xs border border-slate-200 dark:border-slate-700">
             <h3 class="text-lg font-semibold mb-1">${escapeHtml(t('review.month-blocks', { month: monthLabel(month.periode) }))}</h3>
             <p class="text-xs text-slate-500 dark:text-slate-400 mb-3">${t('review.expand-hint')}</p>
             ${blocksTable(month)}
         </div>
-        <div class="bg-white dark:bg-slate-800 rounded-xl p-4 shadow-sm border border-slate-200 dark:border-slate-700">
+        <div class="bg-white dark:bg-slate-800 rounded-3xl p-4 shadow-xs border border-slate-200 dark:border-slate-700">
             <h3 class="text-lg font-semibold mb-1">${t('review.history')}</h3>
             <p class="text-xs text-slate-500 dark:text-slate-400 mb-3">${t('review.history-hint')}</p>
             ${historyTable(review)}
@@ -96,7 +96,7 @@ function renderReview(review, advice) {
 function notices(month) {
     const items = [];
     if (!month.te_pla) {
-        items.push(`<div class="p-3 rounded-lg text-sm bg-amber-100 text-amber-800 dark:bg-amber-500/20 dark:text-amber-300">
+        items.push(`<div class="p-3 rounded-2xl text-sm bg-amber-100 text-amber-800 dark:bg-amber-500/20 dark:text-amber-300">
             ${escapeHtml(t('review.no-plan-notice', { month: monthLabel(month.periode) }))}
             <a href="#budgets" class="underline">${t('review.plan-link')}</a>.
         </div>`);
@@ -114,7 +114,7 @@ const orderedSections = (month) => SECTION_ORDER
 function sectionCard(section) {
     const fund = Number(section.gastat_del_fons) || 0;
     return `
-        <div class="bg-white dark:bg-slate-800 rounded-xl p-4 shadow-sm border border-slate-200 dark:border-slate-700" data-section="${section.tipus}">
+        <div class="bg-white dark:bg-slate-800 rounded-3xl p-4 shadow-xs border border-slate-200 dark:border-slate-700" data-section="${section.tipus}">
             <div class="flex items-start justify-between gap-2 mb-2">
                 <div class="text-sm text-slate-500 dark:text-slate-400">${escapeHtml(sectionLabel(section.tipus))}</div>
                 ${statusPill(section.estat, section.tipus)}
@@ -280,7 +280,7 @@ function historyTable(review) {
 function forecastCard(advice) {
     const rows = (advice.previsio || []).map(block => forecastRows(block, 0, [])).join('');
     return `
-        <div class="bg-white dark:bg-slate-800 rounded-xl p-4 shadow-sm border border-slate-200 dark:border-slate-700" id="forecast-card">
+        <div class="bg-white dark:bg-slate-800 rounded-3xl p-4 shadow-xs border border-slate-200 dark:border-slate-700" id="forecast-card">
             <h3 class="text-lg font-semibold mb-1">${escapeHtml(t('review.forecast-title', { month: monthLabel(advice.periode) }))}</h3>
             <p class="text-xs text-slate-500 dark:text-slate-400 mb-3">
                 ${escapeHtml(t('review.forecast-hint', { day: advice.dia, days: advice.dies_mes }))}
@@ -387,7 +387,7 @@ function proposalsCard(advice) {
     }
 
     return `
-        <div class="bg-white dark:bg-slate-800 rounded-xl p-4 shadow-sm border border-slate-200 dark:border-slate-700" id="proposals-card">
+        <div class="bg-white dark:bg-slate-800 rounded-3xl p-4 shadow-xs border border-slate-200 dark:border-slate-700" id="proposals-card">
             <h3 class="text-lg font-semibold mb-1">${escapeHtml(t('review.proposals-title', { month: target }))}</h3>
             <p class="text-xs text-slate-500 dark:text-slate-400 mb-3">
                 ${escapeHtml(t('review.proposals-hint', { months: sample || t('review.recent-months') }))}

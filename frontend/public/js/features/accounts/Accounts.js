@@ -21,7 +21,7 @@ export async function initAccounts(container) {
     container.innerHTML = `
         <div class="page-header flex justify-between items-center mb-6">
             <h2 class="text-2xl font-bold text-slate-800 dark:text-slate-100">${t('nav.accounts')}</h2>
-            <button id="add-account-btn" class="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/90 flex items-center gap-2">
+            <button id="add-account-btn" class="bg-primary text-white px-4 py-2 rounded-2xl hover:bg-primary/90 flex items-center gap-2">
                 <span class="material-symbols-outlined">add</span>
                 ${t('accounts.add')}
             </button>
@@ -30,31 +30,31 @@ export async function initAccounts(container) {
 
         <!-- Modal -->
         <div id="account-modal" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-50">
-            <div class="bg-white dark:bg-slate-800 rounded-xl p-6 w-full max-w-md">
+            <div class="bg-white dark:bg-slate-800 rounded-3xl p-6 w-full max-w-md">
                 <h3 class="text-xl font-bold mb-4" id="modal-title">${t('accounts.add')}</h3>
                 <form id="account-form" class="space-y-4">
                     <input type="hidden" id="account-id">
                     <div>
                         <label class="block text-sm font-medium mb-1" for="account-name">${t('common.name')}</label>
-                        <input type="text" id="account-name" required class="w-full px-3 py-2 border rounded-lg">
+                        <input type="text" id="account-name" required class="w-full px-3 py-2 border rounded-2xl">
                     </div>
                     <div>
                         <label class="block text-sm font-medium mb-1" for="account-type">${t('common.type')}</label>
-                        <select id="account-type" class="w-full px-3 py-2 border rounded-lg">
+                        <select id="account-type" class="w-full px-3 py-2 border rounded-2xl">
                             ${Object.keys(ACCOUNT_TYPE_LABELS).map(type => `<option value="${type}">${accountTypeLabel(type)}</option>`).join('')}
                         </select>
                     </div>
                     <div>
                         <label class="block text-sm font-medium mb-1" for="account-balance">${t('accounts.initial-balance')}</label>
-                        <input type="number" id="account-balance" step="0.01" value="0" class="w-full px-3 py-2 border rounded-lg">
+                        <input type="number" id="account-balance" step="0.01" value="0" class="w-full px-3 py-2 border rounded-2xl">
                     </div>
                     <div>
                         <label class="block text-sm font-medium mb-1" for="account-color">${t('common.color')}</label>
-                        <input type="color" id="account-color" value="#4f46e5" class="w-full h-10 border rounded-lg">
+                        <input type="color" id="account-color" value="#4f46e5" class="w-full h-10 border rounded-2xl">
                     </div>
                     <div class="flex gap-2 justify-end">
-                        <button type="button" id="cancel-btn" class="px-4 py-2 border rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700">${t('common.cancel')}</button>
-                        <button type="submit" class="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/90">${t('common.save')}</button>
+                        <button type="button" id="cancel-btn" class="px-4 py-2 border rounded-2xl hover:bg-gray-50 dark:hover:bg-slate-700">${t('common.cancel')}</button>
+                        <button type="submit" class="bg-primary text-white px-4 py-2 rounded-2xl hover:bg-primary/90">${t('common.save')}</button>
                     </div>
                 </form>
             </div>
@@ -62,18 +62,18 @@ export async function initAccounts(container) {
 
         <!-- Adjust Balance Modal -->
         <div id="adjust-modal" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-50">
-            <div class="bg-white dark:bg-slate-800 rounded-xl p-6 w-full max-w-md">
+            <div class="bg-white dark:bg-slate-800 rounded-3xl p-6 w-full max-w-md">
                 <h3 class="text-xl font-bold mb-4">${t('accounts.adjust-title')}</h3>
                 <form id="adjust-form" class="space-y-4">
                     <input type="hidden" id="adjust-account-id">
                     <div>
                         <label class="block text-sm font-medium mb-1" for="adjust-amount">${t('accounts.adjust-amount')}</label>
-                        <input type="number" id="adjust-amount" step="0.01" class="w-full px-3 py-2 border rounded-lg">
+                        <input type="number" id="adjust-amount" step="0.01" class="w-full px-3 py-2 border rounded-2xl">
                     </div>
                     <p class="text-sm text-gray-500 dark:text-slate-400">${t('accounts.adjust-hint')}</p>
                     <div class="flex gap-2 justify-end">
-                        <button type="button" id="cancel-adjust-btn" class="px-4 py-2 border rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700">${t('common.cancel')}</button>
-                        <button type="submit" class="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/90">${t('accounts.adjust')}</button>
+                        <button type="button" id="cancel-adjust-btn" class="px-4 py-2 border rounded-2xl hover:bg-gray-50 dark:hover:bg-slate-700">${t('common.cancel')}</button>
+                        <button type="submit" class="bg-primary text-white px-4 py-2 rounded-2xl hover:bg-primary/90">${t('accounts.adjust')}</button>
                     </div>
                 </form>
             </div>
@@ -119,10 +119,10 @@ function renderAccounts(accounts) {
     container.innerHTML = accounts.map(account => {
         const color = sanitizeColor(account.color);
         return `
-        <div class="bg-white dark:bg-slate-800 rounded-xl p-4 shadow-sm border border-slate-200 dark:border-slate-700">
+        <div class="bg-white dark:bg-slate-800 rounded-3xl p-4 shadow-xs border border-slate-200 dark:border-slate-700">
             <div class="flex items-center justify-between mb-3">
                 <div class="flex items-center gap-3">
-                    <div class="w-10 h-10 rounded-lg flex items-center justify-center" style="background-color: ${color}20">
+                    <div class="w-10 h-10 rounded-2xl flex items-center justify-center" style="background-color: ${color}20">
                         <span class="material-symbols-outlined" style="color: ${color}">account_balance_wallet</span>
                     </div>
                     <div>
@@ -131,13 +131,13 @@ function renderAccounts(accounts) {
                     </div>
                 </div>
                 <div class="flex gap-1">
-                    <button data-action="adjust" data-id="${account.id}" class="p-1 hover:bg-gray-100 dark:hover:bg-slate-700 rounded" title="${t('accounts.adjust-title')}">
+                    <button data-action="adjust" data-id="${account.id}" class="p-1 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg" title="${t('accounts.adjust-title')}">
                         <span class="material-symbols-outlined text-sm">edit</span>
                     </button>
-                    <button data-action="edit" data-id="${account.id}" class="p-1 hover:bg-gray-100 dark:hover:bg-slate-700 rounded" title="${t('common.edit')}">
+                    <button data-action="edit" data-id="${account.id}" class="p-1 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg" title="${t('common.edit')}">
                         <span class="material-symbols-outlined text-sm">settings</span>
                     </button>
-                    <button data-action="delete" data-id="${account.id}" class="p-1 hover:bg-red-50 text-red-600 rounded" title="${t('common.delete')}">
+                    <button data-action="delete" data-id="${account.id}" class="p-1 hover:bg-red-50 text-red-600 rounded-lg" title="${t('common.delete')}">
                         <span class="material-symbols-outlined text-sm">delete</span>
                     </button>
                 </div>

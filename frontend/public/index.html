@@ -7,18 +7,14 @@
     <!-- Sense icona, el navegador demanava /favicon.ico a cada càrrega i rebia un 404. -->
     <link rel="icon" type="image/svg+xml" href="favicon.svg">
 
-    <!-- CSS -->
-    <link rel="stylesheet" href="css/main.css">
-    <link rel="stylesheet" href="css/layout.css">
-    <link rel="stylesheet" href="css/components.css">
+    <!-- CSS. layers.css fixa l'ordre de les capes de Tailwind 4 i hi posa els
+         CSS propis (main, layout, components) i les icones: ha d'anar primer. -->
+    <link rel="stylesheet" href="css/layers.css">
 
     <!-- Tot es serveix des de l'aplicació, res des d'un CDN: un script de
          tercers té accés a tota la pàgina, i sense internet l'aplicació es
-         quedava sense estils. Es genera amb "npm run build:assets".
-         tailwind.css va després dels CSS propis, com abans anava el del CDN,
-         perquè a igual especificitat manin les mateixes regles. -->
+         quedava sense estils. Es genera amb "npm run build:assets". -->
     <link rel="stylesheet" href="vendor/inter/inter.css">
-    <link rel="stylesheet" href="vendor/material-symbols/outlined.css">
     <link rel="stylesheet" href="css/tailwind.css">
     <!-- Després de Tailwind: hi tradueix al tema fosc les classes que les
          vistes fan servir sense la variant dark:. -->
@@ -33,47 +29,47 @@
                 <span class="sidebar-logo">Budget AI</span>
             </div>
             <nav class="nav-links flex-1 px-4 space-y-1">
-                <a class="nav-link flex items-center gap-3 px-4 py-3 rounded-xl transition-colors" href="#" data-view="dashboard">
+                <a class="nav-link flex items-center gap-3 px-4 py-3 rounded-3xl transition-colors" href="#" data-view="dashboard">
                     <span class="material-symbols-outlined">dashboard</span>
                     <span class="font-medium text-sm" data-i18n="nav.dashboard">Tauler</span>
                 </a>
-                <a class="nav-link flex items-center gap-3 px-4 py-3 rounded-xl transition-colors" href="#" data-view="transactions">
+                <a class="nav-link flex items-center gap-3 px-4 py-3 rounded-3xl transition-colors" href="#" data-view="transactions">
                     <span class="material-symbols-outlined">receipt_long</span>
                     <span class="font-medium text-sm" data-i18n="nav.transactions">Moviments</span>
                 </a>
-                <a class="nav-link flex items-center gap-3 px-4 py-3 rounded-xl transition-colors" href="#" data-view="categories">
+                <a class="nav-link flex items-center gap-3 px-4 py-3 rounded-3xl transition-colors" href="#" data-view="categories">
                     <span class="material-symbols-outlined">label</span>
                     <span class="font-medium text-sm" data-i18n="nav.categories">Categories</span>
                 </a>
-                <a class="nav-link flex items-center gap-3 px-4 py-3 rounded-xl transition-colors" href="#" data-view="accounts">
+                <a class="nav-link flex items-center gap-3 px-4 py-3 rounded-3xl transition-colors" href="#" data-view="accounts">
                     <span class="material-symbols-outlined">account_balance_wallet</span>
                     <span class="font-medium text-sm" data-i18n="nav.accounts">Comptes</span>
                 </a>
-                <a class="nav-link flex items-center gap-3 px-4 py-3 rounded-xl transition-colors" href="#" data-view="budgets">
+                <a class="nav-link flex items-center gap-3 px-4 py-3 rounded-3xl transition-colors" href="#" data-view="budgets">
                     <span class="material-symbols-outlined">pie_chart</span>
                     <span class="font-medium text-sm" data-i18n="nav.budgets">Pressupost</span>
                 </a>
-                <a class="nav-link flex items-center gap-3 px-4 py-3 rounded-xl transition-colors" href="#" data-view="goals">
+                <a class="nav-link flex items-center gap-3 px-4 py-3 rounded-3xl transition-colors" href="#" data-view="goals">
                     <span class="material-symbols-outlined">flag</span>
                     <span class="font-medium text-sm" data-i18n="nav.goals">Objectius</span>
                 </a>
-                <a class="nav-link flex items-center gap-3 px-4 py-3 rounded-xl transition-colors" href="#" data-view="debts">
+                <a class="nav-link flex items-center gap-3 px-4 py-3 rounded-3xl transition-colors" href="#" data-view="debts">
                     <span class="material-symbols-outlined">handshake</span>
                     <span class="font-medium text-sm" data-i18n="nav.debts">Deutes</span>
                 </a>
-                <a class="nav-link flex items-center gap-3 px-4 py-3 rounded-xl transition-colors" href="#" data-view="transfers">
+                <a class="nav-link flex items-center gap-3 px-4 py-3 rounded-3xl transition-colors" href="#" data-view="transfers">
                     <span class="material-symbols-outlined">swap_horiz</span>
                     <span class="font-medium text-sm" data-i18n="nav.transfers">Transferències</span>
                 </a>
-                <a class="nav-link flex items-center gap-3 px-4 py-3 rounded-xl transition-colors" href="#" data-view="recurring">
+                <a class="nav-link flex items-center gap-3 px-4 py-3 rounded-3xl transition-colors" href="#" data-view="recurring">
                     <span class="material-symbols-outlined">autorenew</span>
                     <span class="font-medium text-sm" data-i18n="nav.recurring">Recurrents</span>
                 </a>
-                <a class="nav-link flex items-center gap-3 px-4 py-3 rounded-xl transition-colors" href="#" data-view="analytics">
+                <a class="nav-link flex items-center gap-3 px-4 py-3 rounded-3xl transition-colors" href="#" data-view="analytics">
                     <span class="material-symbols-outlined">insights</span>
                     <span class="font-medium text-sm" data-i18n="nav.analytics">Anàlisi</span>
                 </a>
-                <a class="nav-link flex items-center gap-3 px-4 py-3 rounded-xl transition-colors" href="#" data-view="settings">
+                <a class="nav-link flex items-center gap-3 px-4 py-3 rounded-3xl transition-colors" href="#" data-view="settings">
                     <span class="material-symbols-outlined">settings</span>
                     <span class="font-medium text-sm" data-i18n="nav.settings">Configuració</span>
                 </a>
@@ -86,7 +82,7 @@
                 <h2 class="page-title text-xl font-bold text-slate-800 dark:text-slate-100" id="page-title">Budget AI</h2>
 
                 <div class="flex items-center gap-4">
-                    <button class="nav-link flex items-center gap-2 rounded-lg bg-primary py-2 px-4 text-white text-sm font-bold shadow-lg shadow-primary/20 hover:bg-primary/90 transition-all" data-view="upload">
+                    <button class="nav-link flex items-center gap-2 rounded-2xl bg-primary py-2 px-4 text-white text-sm font-bold shadow-lg shadow-primary/20 hover:bg-primary/90 transition-all" data-view="upload">
                         <span class="material-symbols-outlined text-lg">upload_file</span>
                         <span data-i18n="nav.upload">Importar CSV</span>
                     </button>
@@ -96,7 +92,7 @@
                     </div>
 
                     <button id="logout-btn" title="Tancar la sessió" data-i18n-title="header.logout-title"
-                            class="flex items-center gap-2 rounded-lg border border-slate-200 dark:border-slate-700 py-2 px-3 text-sm text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
+                            class="flex items-center gap-2 rounded-2xl border border-slate-200 dark:border-slate-700 py-2 px-3 text-sm text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
                         <span class="material-symbols-outlined text-lg">logout</span>
                         <span data-i18n="header.logout">Sortir</span>
                     </button>

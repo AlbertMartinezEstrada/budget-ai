@@ -27,9 +27,15 @@ const lightCss = read('css/tailwind.css') + read('css/components.css');
 const rules = new Map([...lightCss.matchAll(/(?<=^|[}\n])\s*\.((?:[a-z]+\\:)?[a-z][\w-]*(?:\\\/\d+)?)\s*\{([^}]*)\}/g)]
     .map(match => [match[1].replace(/\\/g, ''), match[2]]));
 
-/** Les variables del tema clar (:root de main.css), per resoldre un var(--…). */
+/**
+ * Les variables, per resoldre un var(--…): les del tema clar (:root de
+ * main.css) i les del tema de Tailwind 4, que escriu els colors així
+ * (.text-red-600{color:var(--color-red-600)}).
+ */
 const rootBlock = read('css/main.css').match(/:root \{([^}]*)\}/)[1];
-const variables = new Map([...rootBlock.matchAll(/(--[\w-]+):\s*([^;]+);/g)].map(match => [match[1], match[2]]));
+const themeBlock = read('css/tailwind.css').match(/:root,:host\{([^}]*)\}/)[1];
+const variables = new Map([...`${rootBlock};${themeBlock};`.matchAll(/(--[\w-]+):\s*([^;]+);/g)]
+    .map(match => [match[1], match[2]]));
 
 function parseColor(value) {
     const variable = value.match(/var\((--[\w-]+)\)/);
@@ -76,10 +82,14 @@ function sources() {
 
 test('cada color de text que fa servir l\'aplicació es llegeix sobre blanc', () => {
     // text-white només va sobre un fons de color: ho mira el test següent.
-    const weak = [...rules.keys()]
+    const colors = [...rules.keys()]
         .filter(name => /^text-/.test(name) && name !== 'text-white')
         .map(name => [name, colorOf(name, 'color')])
-        .filter(([, color]) => color)
+        .filter(([, color]) => color);
+    // Un color que no es pot llegir es deixa de banda: si el format del CSS
+    // canviés (va passar en passar a Tailwind 4), el test passaria sense mirar res.
+    assert.ok(colors.length >= 20, `només s'han pogut llegir ${colors.length} colors de text`);
+    const weak = colors
         .map(([name, color]) => [name, contrast(color, WHITE)])
         .filter(([, ratio]) => ratio < MINIMUM);
     assert.deepEqual(weak, [],

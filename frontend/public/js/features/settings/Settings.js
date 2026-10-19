@@ -10,7 +10,7 @@ export async function initSettings(container) {
         <div id="settings-loading" class="text-center py-8 text-slate-500 dark:text-slate-400">${t('common.loading')}</div>
         <div id="settings-content" class="grid grid-cols-1 lg:grid-cols-2 gap-6" style="display: none;">
             <!-- Perfil -->
-            <div class="bg-white dark:bg-slate-800 rounded-xl p-6 shadow-sm border">
+            <div class="bg-white dark:bg-slate-800 rounded-3xl p-6 shadow-xs border">
                 <div class="flex items-center gap-3 mb-4">
                     <span class="material-symbols-outlined text-primary">person</span>
                     <h3 class="text-lg font-semibold">${t('settings.profile')}</h3>
@@ -18,20 +18,20 @@ export async function initSettings(container) {
                 <div class="space-y-4">
                     <div>
                         <label class="block text-sm font-medium text-slate-700 mb-1" for="setting-name">${t('settings.name')}</label>
-                        <input type="text" id="setting-name" class="w-full px-3 py-2 border rounded-lg">
+                        <input type="text" id="setting-name" class="w-full px-3 py-2 border rounded-2xl">
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-slate-700 mb-1" for="setting-email">${t('settings.email')}</label>
-                        <input type="email" id="setting-email" class="w-full px-3 py-2 border rounded-lg">
+                        <input type="email" id="setting-email" class="w-full px-3 py-2 border rounded-2xl">
                     </div>
-                    <button id="save-profile-btn" class="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/90 text-sm">
+                    <button id="save-profile-btn" class="bg-primary text-white px-4 py-2 rounded-2xl hover:bg-primary/90 text-sm">
                         ${t('settings.save-profile')}
                     </button>
                 </div>
             </div>
 
             <!-- Idioma -->
-            <div class="bg-white dark:bg-slate-800 rounded-xl p-6 shadow-sm border">
+            <div class="bg-white dark:bg-slate-800 rounded-3xl p-6 shadow-xs border">
                 <div class="flex items-center gap-3 mb-4">
                     <span class="material-symbols-outlined text-primary">translate</span>
                     <h3 class="text-lg font-semibold">${t('settings.language')}</h3>
@@ -40,7 +40,7 @@ export async function initSettings(container) {
                     <label class="block text-sm font-medium text-slate-700 mb-1" for="setting-language">${t('settings.language')}</label>
                     <!-- Cada idioma, amb el seu nom en aquell idioma: qui no entén
                          l'actual ha de poder trobar el seu. -->
-                    <select id="setting-language" class="w-full px-3 py-2 border rounded-lg">
+                    <select id="setting-language" class="w-full px-3 py-2 border rounded-2xl">
                         ${LANGUAGES.map(language => `<option value="${language.code}" lang="${language.code}">${escapeHtml(language.name)}</option>`).join('')}
                     </select>
                     <p class="text-slate-500 dark:text-slate-400 text-sm mt-2">${t('settings.language-hint')}</p>
@@ -48,14 +48,14 @@ export async function initSettings(container) {
             </div>
 
             <!-- Moneda -->
-            <div class="bg-white dark:bg-slate-800 rounded-xl p-6 shadow-sm border">
+            <div class="bg-white dark:bg-slate-800 rounded-3xl p-6 shadow-xs border">
                 <div class="flex items-center gap-3 mb-4">
                     <span class="material-symbols-outlined text-primary">attach_money</span>
                     <h3 class="text-lg font-semibold">${t('settings.currency')}</h3>
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-slate-700 mb-1" for="setting-currency">${t('settings.default-currency')}</label>
-                    <select id="setting-currency" class="w-full px-3 py-2 border rounded-lg">
+                    <select id="setting-currency" class="w-full px-3 py-2 border rounded-2xl">
                         <option value="EUR">${t('settings.currency-eur')}</option>
                         <option value="USD">${t('settings.currency-usd')}</option>
                         <option value="GBP">${t('settings.currency-gbp')}</option>
@@ -64,7 +64,7 @@ export async function initSettings(container) {
             </div>
 
             <!-- Tema -->
-            <div class="bg-white dark:bg-slate-800 rounded-xl p-6 shadow-sm border">
+            <div class="bg-white dark:bg-slate-800 rounded-3xl p-6 shadow-xs border">
                 <div class="flex items-center gap-3 mb-4">
                     <span class="material-symbols-outlined text-primary">palette</span>
                     <h3 class="text-lg font-semibold">${t('settings.appearance')}</h3>
@@ -89,7 +89,7 @@ export async function initSettings(container) {
             </div>
 
             <!-- Notificacions -->
-            <div class="bg-white dark:bg-slate-800 rounded-xl p-6 shadow-sm border">
+            <div class="bg-white dark:bg-slate-800 rounded-3xl p-6 shadow-xs border">
                 <div class="flex items-center gap-3 mb-4">
                     <span class="material-symbols-outlined text-primary">notifications</span>
                     <h3 class="text-lg font-semibold">${t('settings.notifications')}</h3>
@@ -97,25 +97,25 @@ export async function initSettings(container) {
                 <div class="space-y-3">
                     <label class="flex items-center justify-between cursor-pointer">
                         <span class="text-sm">${t('settings.notify-expenses')}</span>
-                        <input type="checkbox" id="notif-expenses" class="w-5 h-5 text-primary rounded">
+                        <input type="checkbox" id="notif-expenses" class="w-5 h-5 text-primary rounded-lg">
                     </label>
                     <label class="flex items-center justify-between cursor-pointer">
                         <span class="text-sm">${t('settings.notify-budget')}</span>
-                        <input type="checkbox" id="notif-budget" class="w-5 h-5 text-primary rounded">
+                        <input type="checkbox" id="notif-budget" class="w-5 h-5 text-primary rounded-lg">
                     </label>
                     <label class="flex items-center justify-between cursor-pointer">
                         <span class="text-sm">${t('settings.notify-monthly')}</span>
-                        <input type="checkbox" id="notif-monthly" class="w-5 h-5 text-primary rounded">
+                        <input type="checkbox" id="notif-monthly" class="w-5 h-5 text-primary rounded-lg">
                     </label>
                 </div>
-                <button id="save-notifications-btn" class="mt-4 bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/90 text-sm">
+                <button id="save-notifications-btn" class="mt-4 bg-primary text-white px-4 py-2 rounded-2xl hover:bg-primary/90 text-sm">
                     ${t('settings.save-notifications')}
                 </button>
             </div>
 
             <!-- Desar-ho tot -->
-            <div class="bg-white dark:bg-slate-800 rounded-xl p-6 shadow-sm border lg:col-span-2">
-                <button id="save-all-btn" class="bg-green-700 text-white px-6 py-3 rounded-lg hover:bg-green-800 font-medium">
+            <div class="bg-white dark:bg-slate-800 rounded-3xl p-6 shadow-xs border lg:col-span-2">
+                <button id="save-all-btn" class="bg-green-700 text-white px-6 py-3 rounded-2xl hover:bg-green-800 font-medium">
                     ${t('settings.save-all')}
                 </button>
                 <span id="save-status" class="ml-4 text-sm text-slate-500 dark:text-slate-400" role="status"></span>

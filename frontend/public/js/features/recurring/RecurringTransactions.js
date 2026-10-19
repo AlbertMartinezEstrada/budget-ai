@@ -20,11 +20,11 @@ export async function initRecurring(container) {
         <div class="page-header flex justify-between items-center mb-6">
             <h2 class="text-2xl font-bold text-slate-800 dark:text-slate-100">${t('nav.recurring')}</h2>
             <div class="flex gap-2">
-                <button id="process-btn" class="bg-green-700 text-white px-4 py-2 rounded-lg hover:bg-green-800 flex items-center gap-2">
+                <button id="process-btn" class="bg-green-700 text-white px-4 py-2 rounded-2xl hover:bg-green-800 flex items-center gap-2">
                     <span class="material-symbols-outlined">play_arrow</span>
                     ${t('recurring.process')}
                 </button>
-                <button id="add-recurring-btn" class="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/90 flex items-center gap-2">
+                <button id="add-recurring-btn" class="bg-primary text-white px-4 py-2 rounded-2xl hover:bg-primary/90 flex items-center gap-2">
                     <span class="material-symbols-outlined">add</span>
                     ${t('recurring.add')}
                 </button>
@@ -34,46 +34,46 @@ export async function initRecurring(container) {
 
         <!-- Modal -->
         <div id="recurring-modal" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-50">
-            <div class="bg-white dark:bg-slate-800 rounded-xl p-6 w-full max-w-md">
+            <div class="bg-white dark:bg-slate-800 rounded-3xl p-6 w-full max-w-md">
                 <h3 class="text-xl font-bold mb-4" id="modal-title">${t('recurring.add-title')}</h3>
                 <form id="recurring-form" class="space-y-4">
                     <input type="hidden" id="recurring-id">
                     <div>
                         <label class="block text-sm font-medium mb-1" for="recurring-name">${t('common.name')}</label>
-                        <input type="text" id="recurring-name" required class="w-full px-3 py-2 border rounded-lg">
+                        <input type="text" id="recurring-name" required class="w-full px-3 py-2 border rounded-2xl">
                     </div>
                     <div>
                         <label class="block text-sm font-medium mb-1" for="recurring-type">${t('common.type')}</label>
-                        <select id="recurring-type" required class="w-full px-3 py-2 border rounded-lg">
+                        <select id="recurring-type" required class="w-full px-3 py-2 border rounded-2xl">
                             <option value="EXPENSE">${t('common.expense')}</option>
                             <option value="INCOME">${t('common.income')}</option>
                         </select>
                     </div>
                     <div>
                         <label class="block text-sm font-medium mb-1" for="recurring-amount">${t('common.amount')}</label>
-                        <input type="number" id="recurring-amount" step="0.01" required class="w-full px-3 py-2 border rounded-lg">
+                        <input type="number" id="recurring-amount" step="0.01" required class="w-full px-3 py-2 border rounded-2xl">
                     </div>
                     <div>
                         <label class="block text-sm font-medium mb-1" for="recurring-frequency">${t('recurring.frequency')}</label>
-                        <select id="recurring-frequency" required class="w-full px-3 py-2 border rounded-lg">
+                        <select id="recurring-frequency" required class="w-full px-3 py-2 border rounded-2xl">
                             ${Object.keys(FREQUENCY_LABELS).map(frequency => `<option value="${frequency}">${frequencyLabel(frequency)}</option>`).join('')}
                         </select>
                     </div>
                     <div>
                         <label class="block text-sm font-medium mb-1" for="recurring-next-date">${t('recurring.next-date')}</label>
-                        <input type="date" id="recurring-next-date" required class="w-full px-3 py-2 border rounded-lg">
+                        <input type="date" id="recurring-next-date" required class="w-full px-3 py-2 border rounded-2xl">
                     </div>
                     <div>
                         <label class="block text-sm font-medium mb-1" for="recurring-category">${t('common.category')}</label>
-                        <select id="recurring-category" required class="w-full px-3 py-2 border rounded-lg"></select>
+                        <select id="recurring-category" required class="w-full px-3 py-2 border rounded-2xl"></select>
                     </div>
                     <div>
                         <label class="block text-sm font-medium mb-1" for="recurring-description">${t('common.description')}</label>
-                        <textarea id="recurring-description" class="w-full px-3 py-2 border rounded-lg" rows="2"></textarea>
+                        <textarea id="recurring-description" class="w-full px-3 py-2 border rounded-2xl" rows="2"></textarea>
                     </div>
                     <div class="flex gap-2 justify-end">
-                        <button type="button" id="cancel-btn" class="px-4 py-2 border rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700">${t('common.cancel')}</button>
-                        <button type="submit" class="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/90">${t('common.save')}</button>
+                        <button type="button" id="cancel-btn" class="px-4 py-2 border rounded-2xl hover:bg-gray-50 dark:hover:bg-slate-700">${t('common.cancel')}</button>
+                        <button type="submit" class="bg-primary text-white px-4 py-2 rounded-2xl hover:bg-primary/90">${t('common.save')}</button>
                     </div>
                 </form>
             </div>
@@ -140,10 +140,10 @@ function renderRecurrings(recurrings) {
     }
 
     container.innerHTML = recurrings.map(item => `
-        <div class="bg-white dark:bg-slate-800 rounded-xl p-4 shadow-sm border border-slate-200 dark:border-slate-700">
+        <div class="bg-white dark:bg-slate-800 rounded-3xl p-4 shadow-xs border border-slate-200 dark:border-slate-700">
             <div class="flex items-center justify-between mb-3">
                 <div class="flex items-center gap-3">
-                    <div class="w-10 h-10 rounded-lg flex items-center justify-center ${item.tipus === 'INCOME' ? 'bg-green-100' : 'bg-red-100'}">
+                    <div class="w-10 h-10 rounded-2xl flex items-center justify-center ${item.tipus === 'INCOME' ? 'bg-green-100' : 'bg-red-100'}">
                         <span class="material-symbols-outlined ${item.tipus === 'INCOME' ? 'text-green-700' : 'text-red-600'}">${item.tipus === 'INCOME' ? 'trending_up' : 'trending_down'}</span>
                     </div>
                     <div>
@@ -152,10 +152,10 @@ function renderRecurrings(recurrings) {
                     </div>
                 </div>
                 <div class="flex gap-1">
-                    <button data-action="edit" data-id="${item.id}" class="p-1 hover:bg-gray-100 dark:hover:bg-slate-700 rounded" title="${t('common.edit')}">
+                    <button data-action="edit" data-id="${item.id}" class="p-1 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg" title="${t('common.edit')}">
                         <span class="material-symbols-outlined text-sm">edit</span>
                     </button>
-                    <button data-action="delete" data-id="${item.id}" class="p-1 hover:bg-red-50 text-red-600 rounded" title="${t('common.delete')}">
+                    <button data-action="delete" data-id="${item.id}" class="p-1 hover:bg-red-50 text-red-600 rounded-lg" title="${t('common.delete')}">
                         <span class="material-symbols-outlined text-sm">delete</span>
                     </button>
                 </div>

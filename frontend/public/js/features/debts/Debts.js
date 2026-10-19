@@ -76,7 +76,7 @@ export async function initDebts(container) {
     container.innerHTML = `
         <div class="page-header flex flex-wrap justify-between items-center gap-3 mb-2">
             <h2 class="text-2xl font-bold text-slate-800 dark:text-slate-100">${t('debts.title')}</h2>
-            <button id="add-debt-btn" class="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/90 flex items-center gap-2">
+            <button id="add-debt-btn" class="bg-primary text-white px-4 py-2 rounded-2xl hover:bg-primary/90 flex items-center gap-2">
                 <span class="material-symbols-outlined">add</span>
                 ${t('debts.add')}
             </button>
@@ -89,7 +89,7 @@ export async function initDebts(container) {
         </div>
 
         <div id="debt-modal" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-50 p-4">
-            <div class="bg-white dark:bg-slate-800 rounded-xl p-6 w-full max-w-md max-h-full overflow-y-auto">
+            <div class="bg-white dark:bg-slate-800 rounded-3xl p-6 w-full max-w-md max-h-full overflow-y-auto">
                 <h3 class="text-xl font-bold mb-4" id="debt-modal-title">${t('debts.add')}</h3>
                 <form id="debt-form" class="space-y-4">
                     <input type="hidden" id="debt-id">
@@ -167,17 +167,17 @@ export async function initDebts(container) {
         </div>
 
         <div id="receipt-modal" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-50 p-4">
-            <div class="bg-white dark:bg-slate-800 rounded-xl p-6 w-full max-w-md max-h-full overflow-y-auto">
+            <div class="bg-white dark:bg-slate-800 rounded-3xl p-6 w-full max-w-md max-h-full overflow-y-auto">
                 <h3 class="text-xl font-bold mb-1" id="receipt-modal-title">${t('debts.remove-receipt-title')}</h3>
                 <p class="text-sm text-slate-500 dark:text-slate-400 mb-4" id="receipt-modal-hint"></p>
                 <div class="space-y-3">
                     <button type="button" data-receipt-choice="skip"
-                            class="w-full text-left p-3 rounded-lg border hover:bg-gray-50 dark:hover:bg-slate-700">
+                            class="w-full text-left p-3 rounded-2xl border hover:bg-gray-50 dark:hover:bg-slate-700">
                         <span class="font-medium block">${t('debts.skip')}</span>
                         <span class="text-sm text-slate-500 dark:text-slate-400 block" id="receipt-skip-hint"></span>
                     </button>
                     <button type="button" data-receipt-choice="discount"
-                            class="w-full text-left p-3 rounded-lg border hover:bg-gray-50 dark:hover:bg-slate-700">
+                            class="w-full text-left p-3 rounded-2xl border hover:bg-gray-50 dark:hover:bg-slate-700">
                         <span class="font-medium block">${t('debts.discount')}</span>
                         <span class="text-sm text-slate-500 dark:text-slate-400 block" id="receipt-discount-hint"></span>
                     </button>
@@ -273,7 +273,7 @@ function renderTotals() {
         const pending = totalOf(direction, 'pendent');
         const overdue = totalOf(direction, 'endarrerit');
         return `
-            <div class="bg-white dark:bg-slate-800 rounded-xl p-4 shadow-sm border">
+            <div class="bg-white dark:bg-slate-800 rounded-3xl p-4 shadow-xs border">
                 <div class="text-sm text-slate-500 dark:text-slate-400">${t(labels.titol)}</div>
                 <div class="text-2xl font-bold ${direction === 'DEC' ? 'text-red-600' : 'text-green-700'}">
                     ${formatCurrency(pending)}
@@ -299,7 +299,7 @@ function renderCard(debt) {
     const expanded = expandedDebts.has(debt.id);
 
     return `
-        <div class="bg-white dark:bg-slate-800 rounded-xl p-4 shadow-sm border ${debt.saldat ? 'opacity-60' : ''}">
+        <div class="bg-white dark:bg-slate-800 rounded-3xl p-4 shadow-xs border ${debt.saldat ? 'opacity-60' : ''}">
             <div class="flex justify-between items-start gap-2 mb-2">
                 <div class="min-w-0">
                     <h4 class="font-semibold truncate">${escapeHtml(debt.nom)}</h4>
@@ -309,10 +309,10 @@ function renderCard(debt) {
                 </div>
                 <div class="flex items-center gap-1 shrink-0">
                     ${statusBadge(debt, overdue)}
-                    <button data-action="edit" data-id="${debt.id}" class="p-1 hover:bg-gray-100 dark:hover:bg-slate-700 rounded" title="${t('common.edit')}">
+                    <button data-action="edit" data-id="${debt.id}" class="p-1 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg" title="${t('common.edit')}">
                         <span class="material-symbols-outlined text-sm">edit</span>
                     </button>
-                    <button data-action="delete" data-id="${debt.id}" class="p-1 hover:bg-red-50 dark:hover:bg-red-500/10 text-red-600 rounded" title="${t('common.delete')}">
+                    <button data-action="delete" data-id="${debt.id}" class="p-1 hover:bg-red-50 dark:hover:bg-red-500/10 text-red-600 rounded-lg" title="${t('common.delete')}">
                         <span class="material-symbols-outlined text-sm">delete</span>
                     </button>
                 </div>
@@ -428,14 +428,14 @@ function receiptStatusText(receipt, frequency) {
 function receiptAction(debt, receipt, label) {
     if (receipt.eliminable) {
         return `<button data-action="remove-receipt" data-id="${debt.id}" data-date="${escapeHtml(receipt.data)}"
-                        class="flex rounded text-slate-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10"
+                        class="flex rounded-lg text-slate-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10"
                         title="${escapeHtml(t('debts.remove-receipt', { of: ofReceipt(label) }))}" aria-label="${escapeHtml(t('debts.remove-receipt', { of: ofReceipt(label) }))}">
                     <span class="material-symbols-outlined text-base leading-none">close</span>
                 </button>`;
     }
     if (!isActiveReceipt(receipt)) {
         return `<button data-action="restore-receipt" data-id="${debt.id}" data-date="${escapeHtml(receipt.data)}"
-                        class="flex rounded text-slate-500 hover:text-primary hover:bg-gray-100 dark:hover:bg-slate-700"
+                        class="flex rounded-lg text-slate-500 hover:text-primary hover:bg-gray-100 dark:hover:bg-slate-700"
                         title="${t('debts.restore-title')}" aria-label="${escapeHtml(t('debts.restore-receipt', { of: ofReceipt(label) }))}">
                     <span class="material-symbols-outlined text-base leading-none">undo</span>
                 </button>`;

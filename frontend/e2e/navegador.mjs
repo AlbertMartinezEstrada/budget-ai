@@ -126,11 +126,21 @@ async function setTheme(theme) {
  * 3:1 per al text gran). S'executa dins la pàgina.
  */
 function lowContrastTexts() {
+    // Un color amb opacitat de Tailwind 4 (bg-red-500/20) surt com a color-mix
+    // i el navegador el dona en oklab(): abans es llegia com a transparent i
+    // no es mesurava. El que no és rgb() es pinta en un píxel i es llegeix.
+    const pixel = document.createElement('canvas').getContext('2d', { willReadFrequently: true });
     const parse = (value) => {
-        const match = value.match(/rgba?\(([^)]+)\)/);
-        if (!match) return [0, 0, 0, 0];
-        const parts = match[1].split(/[ ,/]+/).filter(Boolean).map(Number);
-        return [parts[0], parts[1], parts[2], parts.length > 3 ? parts[3] : 1];
+        const match = value.match(/^rgba?\(([^)]+)\)$/);
+        if (match) {
+            const parts = match[1].split(/[ ,/]+/).filter(Boolean).map(Number);
+            return [parts[0], parts[1], parts[2], parts.length > 3 ? parts[3] : 1];
+        }
+        pixel.clearRect(0, 0, 1, 1);
+        pixel.fillStyle = value;
+        pixel.fillRect(0, 0, 1, 1);
+        const [red, green, blue, alpha] = pixel.getImageData(0, 0, 1, 1).data;
+        return [red, green, blue, alpha / 255];
     };
     const over = (top, bottom) => [0, 1, 2].map(channel => top[channel] * top[3] + bottom[channel] * (1 - top[3])).concat(1);
     const backgroundOf = (element) => {

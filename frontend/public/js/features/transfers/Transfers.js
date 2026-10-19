@@ -5,7 +5,7 @@ export async function initTransfers(container) {
     container.innerHTML = `
         <div class="page-header flex justify-between items-center mb-6">
             <h2 class="text-2xl font-bold text-slate-800 dark:text-slate-100">${t('nav.transfers')}</h2>
-            <button id="add-transfer-btn" class="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/90 flex items-center gap-2">
+            <button id="add-transfer-btn" class="bg-primary text-white px-4 py-2 rounded-2xl hover:bg-primary/90 flex items-center gap-2">
                 <span class="material-symbols-outlined">add</span>
                 ${t('transfers.add')}
             </button>
@@ -14,32 +14,32 @@ export async function initTransfers(container) {
 
         <!-- Modal -->
         <div id="transfer-modal" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-50">
-            <div class="bg-white dark:bg-slate-800 rounded-xl p-6 w-full max-w-md">
+            <div class="bg-white dark:bg-slate-800 rounded-3xl p-6 w-full max-w-md">
                 <h3 class="text-xl font-bold mb-4">${t('transfers.add')}</h3>
                 <form id="transfer-form" class="space-y-4">
                     <div>
                         <label class="block text-sm font-medium mb-1" for="transfer-source">${t('transfers.source')}</label>
-                        <select id="transfer-source" required class="w-full px-3 py-2 border rounded-lg"></select>
+                        <select id="transfer-source" required class="w-full px-3 py-2 border rounded-2xl"></select>
                     </div>
                     <div>
                         <label class="block text-sm font-medium mb-1" for="transfer-destination">${t('transfers.destination')}</label>
-                        <select id="transfer-destination" required class="w-full px-3 py-2 border rounded-lg"></select>
+                        <select id="transfer-destination" required class="w-full px-3 py-2 border rounded-2xl"></select>
                     </div>
                     <div>
                         <label class="block text-sm font-medium mb-1" for="transfer-amount">${t('common.amount')}</label>
-                        <input type="number" id="transfer-amount" step="0.01" required class="w-full px-3 py-2 border rounded-lg">
+                        <input type="number" id="transfer-amount" step="0.01" required class="w-full px-3 py-2 border rounded-2xl">
                     </div>
                     <div>
                         <label class="block text-sm font-medium mb-1" for="transfer-date">${t('common.date')}</label>
-                        <input type="date" id="transfer-date" required class="w-full px-3 py-2 border rounded-lg">
+                        <input type="date" id="transfer-date" required class="w-full px-3 py-2 border rounded-2xl">
                     </div>
                     <div>
                         <label class="block text-sm font-medium mb-1" for="transfer-description">${t('common.description')}</label>
-                        <input type="text" id="transfer-description" class="w-full px-3 py-2 border rounded-lg">
+                        <input type="text" id="transfer-description" class="w-full px-3 py-2 border rounded-2xl">
                     </div>
                     <div class="flex gap-2 justify-end">
-                        <button type="button" id="cancel-btn" class="px-4 py-2 border rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700">${t('common.cancel')}</button>
-                        <button type="submit" class="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/90">${t('common.save')}</button>
+                        <button type="button" id="cancel-btn" class="px-4 py-2 border rounded-2xl hover:bg-gray-50 dark:hover:bg-slate-700">${t('common.cancel')}</button>
+                        <button type="submit" class="bg-primary text-white px-4 py-2 rounded-2xl hover:bg-primary/90">${t('common.save')}</button>
                     </div>
                 </form>
             </div>
@@ -91,7 +91,7 @@ function renderTransfers(transfers) {
     }
 
     container.innerHTML = transfers.map(transfer => `
-        <div class="bg-white dark:bg-slate-800 rounded-xl p-4 shadow-sm border border-slate-200 dark:border-slate-700 flex items-center justify-between">
+        <div class="bg-white dark:bg-slate-800 rounded-3xl p-4 shadow-xs border border-slate-200 dark:border-slate-700 flex items-center justify-between">
             <div class="flex items-center gap-4">
                 <div class="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
                     <span class="material-symbols-outlined text-blue-600">swap_horiz</span>
@@ -103,7 +103,7 @@ function renderTransfers(transfers) {
             </div>
             <div class="flex items-center gap-3">
                 <span class="text-lg font-bold text-slate-800 dark:text-slate-100">${formatCurrency(transfer.import)}</span>
-                <button data-action="delete" data-id="${transfer.id}" class="p-1 hover:bg-red-50 text-red-600 rounded" title="${t('common.delete')}">
+                <button data-action="delete" data-id="${transfer.id}" class="p-1 hover:bg-red-50 text-red-600 rounded-lg" title="${t('common.delete')}">
                     <span class="material-symbols-outlined text-sm">delete</span>
                 </button>
             </div>

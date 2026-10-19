@@ -33,7 +33,7 @@ test/                 tests con el ejecutor integrado de Node
 
 ```bash
 npm ci                 # instalar exactamente las versiones del lockfile
-npm test               # 113 tests (hace falta npm ci antes: compilan Tailwind)
+npm test               # 117 tests (hace falta npm ci antes: compilan Tailwind)
 npm run build:assets   # regenerar tailwind.css, las fuentes y Chart.js de public/vendor
 npm run test:navegador # todas las vistas en Chromium; solo contra una base de datos de prueba
 ```
@@ -141,9 +141,9 @@ devuelve a esa pantalla automáticamente.
   vista nueva.
 - `css/dark.css`, cargado después de Tailwind, que traduce al oscuro las clases
   que las vistas usan sin `dark:` (`bg-white`, `text-gray-900`,
-  `text-red-600`…) y da a todos los campos los colores del tema. Va con
-  `:where(html.dark)` delante, que no suma especificidad: si una vista pone su
-  propio `dark:`, manda la vista. `test/darkMode.test.js` falla si la app usa
+  `text-red-600`…) y da a todos los campos los colores del tema. Va en la capa
+  `utilities` y con `:where(html.dark)` delante, que no suma especificidad: si
+  una vista pone su propio `dark:`, manda la vista. `test/darkMode.test.js` falla si la app usa
   una clase clara de esas que no está traducida: añádela ahí.
 
 La barra lateral es oscura en los dos temas (`--bg-sidebar`), así que el logo y
@@ -180,20 +180,36 @@ otro dominio), no funcionará: hazlo con `addEventListener` desde el módulo.
 e instala solo `express` (`npm ci --omit=dev`): Tailwind y el resto solo hacen
 falta para generar `public/css` y `public/vendor`, que ya vienen hechos.
 
-**`npm audit` sin `--omit=dev` saca 7 avisos, y se quedan así a propósito.**
-Todos vienen de Tailwind 3 y solo corren al generar el CSS, en tu máquina o en
-el CI, nunca en la imagen. Solo dos son causa: `braces` (no hay versión
-arreglada; solo es peligroso con patrones de glob maliciosos, y aquí solo lee
-los de `tailwind.config.js`) y `postcss-selector-parser` (lento con CSS
-malicioso; solo procesa el nuestro, y la versión arreglada no es compatible
-con Tailwind 3). Arreglarlos es pasar a Tailwind 4: colores en OKLCH, otro color
-de borde por defecto y utilidades renombradas, o sea rehacer la revisión de
-contraste de los dos temas, por un riesgo prácticamente nulo. El CI vigila las
-dependencias de producción (`npm audit --omit=dev`), que están a 0.
+**`npm audit`, también sin `--omit=dev`, sale a 0.** Los avisos que quedaban
+eran de Tailwind 3. Con Tailwind 4, el único que quedaba era `braces`, que llega
+por `@parcel/watcher` 2.5.1, fijado por `@tailwindcss/cli` y que solo se usa
+con `--watch`: `package.json` lo sube a la 2.6.0 con `overrides`, que ya no lo
+arrastra. Al actualizar `@tailwindcss/cli`, mira si la versión nueva ya trae
+una buena y quita el `overrides`. El CI vigila las dependencias de producción
+(`npm audit --omit=dev`).
 
 **Tailwind está compilado y guardado en el repositorio**
 (`public/css/tailwind.css`), porque el frontend se sirve desde disco tal cual,
-sin paso de construcción. La configuración está en `tailwind.config.js`.
+sin paso de construcción. Es **Tailwind 4**, y la configuración está en CSS, en
+`src/tailwind.css`: el color `primary`, de dónde lee las clases (`@source`),
+el plugin de formularios, el modo oscuro por clase y la paleta.
+
+- **La paleta es la de Tailwind 3**, en hexadecimal, en el `@theme`: la de
+  Tailwind 4 es en OKLCH y cambia un poco cada tono, y el contraste de los dos
+  temas y los colores de `dark.css` están medidos para estos.
+- **Las capas (`@layer`)**: Tailwind 4 pone su CSS en las capas `base`,
+  `components` y `utilities`, y un CSS que no está en ninguna gana a todas.
+  `css/layers.css` es el primer CSS de la página: fija el orden y mete
+  `main.css`, `layout.css`, `components.css` y los iconos en `components`, por
+  encima del preflight y por debajo de las clases de las vistas, como estaban.
+  `dark.css` va en `utilities`, y su borde por defecto en `base`. Un CSS nuevo
+  va dentro de `layers.css`, no con otro `<link>`.
+- **Las variables propias llevan `--app-` si se pueden confundir** con las del
+  tema de Tailwind (`--app-radius-lg`, no `--radius-lg`): con el mismo nombre,
+  la nuestra pisa la suya. Lo comprueba `test/assets.test.js`.
+- **Los nombres de Tailwind 4**: `rounded-lg` es 0,5 rem, `rounded-2xl` 1 rem y
+  `rounded-3xl` 1,5 rem; `shadow-xs` es la sombra pequeña. Un `border` sin color
+  es gris 200 (lo pone `src/tailwind.css`, como hacía Tailwind 3).
 
 - **Si usas una clase de Tailwind que no se usaba en ningún otro sitio, ejecuta
   `npm run build:assets`** y sube el `tailwind.css` que genera. Si no, la clase

@@ -51,6 +51,29 @@ test('dark.css es carrega després de tailwind.css, perquè a igual especificita
     assert.ok(tailwind > 0 && dark > tailwind, 'index.html ha de carregar css/dark.css després de css/tailwind.css');
 });
 
+test('els CSS van a les capes de Tailwind 4: els propis a components, dark.css a utilities', () => {
+    // Fora de cap capa, un CSS guanya a totes: .material-symbols-outlined
+    // trepitjaria un «hidden» de la vista, i dark.css una variant dark:.
+    const html = read('index.html');
+    const stylesheets = [...html.matchAll(/<link rel="stylesheet" href="([^"]+)">/g)].map(match => match[1]);
+    assert.equal(stylesheets[0], 'css/layers.css', 'layers.css fixa l\'ordre de les capes: ha de ser el primer CSS');
+    for (const file of ['css/main.css', 'css/layout.css', 'css/components.css', 'vendor/material-symbols/outlined.css']) {
+        assert.ok(!stylesheets.includes(file), `${file} s'ha de carregar des de layers.css, dins d'una capa`);
+    }
+
+    const layers = read('css/layers.css').replace(/\/\*[\s\S]*?\*\//g, '');
+    assert.match(layers, /^\s*@layer properties, theme, base, components, utilities;/);
+    for (const file of ['../vendor/material-symbols/outlined.css', 'main.css', 'layout.css', 'components.css']) {
+        assert.ok(layers.includes(`@import url("${file}") layer(components);`), `${file} no és a la capa de components`);
+    }
+
+    // dark.css: la vora per defecte a la capa base (sota qualsevol classe) i la
+    // resta a la d'utilitats. Res fora de cap capa.
+    const dark = read('css/dark.css').replace(/\/\*[\s\S]*?\*\//g, '').trim();
+    assert.match(dark, /^@layer base \{[^{}]*\{[^{}]*\}\s*\}\s*@layer utilities \{[\s\S]*\}$/,
+        'dark.css: la vora per defecte dins de @layer base i la resta dins de @layer utilities');
+});
+
 test('les traduccions de dark.css no passen per davant d\'una variant dark: escrita a la vista', () => {
     // :where(html.dark) no suma especificitat: una classe .dark\:x de la vista
     // n'ha de tenir més. Un "html.dark .bg-white" la trepitjaria.

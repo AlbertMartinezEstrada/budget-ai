@@ -16,7 +16,7 @@ import { t } from '../../i18n.js';
  * POST /budgets/apply-changes que les propostes de la pestanya Presupuesto.
  */
 
-const card = 'bg-white dark:bg-slate-800 rounded-xl p-4 shadow-sm border border-slate-200 dark:border-slate-700';
+const card = 'bg-white dark:bg-slate-800 rounded-3xl p-4 shadow-xs border border-slate-200 dark:border-slate-700';
 
 export async function initDecisions(container) {
     container.innerHTML = `<p class="text-sm text-slate-500">${t('common.loading')}</p>`;
@@ -24,7 +24,7 @@ export async function initDecisions(container) {
     try {
         data = await getDecisions();
     } catch (error) {
-        container.innerHTML = `<div class="p-3 rounded-lg text-sm bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-300">
+        container.innerHTML = `<div class="p-3 rounded-2xl text-sm bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-300">
             ${escapeHtml(t('decisions.load-failed', { message: error.message }))}</div>`;
         return;
     }
@@ -91,7 +91,7 @@ function simulatorCard(data) {
                                 <td class="text-right whitespace-nowrap">${formatCurrency(item.mitjana_real)}</td>
                                 <td class="text-right">
                                     <input type="number" min="0" step="5" inputmode="decimal"
-                                           class="sim-input w-24 px-2 py-1 border rounded text-right bg-white text-slate-900 dark:bg-slate-700 dark:text-slate-100 dark:border-slate-600"
+                                           class="sim-input w-24 px-2 py-1 border rounded-lg text-right bg-white text-slate-900 dark:bg-slate-700 dark:text-slate-100 dark:border-slate-600"
                                            data-category="${item.categoria_id}" value="${startingValue(item)}"
                                            aria-label="${escapeHtml(t('decisions.new-plan-label', { name: item.nom }))}">
                                 </td>
@@ -293,7 +293,7 @@ function trendsCard(trends) {
                                 const height = Math.max(2, ((Number.parseFloat(month.real) || 0) / max) * 40);
                                 // Els tres últims, els que pugen, en color; els d'abans, apagats.
                                 const recent = index >= months.length - 3;
-                                return `<span class="w-2 rounded-t ${recent ? '' : 'bg-slate-300 dark:bg-slate-600'}"
+                                return `<span class="w-2 rounded-t-lg ${recent ? '' : 'bg-slate-300 dark:bg-slate-600'}"
                                               style="height: ${height.toFixed(0)}px${recent ? `; background-color: ${theme.series[1]}` : ''}"
                                               title="${escapeHtml(`${monthName(month.periode)}: ${formatCurrency(month.real)}`)}"></span>`;
                             }).join('')}

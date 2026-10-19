@@ -22,10 +22,10 @@ const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const modules = path.join(root, 'node_modules');
 const vendor = path.join(root, 'public', 'vendor');
 
+/** Tailwind 4: la configuració és a src/tailwind.css (@theme, @source, @plugin). */
 export function buildTailwind(outputFile) {
     execFileSync(process.execPath, [
-        path.join(modules, 'tailwindcss', 'lib', 'cli.js'),
-        '--config', path.join(root, 'tailwind.config.js'),
+        path.join(modules, '@tailwindcss', 'cli', 'dist', 'index.mjs'),
         '--input', path.join(root, 'src', 'tailwind.css'),
         '--output', outputFile,
         '--minify',

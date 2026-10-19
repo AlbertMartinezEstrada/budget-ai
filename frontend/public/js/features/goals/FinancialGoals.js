@@ -5,7 +5,7 @@ export async function initGoals(container) {
     container.innerHTML = `
         <div class="page-header flex justify-between items-center mb-6">
             <h2 class="text-2xl font-bold text-slate-800 dark:text-slate-100">${t('nav.goals')}</h2>
-            <button id="add-goal-btn" class="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/90 flex items-center gap-2">
+            <button id="add-goal-btn" class="bg-primary text-white px-4 py-2 rounded-2xl hover:bg-primary/90 flex items-center gap-2">
                 <span class="material-symbols-outlined">add</span>
                 ${t('goals.add')}
             </button>
@@ -16,25 +16,25 @@ export async function initGoals(container) {
 
         <!-- Modal -->
         <div id="goal-modal" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-50">
-            <div class="bg-white dark:bg-slate-800 rounded-xl p-6 w-full max-w-md">
+            <div class="bg-white dark:bg-slate-800 rounded-3xl p-6 w-full max-w-md">
                 <h3 class="text-xl font-bold mb-4" id="modal-title">${t('goals.add')}</h3>
                 <form id="goal-form" class="space-y-4">
                     <input type="hidden" id="goal-id">
                     <div>
                         <label class="block text-sm font-medium mb-1" for="goal-name">${t('common.name')}</label>
-                        <input type="text" id="goal-name" required class="w-full px-3 py-2 border rounded-lg">
+                        <input type="text" id="goal-name" required class="w-full px-3 py-2 border rounded-2xl">
                     </div>
                     <div>
                         <label class="block text-sm font-medium mb-1" for="goal-target">${t('goals.target')}</label>
-                        <input type="number" id="goal-target" step="0.01" required class="w-full px-3 py-2 border rounded-lg">
+                        <input type="number" id="goal-target" step="0.01" required class="w-full px-3 py-2 border rounded-2xl">
                     </div>
                     <div>
                         <label class="block text-sm font-medium mb-1" for="goal-deadline">${t('goals.deadline')}</label>
-                        <input type="date" id="goal-deadline" class="w-full px-3 py-2 border rounded-lg">
+                        <input type="date" id="goal-deadline" class="w-full px-3 py-2 border rounded-2xl">
                     </div>
                     <div class="flex gap-2 justify-end">
-                        <button type="button" id="cancel-btn" class="px-4 py-2 border rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700">${t('common.cancel')}</button>
-                        <button type="submit" class="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/90">${t('common.save')}</button>
+                        <button type="button" id="cancel-btn" class="px-4 py-2 border rounded-2xl hover:bg-gray-50 dark:hover:bg-slate-700">${t('common.cancel')}</button>
+                        <button type="submit" class="bg-primary text-white px-4 py-2 rounded-2xl hover:bg-primary/90">${t('common.save')}</button>
                     </div>
                 </form>
             </div>
@@ -76,7 +76,7 @@ function renderGoals(goals) {
         const current = goal.quantitat_actual || 0;
         const progress = target > 0 ? (current / target * 100) : 0;
         return `
-            <div class="bg-white dark:bg-slate-800 rounded-xl p-4 shadow-sm border">
+            <div class="bg-white dark:bg-slate-800 rounded-3xl p-4 shadow-xs border">
                 <div class="flex justify-between items-start mb-2">
                     <h3 class="font-semibold">${escapeHtml(goal.nom)}</h3>
                     <button data-action="delete" data-id="${goal.id}" class="text-red-600 hover:text-red-700" title="${t('common.delete')}">

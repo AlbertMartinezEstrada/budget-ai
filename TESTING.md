@@ -52,7 +52,10 @@ El CI la fa a cada PR amb un PostgreSQL nou (job «Navegador»). Després de les
 vistes en clar i en fosc, tria cada idioma a Configuració i torna a recórrer
 totes les vistes: falla si el menú no diu el que diu el fitxer de l'idioma, si
 falta una traducció (surt com a error a la consola) o si un text no hi cap (la
-pàgina s'eixampla o el menú talla un nom). En tornar a pujar l'extracte, l'avís
+pàgina s'eixampla o el menú talla un nom). El contrast el mesura amb els colors
+que calcula el navegador; els que no surten en `rgb()` (un color amb opacitat
+de Tailwind 4 surt en `oklab()`) els pinta en un píxel i els llegeix, en lloc de
+prendre'ls per transparents. En tornar a pujar l'extracte, l'avís
 que ja hi era (el diu el backend) ha de ser en l'idioma de la pantalla: és la
 prova que la capçalera `Accept-Language` arriba.
 
@@ -379,7 +382,10 @@ de les tendències.
 Que el tema fosc no es trenqui en silenci. Que cada classe de color pensada per
 al tema clar que fa servir l'aplicació (fons clars, grisos de text, colors amb
 significat en to fosc) tingui el seu equivalent a `css/dark.css`; que
-`dark.css` es carregui després de Tailwind; que les seves traduccions vagin amb
+`dark.css` es carregui després de Tailwind; que els CSS vagin a les capes de
+Tailwind 4 (els propis i les icones a `components` des de `layers.css`,
+`dark.css` a `utilities`): fora de cap capa, `.material-symbols-outlined`
+trepitjaria un `hidden` de la vista; que les seves traduccions vagin amb
 `:where(html.dark)` i no trepitgin una variant `dark:` de la vista; i que els
 camps i les taules agafin els colors de les variables del tema, no un blanc
 fix. Abans, els camps eren blancs amb el text clar del tema i no es veia què
@@ -397,7 +403,9 @@ d'un botó arribi a 4.5:1 sobre el seu fons (`bg-emerald-100 text-emerald-700`,
 amb text blanc (`.btn-success`…) tinguin un fons prou fosc. Abans, el verd dels
 ingressos es quedava a 2.5:1, el vermell de les despeses a 3.8:1 i el botó
 verd amb text blanc a 3.3:1. Comprovat que, amb el codi d'abans, els tres
-tests fallen.
+tests fallen. Llegeix els colors de les variables del tema de Tailwind 4
+(`var(--color-red-600)`) i falla si en llegeix menys de 20: en passar a
+Tailwind 4 no en sabia llegir cap i passava sense comprovar res.
 
 ### `frontend/test/server.test.js`
 
@@ -414,7 +422,9 @@ Tailwind, les fonts i Chart.js es generen amb `npm run build:assets` i es desen
 a `public/`. Aquest test torna a compilar Tailwind i compara el resultat amb
 `public/css/tailwind.css`, i comprova que les fonts i Chart.js de
 `public/vendor/` siguin els dels paquets instal·lats. Una classe nova sense regenerar el CSS no dona
-cap error: simplement no té estil. Necessita `npm ci` abans.
+cap error: simplement no té estil. Necessita `npm ci` abans. També, que cap
+variable de `main.css` es digui com una del tema de Tailwind: amb
+`--radius-lg` a `main.css`, les caselles amb `rounded-lg` sortien rodones.
 
 ## Tests d'integració
 
