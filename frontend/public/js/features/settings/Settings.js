@@ -1,5 +1,6 @@
-import { getSettings, updateSettings, setTheme, setCurrency, setLanguage, escapeHtml } from '../../api.js';
-import { t, LANGUAGES, getLanguage } from '../../i18n.js';
+import { getSettings, updateSettings, setTheme, setCurrency, setLanguage, escapeHtml, getSessions, closeOtherSessions } from '../../api.js';
+import { t, LANGUAGES, getLanguage, formatDate } from '../../i18n.js';
+import { describeDevice } from '../../devices.js';
 
 export async function initSettings(container) {
     container.innerHTML = `
@@ -120,14 +121,30 @@ export async function initSettings(container) {
                 </button>
                 <span id="save-status" class="ml-4 text-sm text-slate-500 dark:text-slate-400" role="status"></span>
             </div>
+
+            <!-- Sessions obertes: sortir en tanca una de debò, i aquí es tanquen les altres. -->
+            <div class="bg-white dark:bg-slate-800 rounded-3xl p-6 shadow-xs border lg:col-span-2">
+                <div class="flex items-center gap-3 mb-2">
+                    <span class="material-symbols-outlined text-primary">devices</span>
+                    <h3 class="text-lg font-semibold">${t('settings.sessions')}</h3>
+                </div>
+                <p class="text-slate-500 dark:text-slate-400 text-sm mb-4">${t('settings.sessions-hint')}</p>
+                <ul id="sessions-list" class="divide-y mb-4"></ul>
+                <button id="close-other-sessions-btn" class="bg-primary text-white px-4 py-2 rounded-2xl hover:bg-primary/90 text-sm disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                    ${t('settings.close-other-sessions')}
+                </button>
+                <span id="sessions-status" class="ml-4 text-sm text-slate-500 dark:text-slate-400" role="status"></span>
+            </div>
         </div>
     `;
 
     loadSettings();
+    loadSessions();
 
     document.getElementById('save-all-btn').addEventListener('click', saveAllSettings);
     document.getElementById('save-profile-btn').addEventListener('click', saveProfile);
     document.getElementById('save-notifications-btn').addEventListener('click', saveNotifications);
+    document.getElementById('close-other-sessions-btn').addEventListener('click', closeOthers);
     document.getElementById('setting-language').addEventListener('change', saveLanguage);
     document.getElementById('setting-currency').addEventListener('change', () => saveAllSettings());
     document.querySelectorAll('input[name="theme"]').forEach(radio => {
@@ -219,4 +236,56 @@ async function saveNotifications() {
         notificationsBudget: document.getElementById('notif-budget').checked,
         notificationsMonthly: document.getElementById('notif-monthly').checked
     }, 'settings.notifications-saved');
+}
+
+const SESSION_DATE = { dateStyle: 'medium', timeStyle: 'short' };
+
+/** Cada sessió oberta: el navegador, si és aquesta, i quan es va obrir i fer servir. */
+function sessionRow(session) {
+    const { browser, system } = describeDevice(session.navegador);
+    const device = [browser, system].filter(Boolean).join(' · ') || t('settings.session-unknown-device');
+    const dates = t('settings.session-dates', {
+        started: formatDate(session.creada, SESSION_DATE),
+        lastUsed: formatDate(session.darrer_us, SESSION_DATE)
+    });
+    return `
+        <li class="py-3 first:pt-0" data-session="${session.actual ? 'actual' : 'altra'}">
+            <p class="text-sm font-medium flex items-center gap-2">
+                ${escapeHtml(device)}
+                ${session.actual ? `<span class="text-xs px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-300">${t('settings.session-current')}</span>` : ''}
+            </p>
+            <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">${escapeHtml(dates)}</p>
+        </li>`;
+}
+
+async function loadSessions() {
+    const list = document.getElementById('sessions-list');
+    const button = document.getElementById('close-other-sessions-btn');
+    try {
+        const sessions = await getSessions();
+        list.innerHTML = sessions.map(sessionRow).join('');
+        const others = sessions.filter(session => !session.actual).length;
+        button.disabled = others === 0;
+        if (others === 0) list.insertAdjacentHTML('beforeend',
+            `<li class="py-3 text-sm text-slate-500 dark:text-slate-400">${t('settings.no-other-sessions')}</li>`);
+    } catch (error) {
+        console.error('Error carregant les sessions:', error);
+        list.innerHTML = `<li class="py-3 text-sm text-red-700">${escapeHtml(t('settings.sessions-load-failed', { message: error.message }))}</li>`;
+    }
+}
+
+/** Les altres sessions deixen de servir a l'instant: el seu navegador torna a la pantalla d'entrada. */
+async function closeOthers() {
+    const statusElement = document.getElementById('sessions-status');
+    const button = document.getElementById('close-other-sessions-btn');
+    button.disabled = true;
+    try {
+        const closed = await closeOtherSessions();
+        statusElement.textContent = t('settings.other-sessions-closed', { count: closed });
+        setTimeout(() => statusElement.textContent = '', 3000);
+    } catch (error) {
+        statusElement.textContent = t('settings.close-sessions-failed', { message: error.message });
+        console.error(error);
+    }
+    await loadSessions();
 }

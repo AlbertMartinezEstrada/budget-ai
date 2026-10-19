@@ -57,7 +57,26 @@ minuto.
 ## Cómo funciona
 
 La sesión es un JWT firmado con HMAC-SHA256 que viaja en una cookie
-`budget_session`. No hay estado de sesión en el servidor.
+`budget_session`. El token lleva el identificador de una fila de la tabla
+`sessions` (el `jti`): cada vez que se entra se crea una, y **salir la borra**.
+Desde ese momento el token ya no abre nada, aunque la firma y la caducidad sigan
+siendo buenas.
+
+Hasta octubre de 2026 no había nada guardado en el servidor: salir solo le
+pedía al navegador que borrara la cookie, y una copia del token (de un
+ordenador compartido, de una copia de seguridad del navegador) seguía sirviendo
+hasta que caducaba, siete días después.
+
+Cada petición comprueba que su sesión sigue abierta. Para no ir a la base de
+datos cada vez, una sesión confirmada se da por buena durante un minuto, y de
+paso se apunta su último uso. Salir y cerrar las demás sesiones vacían esa
+memoria al momento: el token deja de servir en la petición siguiente. Solo un
+cambio hecho directamente en la base de datos (borrar filas a mano, restaurar
+una copia) puede tardar ese minuto en notarse. Las sesiones caducadas se borran
+solas cada hora.
+
+**Al aplicar la migración 020 hay que volver a entrar**: los tokens de antes no
+llevan sesión y se rechazan.
 
 La cookie es **httpOnly**, así que JavaScript no puede leerla: un XSS futuro no
 podría robarla, cosa que sí pasaría con un token en `localStorage`. Y es
@@ -76,9 +95,19 @@ concreta de orígenes: con `*` el navegador lo rechazaría.
 | Ruta | Sesión | Qué hace |
 |---|---|---|
 | `POST /auth/login` | no | Devuelve la cookie si las credenciales son correctas |
-| `POST /auth/logout` | no | Caduca la cookie |
+| `POST /auth/logout` | no | Cierra la sesión en el servidor y caduca la cookie |
 | `GET /auth/me` | **sí** | El frontend lo llama al arrancar; un 401 significa "no hay sesión" |
+| `GET /auth/sessions` | **sí** | Las sesiones abiertas, con la de la petición marcada (`actual`) |
+| `DELETE /auth/sessions/others` | **sí** | Cierra todas las sesiones menos la de la petición |
 | Todo lo demás | **sí** | 401 sin sesión |
+
+### Sesiones abiertas
+
+Configuración enseña las sesiones abiertas: el navegador y el sistema de cada
+una (sacados del `User-Agent`), cuándo se abrió y cuándo se usó por última vez,
+con la de ese navegador marcada. Si no se reconoce alguna, **«Cerrar las demás
+sesiones»** las cierra todas menos esa, y los otros navegadores vuelven a la
+pantalla de entrada. El identificador de las sesiones no sale de la API.
 
 ### Protecciones
 
@@ -99,9 +128,10 @@ concreta de orígenes: con `*` el navegador lo rechazaría.
   las ocho tablas de datos y filtrar todas las consultas.
 - **No hay forma de cambiar la contraseña desde la aplicación.** Se cambia en
   el `.env` y se reinicia el backend.
-- **No se pueden revocar sesiones.** Al ser un JWT sin estado, un token robado
-  vale hasta que caduca. Cambiar `JWT_SECRET` invalida todas las sesiones de
-  golpe, que es el procedimiento de emergencia.
+- **Las sesiones se cierran de una en una solo desde su navegador.** Desde
+  otro, «Cerrar las demás sesiones» las cierra todas menos la propia; no se
+  puede elegir una. Cambiar `JWT_SECRET` sigue invalidándolas todas de golpe,
+  incluida la propia.
 - **El frontend no está protegido**, solo la API. Cualquiera puede cargar el
   HTML y el JavaScript en el puerto 3000; lo que no puede es obtener ningún
   dato sin sesión.

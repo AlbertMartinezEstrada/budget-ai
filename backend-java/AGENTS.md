@@ -29,8 +29,8 @@ migrations/   cambios de esquema para instalaciones existentes
 ## Comandos
 
 ```bash
-./gradlew test              # 274 unitarios, rápidos, sin Docker
-./gradlew integrationTest   # 171, requieren Docker
+./gradlew test              # 283 unitarios, rápidos, sin Docker
+./gradlew integrationTest   # 179, requieren Docker
 ./gradlew check             # ambos
 ./gradlew assemble          # empaquetar sin verificar
 ```
@@ -51,6 +51,12 @@ apuntando a una base de datos equivocada.
 
 **Toda la API requiere sesión** salvo `/auth/login` y `/auth/logout`. Si añades
 un endpoint, ya queda protegido por defecto: `anyRequest().authenticated()`.
+
+**Una sesión es una fila de `sessions`, no solo el token.** El JWT lleva su id
+(`jti`) y `JwtAuthenticationFilter` pregunta a `SessionService` si sigue
+abierta: salir la borra y el token deja de servir aunque esté bien firmado. Un
+controlador que necesite saber la sesión de la petición la recibe con
+`@AuthenticationPrincipal SessionUser`.
 
 **Los mensajes para el usuario llevan clave, no texto.** Van en
 `src/main/resources/i18n/messages_ca.properties` (la referencia), `_es`, `_pt` y

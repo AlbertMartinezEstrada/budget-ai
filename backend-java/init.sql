@@ -240,6 +240,20 @@ CREATE TABLE IF NOT EXISTS import_rules (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Les sessions obertes: una fila cada vegada que s'entra. El token de la
+-- cookie porta l'identificador (jti), i sense la fila no serveix: sortir o
+-- tancar les altres sessions des de Configuració la tanca de debò.
+CREATE TABLE IF NOT EXISTS sessions (
+    -- L'identificador que porta el token: un UUID aleatori.
+    id VARCHAR(36) PRIMARY KEY,
+    -- El navegador i el sistema, per reconèixer-la a Configuració.
+    user_agent VARCHAR(255),
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    last_used_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    -- Quan caduca el token. Les caducades s'esborren soles cada hora.
+    expires_at TIMESTAMP WITH TIME ZONE NOT NULL
+);
+
 -- Inserció de categories per defecte
 --
 -- Van en dos passos perquè les subcategories necessiten l'id del seu bloc, i

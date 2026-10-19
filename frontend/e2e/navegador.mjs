@@ -2,7 +2,8 @@
 //
 // Entra, importa l'extracte d'exemple per la pantalla fins a desar-lo, i
 // recorre totes les vistes i els seus formularis en tema clar i fosc, i després
-// en cada idioma. Falla si hi ha errors de JavaScript, peticions que fallen,
+// en cada idioma. Al final tanca les sessions i comprova que un token copiat
+// ja no entra. Falla si hi ha errors de JavaScript, peticions que fallen,
 // violacions de la política de seguretat, una capçalera que no diu la vista,
 // textos amb poc contrast, una traducció que falta o un text que no hi cap.
 //
@@ -248,17 +249,31 @@ async function checkView({ view, formButton }, theme) {
 }
 
 // ---- Entrar ----
-await page.goto(FRONTEND_URL);
-await page.fill('input[type="text"], input[name="username"]', USERNAME);
-await page.fill('input[type="password"]', PASSWORD);
-// Fins que el login no respon, la cookie de sessió no existeix: si se surt
-// abans de la pàgina, la vista següent torna a demanar el login.
-const [loginResponse] = await Promise.all([
-    page.waitForResponse(response => response.url().endsWith('/auth/login')),
-    page.keyboard.press('Enter')
-]);
-if (loginResponse.status() !== 200) {
-    console.error(`El login ha respost ${loginResponse.status()}: reviseu E2E_USERNAME i E2E_PASSWORD.`);
+
+/** Entra per la pantalla d'entrada i torna què ha respost el login. */
+async function logIn(targetPage) {
+    await targetPage.goto(FRONTEND_URL);
+    await targetPage.fill('input[type="text"], input[name="username"]', USERNAME);
+    await targetPage.fill('input[type="password"]', PASSWORD);
+    // Fins que el login no respon, la cookie de sessió no existeix: si se surt
+    // abans de la pàgina, la vista següent torna a demanar el login.
+    const [response] = await Promise.all([
+        targetPage.waitForResponse(candidate => candidate.url().endsWith('/auth/login')),
+        targetPage.keyboard.press('Enter')
+    ]);
+    return response.status();
+}
+
+/** Si la pàgina, oberta de nou, demana entrar: la seva sessió ja no serveix. */
+async function asksToLogIn(targetPage) {
+    await targetPage.goto(FRONTEND_URL);
+    return targetPage.waitForSelector('#login-password', { state: 'visible', timeout: 15000 })
+        .then(() => true, () => false);
+}
+
+const loginStatus = await logIn(page);
+if (loginStatus !== 200) {
+    console.error(`El login ha respost ${loginStatus}: reviseu E2E_USERNAME i E2E_PASSWORD.`);
     process.exit(1);
 }
 loggedIn = true;
@@ -368,6 +383,37 @@ for (const { code } of [...LANGUAGES].reverse()) {
     }
 }
 
+// ---- Sessions: sortir i «tancar les altres» les tanquen de debò ----
+currentStep = 'sessions · tancar les altres';
+const otherBrowser = await browser.newContext();
+const otherPage = await otherBrowser.newPage();
+if (await logIn(otherPage) !== 200) fail('el segon navegador no ha pogut entrar');
+await openView('settings', 'light');
+await page.waitForSelector('#sessions-list [data-session]');
+const listedSessions = await page.$$eval('#sessions-list [data-session]', rows => rows.map(row => row.dataset.session));
+if (listedSessions.length < 2) fail(`Configuració ensenya ${listedSessions.length} sessions i n'hi ha almenys dues d'obertes`);
+if (listedSessions.filter(kind => kind === 'actual').length !== 1) fail('Configuració no marca una sola sessió com a «aquesta»');
+await page.click('#close-other-sessions-btn');
+await page.waitForFunction(() => document.querySelectorAll('#sessions-list [data-session]').length === 1
+    && document.getElementById('close-other-sessions-btn').disabled, null, { timeout: 15000 })
+    .catch(() => fail('després de tancar les altres, Configuració no en deixa només una'));
+if (!await asksToLogIn(otherPage)) fail('el segon navegador continua dins després de tancar-ne la sessió');
+await otherBrowser.close();
+
+// La cookie d'abans de sortir, copiada a un altre navegador: abans servia set dies més.
+currentStep = 'sessions · sortir';
+const [sessionCookie] = (await page.context().cookies()).filter(cookie => cookie.name === 'budget_session');
+loggedIn = false;
+await Promise.all([
+    page.waitForResponse(response => response.url().endsWith('/auth/logout')),
+    page.click('#logout-btn')
+]);
+await page.waitForSelector('#login-password', { state: 'visible' });
+const copiedBrowser = await browser.newContext();
+await copiedBrowser.addCookies([sessionCookie]);
+if (!await asksToLogIn(await copiedBrowser.newPage())) fail('una còpia de la cookie continua entrant després de sortir');
+await copiedBrowser.close();
+
 await browser.close();
 
 if (failures.length) {
@@ -376,4 +422,4 @@ if (failures.length) {
     process.exit(1);
 }
 console.log(`✓ Importació i ${VIEWS.length} vistes en clar i en fosc i en ${LANGUAGES.length} idiomes, `
-    + 'sense errors, textos amb poc contrast ni traduccions que faltin.');
+    + 'sense errors, textos amb poc contrast ni traduccions que faltin; sortir tanca la sessió de debò.');

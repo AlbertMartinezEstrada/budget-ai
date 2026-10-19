@@ -232,10 +232,12 @@ la clau vagi a la capçalera `x-goog-api-key` i no a l'adreça, i que si Gemini
 falla o respon amb una forma inesperada la importació continuï amb els
 moviments tal com eren, sense classificar.
 
-### `JwtServiceTest`, `LoginThrottleTest`, `AuthCookiesTest`, `LocalCredentialsTest`
+### `JwtServiceTest`, `SessionServiceTest`, `LoginThrottleTest`, `AuthCookiesTest`, `LocalCredentialsTest`
 
-La sessió. Que un token amb la signatura manipulada, signat amb una altra clau
-o caducat es rebutgi; que la cookie porti sempre `HttpOnly` i `SameSite=Strict`;
+La sessió. Que un token amb la signatura manipulada, signat amb una altra clau,
+caducat o sense sessió (els d'abans de la taula `sessions`) es rebutgi; que la
+memòria d'un minut de `SessionService` estalviï anar a la base de dades però
+oblidi a l'acte una sessió tancada, també les altres en «tancar les altres»; que la cookie porti sempre `HttpOnly` i `SameSite=Strict`;
 que la contrasenya no es desi mai en clar; que faltar una credencial faci
 fallar l'arrencada en comptes de deixar l'API oberta; i que el límit d'intents
 bloquegi al cinquè error i es desbloquegi sol. Cada bloqueig seguit dura el
@@ -377,6 +379,13 @@ mesos abans s'hi arriba amb la simulació, que aplicar-la enviï només el que
 canvia (un percentatge com a percentatge), els recurrents per blocs i el text
 de les tendències.
 
+### `frontend/test/devices.test.js`
+
+De quin navegador i sistema és cada sessió de Configuració, amb User-Agents de
+debò: el d'Edge diu també «Chrome» i «Safari», el d'Android diu «Linux» i el
+d'iPhone diu «Mac OS X», i l'ordre de les comprovacions ho ha de resoldre. El
+que no es reconeix surt com a desconegut, mai amb un tros del text rebut.
+
 ### `frontend/test/darkMode.test.js`
 
 Que el tema fosc no es trenqui en silenci. Que cada classe de color pensada per
@@ -462,6 +471,13 @@ nova.
   seguretat de debò. Que cap endpoint retorni dades sense cookie: es pregunten
   a Spring totes les rutes que existeixen, de manera que una de nova queda
   comprovada sola. Abans era una llista feta a mà d'una dotzena.
+- `SessionsIntegrationTest`: que sortir tanqui la sessió de debò. Es guarda la
+  cookie d'abans de sortir i es torna a fer servir: abans obria l'API set dies
+  més, i ara és un 401 encara que el token sigui ben signat i no hagi caducat.
+  També que sortir d'un navegador no tanqui els altres, que «tancar les altres
+  sessions» deixi només la d'ara, que la llista de Configuració porti el
+  navegador i marqui la d'ara sense ensenyar-ne l'id, que un token signat d'una
+  sessió que no existeix no serveixi i que la neteja esborri les caducades.
 - `MigrationsIntegrationTest`: que una base de dades de l'agost (l'`init.sql`
   d'abans de la migració 004, a `src/test/resources/migrations`) més totes les
   migracions quedi igual que una de nova feta amb l'`init.sql` d'ara: mateixes
@@ -562,6 +578,10 @@ seus formularis en clar i en fosc. Falla amb:
 - una capçalera que no diu el nom de la vista;
 - qualsevol text o camp per sota de 4.5:1 (3:1 si és gran), amb les
   transicions aturades perquè un color a mig canviar no compti.
+
+Al final obre un segon navegador, tanca la seva sessió amb «Tancar les altres
+sessions» i comprova que torna a la pantalla d'entrada; després surt i prova la
+cookie d'abans de sortir en un tercer navegador, que també ha de demanar entrar.
 
 Abans tot això es comprovava a mà a cada PR. El primer dia va trobar dos
 errors: tornar a pujar un extracte ja importat deia «Resposta inesperada del
