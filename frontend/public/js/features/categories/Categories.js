@@ -22,13 +22,13 @@ export async function initCategories(container) {
                     ${t('categories.subtitle')}
                 </p>
             </div>
-            <button id="add-category-btn" class="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/90 flex items-center gap-2">
+            <button id="add-category-btn" class="bg-primary text-white px-4 py-2 rounded-2xl hover:bg-primary/90 flex items-center gap-2">
                 <span class="material-symbols-outlined">add</span>
                 ${t('categories.add')}
             </button>
         </div>
 
-        <div class="bg-white dark:bg-slate-800 rounded-xl p-4 shadow-sm border border-slate-200 dark:border-slate-700 mb-6 text-sm text-gray-600 dark:text-slate-300">
+        <div class="bg-white dark:bg-slate-800 rounded-3xl p-4 shadow-xs border border-slate-200 dark:border-slate-700 mb-6 text-sm text-gray-600 dark:text-slate-300">
             <p><strong>${t('categories.legend-group-term')}</strong>: ${t('categories.legend-group')}</p>
             <p><strong>${t('categories.legend-fixed-term')}</strong>: ${t('categories.legend-fixed')}</p>
             <p><strong>${t('categories.legend-variable-term')}</strong>: ${t('categories.legend-variable')}</p>
@@ -38,28 +38,28 @@ export async function initCategories(container) {
 
         <!-- Modal -->
         <div id="category-modal" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-50">
-            <div class="bg-white dark:bg-slate-800 rounded-xl p-6 w-full max-w-md">
+            <div class="bg-white dark:bg-slate-800 rounded-3xl p-6 w-full max-w-md">
                 <h3 class="text-xl font-bold mb-4" id="category-modal-title">${t('categories.add')}</h3>
                 <form id="category-form" class="space-y-4">
                     <input type="hidden" id="category-id">
                     <div>
                         <label class="block text-sm font-medium mb-1" for="category-name">${t('common.name')}</label>
-                        <input type="text" id="category-name" required class="w-full px-3 py-2 border rounded-lg">
+                        <input type="text" id="category-name" required class="w-full px-3 py-2 border rounded-2xl">
                     </div>
                     <div>
                         <label class="block text-sm font-medium mb-1" for="category-parent">${t('categories.parent')}</label>
-                        <select id="category-parent" class="w-full px-3 py-2 border rounded-lg"></select>
+                        <select id="category-parent" class="w-full px-3 py-2 border rounded-2xl"></select>
                     </div>
                     <div id="category-nature-wrapper">
                         <label class="block text-sm font-medium mb-1" for="category-nature">${t('categories.nature')}</label>
-                        <select id="category-nature" class="w-full px-3 py-2 border rounded-lg">
+                        <select id="category-nature" class="w-full px-3 py-2 border rounded-2xl">
                             <option value="VARIABLE">${t('categories.nature-variable')}</option>
                             <option value="FIXED">${t('categories.nature-fixed')}</option>
                         </select>
                     </div>
                     <div id="category-section-wrapper" style="display: none;">
                         <label class="block text-sm font-medium mb-1" for="category-section">${t('categories.section')}</label>
-                        <select id="category-section" class="w-full px-3 py-2 border rounded-lg">
+                        <select id="category-section" class="w-full px-3 py-2 border rounded-2xl">
                             <option value="AUTO">${t('categories.section-auto')}</option>
                             <option value="FIXED">${sectionLabel('FIXED')}</option>
                             <option value="VARIABLE">${sectionLabel('VARIABLE')}</option>
@@ -69,8 +69,8 @@ export async function initCategories(container) {
                     </div>
                     <p id="category-hint" class="text-xs text-gray-500 dark:text-slate-400"></p>
                     <div class="flex gap-2 justify-end">
-                        <button type="button" id="category-cancel-btn" class="px-4 py-2 border rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700">${t('common.cancel')}</button>
-                        <button type="submit" class="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/90">${t('common.save')}</button>
+                        <button type="button" id="category-cancel-btn" class="px-4 py-2 border rounded-2xl hover:bg-gray-50 dark:hover:bg-slate-700">${t('common.cancel')}</button>
+                        <button type="submit" class="bg-primary text-white px-4 py-2 rounded-2xl hover:bg-primary/90">${t('common.save')}</button>
                     </div>
                 </form>
             </div>
@@ -118,7 +118,7 @@ function renderTree() {
     const loose = roots.filter(category => !isGroup(category));
 
     const cards = groups.map(group => `
-        <div class="bg-white dark:bg-slate-800 rounded-xl p-4 shadow-sm border border-slate-200 dark:border-slate-700">
+        <div class="bg-white dark:bg-slate-800 rounded-3xl p-4 shadow-xs border border-slate-200 dark:border-slate-700">
             ${renderRow(group, true)}
             ${renderChildren(group, new Set([group.id]))}
         </div>
@@ -126,7 +126,7 @@ function renderTree() {
 
     if (loose.length > 0) {
         cards.push(`
-            <div class="bg-white dark:bg-slate-800 rounded-xl p-4 shadow-sm border border-slate-200 dark:border-slate-700">
+            <div class="bg-white dark:bg-slate-800 rounded-3xl p-4 shadow-xs border border-slate-200 dark:border-slate-700">
                 <h3 class="font-semibold text-gray-500 dark:text-slate-400 text-sm mb-3">${t('categories.no-group')}</h3>
                 <div class="space-y-2">
                     ${loose.map(category => renderRow(category, false)).join('')}
@@ -177,10 +177,10 @@ function renderRow(category, asGroupHeader) {
                 ${group ? `<span class="text-xs text-gray-500 dark:text-slate-400">${escapeHtml(t('categories.subcategory-count', { count: childrenOf(category.id).length }))}</span>` : ''}
             </span>
             <span class="flex gap-1">
-                <button data-action="edit" data-id="${category.id}" class="p-1 hover:bg-gray-100 dark:hover:bg-slate-700 rounded" title="${t('common.edit')}">
+                <button data-action="edit" data-id="${category.id}" class="p-1 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg" title="${t('common.edit')}">
                     <span class="material-symbols-outlined text-sm">edit</span>
                 </button>
-                <button data-action="delete" data-id="${category.id}" class="p-1 hover:bg-red-50 text-red-600 rounded" title="${t('common.delete')}">
+                <button data-action="delete" data-id="${category.id}" class="p-1 hover:bg-red-50 text-red-600 rounded-lg" title="${t('common.delete')}">
                     <span class="material-symbols-outlined text-sm">delete</span>
                 </button>
             </span>

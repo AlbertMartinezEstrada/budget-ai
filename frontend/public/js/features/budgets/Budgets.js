@@ -111,37 +111,37 @@ export async function initBudgets(container) {
                 <p class="text-sm text-gray-500 dark:text-slate-400 mt-1">${t('budgets.subtitle')}</p>
             </div>
             <div class="flex items-center gap-2">
-                <select id="budget-year" class="px-3 py-2 border rounded-lg bg-white dark:bg-slate-800 dark:border-slate-600"></select>
-                <select id="budget-month" class="px-3 py-2 border rounded-lg bg-white dark:bg-slate-800 dark:border-slate-600">
+                <select id="budget-year" class="px-3 py-2 border rounded-2xl bg-white dark:bg-slate-800 dark:border-slate-600"></select>
+                <select id="budget-month" class="px-3 py-2 border rounded-2xl bg-white dark:bg-slate-800 dark:border-slate-600">
                     ${Array.from({ length: 12 }, (unused, monthIndex) => `<option value="${monthIndex + 1}">${formatMonthName(monthIndex + 1)}</option>`).join('')}
                 </select>
-                <button id="fixed-costs-btn" class="px-3 py-2 border rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700 dark:border-slate-600 flex items-center gap-2"
+                <button id="fixed-costs-btn" class="px-3 py-2 border rounded-2xl hover:bg-gray-50 dark:hover:bg-slate-700 dark:border-slate-600 flex items-center gap-2"
                         title="${t('budgets.recurring-button-title')}">
                     <span class="material-symbols-outlined">event_repeat</span>
                     ${t('budgets.recurring-button')}
                 </button>
-                <button id="copy-month-btn" class="px-3 py-2 border rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700 dark:border-slate-600 flex items-center gap-2"
+                <button id="copy-month-btn" class="px-3 py-2 border rounded-2xl hover:bg-gray-50 dark:hover:bg-slate-700 dark:border-slate-600 flex items-center gap-2"
                         title="${t('budgets.copy-month-title')}">
                     <span class="material-symbols-outlined">content_copy</span>
                     ${t('budgets.copy-month')}
                 </button>
-                <button id="add-budget-btn" class="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/90 flex items-center gap-2">
+                <button id="add-budget-btn" class="bg-primary text-white px-4 py-2 rounded-2xl hover:bg-primary/90 flex items-center gap-2">
                     <span class="material-symbols-outlined">add</span>
                     ${t('budgets.assign')}
                 </button>
             </div>
         </div>
 
-        <div id="salary-header" class="bg-white dark:bg-slate-800 rounded-xl p-5 shadow-sm border border-slate-200 dark:border-slate-700 mb-6"></div>
+        <div id="salary-header" class="bg-white dark:bg-slate-800 rounded-3xl p-5 shadow-xs border border-slate-200 dark:border-slate-700 mb-6"></div>
 
         <div id="budgets-list" class="space-y-6"></div>
 
         <!-- Costos fixos -->
         <div id="fixed-costs-modal" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-50 p-4">
-            <div class="bg-white dark:bg-slate-800 rounded-xl p-6 w-full max-w-2xl max-h-full overflow-y-auto">
+            <div class="bg-white dark:bg-slate-800 rounded-3xl p-6 w-full max-w-2xl max-h-full overflow-y-auto">
                 <div class="flex justify-between items-start gap-4 mb-1">
                     <h3 class="text-xl font-bold">${t('budgets.recurring-title')}</h3>
-                    <button type="button" id="fixed-costs-close" class="p-1 hover:bg-gray-100 dark:hover:bg-slate-700 rounded" title="${t('common.close')}">
+                    <button type="button" id="fixed-costs-close" class="p-1 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg" title="${t('common.close')}">
                         <span class="material-symbols-outlined">close</span>
                     </button>
                 </div>
@@ -149,33 +149,33 @@ export async function initBudgets(container) {
 
                 <div id="fixed-costs-list" class="space-y-2 mb-4"></div>
 
-                <form id="fixed-cost-form" class="rounded-lg bg-slate-50 dark:bg-slate-700/50 p-4 space-y-3">
+                <form id="fixed-cost-form" class="rounded-2xl bg-slate-50 dark:bg-slate-700/50 p-4 space-y-3">
                     <input type="hidden" id="fixed-cost-id">
                     <div class="font-semibold text-sm" id="fixed-cost-form-title">${t('budgets.recurring-add-title')}</div>
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div>
                             <label class="block text-sm font-medium mb-1" for="fixed-cost-name">${t('common.name')}</label>
-                            <input type="text" id="fixed-cost-name" required maxlength="150" class="w-full px-3 py-2 border rounded-lg bg-white dark:bg-slate-700 dark:border-slate-600">
+                            <input type="text" id="fixed-cost-name" required maxlength="150" class="w-full px-3 py-2 border rounded-2xl bg-white dark:bg-slate-700 dark:border-slate-600">
                         </div>
                         <div>
                             <label class="block text-sm font-medium mb-1" for="fixed-cost-category">${t('common.category')}</label>
-                            <select id="fixed-cost-category" required class="w-full px-3 py-2 border rounded-lg bg-white dark:bg-slate-700 dark:border-slate-600"></select>
+                            <select id="fixed-cost-category" required class="w-full px-3 py-2 border rounded-2xl bg-white dark:bg-slate-700 dark:border-slate-600"></select>
                         </div>
                         <div>
                             <label class="block text-sm font-medium mb-1" for="fixed-cost-amount">${t('common.amount')}</label>
-                            <input type="number" id="fixed-cost-amount" required step="0.01" min="0" class="w-full px-3 py-2 border rounded-lg bg-white dark:bg-slate-700 dark:border-slate-600">
+                            <input type="number" id="fixed-cost-amount" required step="0.01" min="0" class="w-full px-3 py-2 border rounded-2xl bg-white dark:bg-slate-700 dark:border-slate-600">
                         </div>
                         <div>
                             <label class="block text-sm font-medium mb-1" for="fixed-cost-frequency">${t('budgets.how-often')}</label>
-                            <select id="fixed-cost-frequency" class="w-full px-3 py-2 border rounded-lg bg-white dark:bg-slate-700 dark:border-slate-600">
+                            <select id="fixed-cost-frequency" class="w-full px-3 py-2 border rounded-2xl bg-white dark:bg-slate-700 dark:border-slate-600">
                                 ${Object.entries(FREQUENCIES).map(([value, key]) => `<option value="${value}">${t(key)}</option>`).join('')}
                             </select>
                         </div>
                     </div>
                     <p class="text-xs text-gray-500 dark:text-slate-400" id="fixed-cost-hint"></p>
                     <div class="flex gap-2 justify-end">
-                        <button type="button" id="fixed-cost-cancel" class="px-4 py-2 border rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700 dark:border-slate-600 hidden">${t('common.cancel')}</button>
-                        <button type="submit" class="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/90" id="fixed-cost-submit">${t('common.add')}</button>
+                        <button type="button" id="fixed-cost-cancel" class="px-4 py-2 border rounded-2xl hover:bg-gray-50 dark:hover:bg-slate-700 dark:border-slate-600 hidden">${t('common.cancel')}</button>
+                        <button type="submit" class="bg-primary text-white px-4 py-2 rounded-2xl hover:bg-primary/90" id="fixed-cost-submit">${t('common.add')}</button>
                     </div>
                 </form>
             </div>
@@ -183,49 +183,49 @@ export async function initBudgets(container) {
 
         <!-- Modal -->
         <div id="budget-modal" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-50 p-4">
-            <div class="bg-white dark:bg-slate-800 rounded-xl p-6 w-full max-w-md max-h-full overflow-y-auto">
+            <div class="bg-white dark:bg-slate-800 rounded-3xl p-6 w-full max-w-md max-h-full overflow-y-auto">
                 <h3 class="text-xl font-bold mb-1" id="modal-title">${t('budgets.assign-title')}</h3>
                 <p class="text-sm text-gray-500 dark:text-slate-400 mb-4" id="modal-subtitle"></p>
                 <form id="budget-form" class="space-y-4">
                     <input type="hidden" id="budget-id">
                     <div>
                         <label class="block text-sm font-medium mb-1" for="budget-category">${t('common.category')}</label>
-                        <select id="budget-category" required class="w-full px-3 py-2 border rounded-lg bg-white dark:bg-slate-700 dark:border-slate-600"></select>
+                        <select id="budget-category" required class="w-full px-3 py-2 border rounded-2xl bg-white dark:bg-slate-700 dark:border-slate-600"></select>
                     </div>
-                    <div class="rounded-lg bg-slate-50 dark:bg-slate-700/50 p-3 text-sm" id="budget-pot">
+                    <div class="rounded-2xl bg-slate-50 dark:bg-slate-700/50 p-3 text-sm" id="budget-pot">
                         <div class="text-xs text-gray-500 dark:text-slate-400">${t('budgets.pot-label')}</div>
                         <div class="font-semibold" id="budget-pot-label">—</div>
                     </div>
                     <div>
                         <label class="block text-sm font-medium mb-1" for="budget-mode">${t('budgets.mode')}</label>
-                        <select id="budget-mode" class="w-full px-3 py-2 border rounded-lg bg-white dark:bg-slate-700 dark:border-slate-600">
+                        <select id="budget-mode" class="w-full px-3 py-2 border rounded-2xl bg-white dark:bg-slate-700 dark:border-slate-600">
                             <option value="AMOUNT">${t('budgets.mode-amount')}</option>
                             <option value="PERCENT">${t('budgets.mode-percent')}</option>
                         </select>
                     </div>
                     <div id="budget-limit-wrapper">
                         <label class="block text-sm font-medium mb-1" for="budget-limit">${t('budgets.monthly-amount')}</label>
-                        <input type="number" id="budget-limit" step="0.01" min="0" class="w-full px-3 py-2 border rounded-lg bg-white dark:bg-slate-700 dark:border-slate-600">
+                        <input type="number" id="budget-limit" step="0.01" min="0" class="w-full px-3 py-2 border rounded-2xl bg-white dark:bg-slate-700 dark:border-slate-600">
                         <p class="text-xs text-gray-500 dark:text-slate-400 mt-1" id="budget-limit-hint"></p>
                     </div>
                     <div id="budget-percent-wrapper" style="display: none;">
                         <label class="block text-sm font-medium mb-1" for="budget-percent">${t('budgets.percent')}</label>
-                        <input type="number" id="budget-percent" step="0.01" min="0" max="100" class="w-full px-3 py-2 border rounded-lg bg-white dark:bg-slate-700 dark:border-slate-600">
+                        <input type="number" id="budget-percent" step="0.01" min="0" max="100" class="w-full px-3 py-2 border rounded-2xl bg-white dark:bg-slate-700 dark:border-slate-600">
                         <p class="text-xs text-gray-500 dark:text-slate-400 mt-1" id="budget-percent-hint"></p>
                     </div>
                     <div class="grid grid-cols-2 gap-4">
                         <div>
                             <label class="block text-sm font-medium mb-1" for="budget-start">${t('budgets.start')}</label>
-                            <input type="date" id="budget-start" required class="w-full px-3 py-2 border rounded-lg bg-white dark:bg-slate-700 dark:border-slate-600">
+                            <input type="date" id="budget-start" required class="w-full px-3 py-2 border rounded-2xl bg-white dark:bg-slate-700 dark:border-slate-600">
                         </div>
                         <div>
                             <label class="block text-sm font-medium mb-1" for="budget-end">${t('budgets.end')}</label>
-                            <input type="date" id="budget-end" required class="w-full px-3 py-2 border rounded-lg bg-white dark:bg-slate-700 dark:border-slate-600">
+                            <input type="date" id="budget-end" required class="w-full px-3 py-2 border rounded-2xl bg-white dark:bg-slate-700 dark:border-slate-600">
                         </div>
                     </div>
                     <div class="flex gap-2 justify-end">
-                        <button type="button" id="cancel-btn" class="px-4 py-2 border rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700 dark:border-slate-600">${t('common.cancel')}</button>
-                        <button type="submit" class="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/90">${t('common.save')}</button>
+                        <button type="button" id="cancel-btn" class="px-4 py-2 border rounded-2xl hover:bg-gray-50 dark:hover:bg-slate-700 dark:border-slate-600">${t('common.cancel')}</button>
+                        <button type="submit" class="bg-primary text-white px-4 py-2 rounded-2xl hover:bg-primary/90">${t('common.save')}</button>
                     </div>
                 </form>
             </div>
@@ -401,7 +401,7 @@ function renderHeader(summary) {
             <div class="text-center py-2">
                 <div class="text-lg font-semibold mb-1">${t('budgets.no-income-title')}</div>
                 <p class="text-sm text-gray-500 dark:text-slate-400 mb-3">${t('budgets.no-income-hint')}</p>
-                <button data-action="edit-income" class="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/90">
+                <button data-action="edit-income" class="bg-primary text-white px-4 py-2 rounded-2xl hover:bg-primary/90">
                     ${t('budgets.set-salary')}
                 </button>
             </div>`;
@@ -499,7 +499,7 @@ function renderSection(section, budgetByCategory, available) {
     const width = pot > 0 ? Math.min((assigned / pot) * 100, 100) : 0;
 
     return `
-        <section class="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 ${style.accent} overflow-hidden">
+        <section class="bg-white dark:bg-slate-800 rounded-3xl shadow-xs border border-slate-200 dark:border-slate-700 ${style.accent} overflow-hidden">
             <header class="p-5 pb-4 border-b border-slate-200 dark:border-slate-700">
                 <div class="flex flex-wrap justify-between items-start gap-3">
                     <div>
@@ -584,12 +584,12 @@ function renderBlock(node, budgetByCategory, style) {
     const textClass = style.esEstalvi ? 'text-teal-700 dark:text-teal-300' : TEXT_CLASSES[level];
 
     return `
-        <div class="rounded-lg border border-slate-200 dark:border-slate-700 p-4">
+        <div class="rounded-2xl border border-slate-200 dark:border-slate-700 p-4">
             <div class="flex flex-wrap justify-between items-start gap-3 mb-3">
                 <div class="flex items-start gap-2 min-w-0">
                     ${children.length > 0 ? `
                         <button data-action="toggle" data-id="${category.id}"
-                                class="p-1 -ml-1 hover:bg-gray-100 dark:hover:bg-slate-700 rounded shrink-0"
+                                class="p-1 -ml-1 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg shrink-0"
                                 title="${t(expanded ? 'budgets.collapse' : 'budgets.expand')}">
                             <span class="material-symbols-outlined text-base">${expanded ? 'expand_less' : 'expand_more'}</span>
                         </button>` : '<span class="w-6 shrink-0"></span>'}
@@ -785,16 +785,16 @@ function actionButtons(node, budgetByCategory) {
     const hasFixedCost = toNumber(node.prorrateig_mensual) > 0;
     if (budget) {
         return `
-            <button data-action="edit" data-id="${budget.id}" class="p-1 hover:bg-gray-100 dark:hover:bg-slate-700 rounded" title="${t('budgets.edit-allocation')}">
+            <button data-action="edit" data-id="${budget.id}" class="p-1 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg" title="${t('budgets.edit-allocation')}">
                 <span class="material-symbols-outlined text-sm">edit</span>
             </button>
-            <button data-action="delete" data-id="${budget.id}" data-fixed="${hasFixedCost}" class="p-1 hover:bg-red-50 dark:hover:bg-red-500/10 text-red-600 rounded"
+            <button data-action="delete" data-id="${budget.id}" data-fixed="${hasFixedCost}" class="p-1 hover:bg-red-50 dark:hover:bg-red-500/10 text-red-600 rounded-lg"
                     title="${t(hasFixedCost ? 'budgets.back-to-recurring' : 'budgets.remove-allocation')}">
                 <span class="material-symbols-outlined text-sm">${hasFixedCost ? 'undo' : 'delete'}</span>
             </button>`;
     }
     return `
-        <button data-action="create" data-category="${node.categoria.id}" class="p-1 hover:bg-gray-100 dark:hover:bg-slate-700 rounded"
+        <button data-action="create" data-category="${node.categoria.id}" class="p-1 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg"
                 title="${t(hasFixedCost ? 'budgets.change-this-month' : 'budgets.assign-title')}">
             <span class="material-symbols-outlined text-sm">${hasFixedCost ? 'edit' : 'add'}</span>
         </button>`;
@@ -1031,7 +1031,7 @@ function renderFixedCosts(fixedCosts, monthlyTotal) {
         const monthly = toNumber(fixedCost.prorrateig_mensual) || 0;
         const isMonthly = fixedCost.frequencia === 'MENSUAL';
         return `
-            <div class="flex items-center justify-between gap-3 p-3 rounded-lg border border-slate-200 dark:border-slate-700">
+            <div class="flex items-center justify-between gap-3 p-3 rounded-2xl border border-slate-200 dark:border-slate-700">
                 <div class="min-w-0">
                     <div class="font-medium truncate">${escapeHtml(fixedCost.nom)}</div>
                     <div class="text-xs text-gray-500 dark:text-slate-400">
@@ -1042,10 +1042,10 @@ function renderFixedCosts(fixedCosts, monthlyTotal) {
                 </div>
                 <div class="flex items-center gap-1 shrink-0">
                     <span class="font-semibold mr-2">${formatCurrency(monthly)}</span>
-                    <button data-action="edit-fixed" data-id="${fixedCost.id}" class="p-1 hover:bg-gray-100 dark:hover:bg-slate-700 rounded" title="${t('budgets.change-from-this-month')}">
+                    <button data-action="edit-fixed" data-id="${fixedCost.id}" class="p-1 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg" title="${t('budgets.change-from-this-month')}">
                         <span class="material-symbols-outlined text-sm">edit</span>
                     </button>
-                    <button data-action="delete-fixed" data-id="${fixedCost.id}" class="p-1 hover:bg-red-50 dark:hover:bg-red-500/10 text-red-600 rounded" title="${t('budgets.remove-from-this-month')}">
+                    <button data-action="delete-fixed" data-id="${fixedCost.id}" class="p-1 hover:bg-red-50 dark:hover:bg-red-500/10 text-red-600 rounded-lg" title="${t('budgets.remove-from-this-month')}">
                         <span class="material-symbols-outlined text-sm">delete</span>
                     </button>
                 </div>

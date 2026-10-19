@@ -33,3 +33,16 @@ test('les fonts i Chart.js de public/vendor són els del paquet instal·lat', ()
         .map(([, target]) => target);
     assert.deepEqual(stale, [], `fitxers desactualitzats: ${stale.join(', ')}. Executa "npm run build:assets"`);
 });
+
+test('les variables pròpies no es diuen com les de Tailwind', () => {
+    // Tailwind 4 posa el seu tema en variables (--radius-lg, --color-red-600…)
+    // i els CSS propis van en una capa per sobre: amb el mateix nom, la nostra
+    // trepitja la seva. Una --radius-lg de main.css feia rodones les caselles
+    // amb rounded-lg.
+    const own = new Set([...fs.readFileSync(path.join(root, 'public', 'css', 'main.css'), 'utf8')
+        .matchAll(/(--[\w-]+)\s*:/g)].map(match => match[1]));
+    const tailwind = fs.readFileSync(path.join(root, 'public', 'css', 'tailwind.css'), 'utf8');
+    const theirs = new Set([...tailwind.matchAll(/(--[\w-]+)\s*[:,)]/g)].map(match => match[1]));
+    assert.ok(theirs.has('--radius-lg') && theirs.has('--color-slate-500'), 'no s\'han trobat les variables de Tailwind');
+    assert.deepEqual([...own].filter(name => theirs.has(name)), []);
+});

@@ -1,0 +1,20 @@
+/*
+ * L'ordre de les capes (@layer) de Tailwind 4, i els CSS propis a dins.
+ *
+ * Tailwind 4 posa el seu CSS en capes: base (el preflight), components i
+ * utilities. Un CSS que no és a cap capa guanya a totes, tingui l'especificitat
+ * que tingui: .btn o .material-symbols-outlined trepitjarien qualsevol classe
+ * de la vista (un «hidden», un «text-sm»). Amb Tailwind 3 no hi havia capes, i
+ * aquests fitxers anaven abans de tailwind.css perquè, a igual especificitat,
+ * manés la classe de la vista. A la capa de components queden igual: per sobre
+ * del preflight i per sota de les utilitats.
+ *
+ * L'ordre el fixa la primera vegada que surt cada capa, i aquest és el primer
+ * CSS de la pàgina. dark.css va a la capa d'utilitats, després de tailwind.css.
+ */
+@layer properties, theme, base, components, utilities;
+
+@import url("../vendor/material-symbols/outlined.css") layer(components);
+@import url("main.css") layer(components);
+@import url("layout.css") layer(components);
+@import url("components.css") layer(components);

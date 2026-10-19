@@ -1073,9 +1073,10 @@ Recopilación de detalles que cuestan tiempo si no se saben:
 - **Los ficheros estáticos se sirven con `Cache-Control: no-cache`.** Sin eso el
   navegador se quedaba con el CSS y el JavaScript antiguos, y parecía que los
   cambios no se aplicaban.
-- **Tailwind viene por CDN** y genera las clases mirando el DOM. Funciona con
-  contenido inyectado dinámicamente, pero **no puede generar clases construidas
-  en tiempo de ejecución**: `bg-${color}-500` no existe. Hay que enumerarlas.
+- **Tailwind (4) se compila** con `npm run build:assets` a partir de las clases
+  escritas en `index.html` y `js/` (ver `frontend/AGENTS.md`). **No puede generar
+  clases construidas en tiempo de ejecución**: `bg-${color}-500` no existe. Hay
+  que enumerarlas.
 - **El tema oscuro tiene dos mitades**: las variables CSS de `main.css` bajo
   `html.dark`, y las variantes `dark:` de Tailwind en las vistas. Si tocas una,
   mira la otra.

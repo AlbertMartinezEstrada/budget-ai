@@ -138,7 +138,7 @@ export async function initTransactions(container) {
 
         <!-- Modal d'alta manual -->
         <div id="transaction-modal" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-50 p-4">
-            <div class="bg-white dark:bg-slate-800 rounded-xl p-6 w-full max-w-md max-h-full overflow-y-auto">
+            <div class="bg-white dark:bg-slate-800 rounded-3xl p-6 w-full max-w-md max-h-full overflow-y-auto">
                 <h3 class="text-xl font-bold mb-1" id="transaction-modal-title">${t('transactions.add-title')}</h3>
                 <p class="text-sm text-gray-500 dark:text-slate-400 mb-4" id="transaction-modal-hint">${t('transactions.add-hint')}</p>
                 <form id="transaction-form" class="space-y-4">

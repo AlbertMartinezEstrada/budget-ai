@@ -33,7 +33,7 @@ const toCents = (value) => Math.round((Number.parseFloat(value) || 0) * 100);
 export function setUpSplitEditor(container, { categories, debts, save, remove }) {
     container.insertAdjacentHTML('beforeend', `
         <div id="split-modal" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-50 p-4">
-            <div class="bg-white dark:bg-slate-800 rounded-xl p-6 w-full max-w-3xl max-h-full overflow-y-auto">
+            <div class="bg-white dark:bg-slate-800 rounded-3xl p-6 w-full max-w-3xl max-h-full overflow-y-auto">
                 <h3 class="text-xl font-bold mb-1">${t('split.title')}</h3>
                 <p id="split-summary" class="text-sm font-medium mb-1"></p>
                 <p class="text-xs text-gray-500 dark:text-slate-400 mb-4">${t('split.hint')}</p>
@@ -75,7 +75,7 @@ export function setUpSplitEditor(container, { categories, debts, save, remove })
 
     function addRow(part = {}) {
         rows.insertAdjacentHTML('beforeend', `
-            <div class="border border-slate-200 dark:border-slate-700 rounded-lg p-3 grid grid-cols-12 gap-2 items-center" data-part-row>
+            <div class="border border-slate-200 dark:border-slate-700 rounded-2xl p-3 grid grid-cols-12 gap-2 items-center" data-part-row>
                 <input type="number" step="0.01" min="0.01" class="form-control col-span-6 md:col-span-2"
                        data-field="amount" placeholder="${t('common.amount')}" aria-label="${t('split.amount-label')}">
                 <select class="form-control col-span-6 md:col-span-4" data-field="category" aria-label="${t('split.category-label')}">
@@ -84,7 +84,7 @@ export function setUpSplitEditor(container, { categories, debts, save, remove })
                 <select class="form-control col-span-10 md:col-span-5" data-field="debt" aria-label="${t('split.debt-label')}">
                     ${debtOptions}
                 </select>
-                <button type="button" class="col-span-2 md:col-span-1 p-1 hover:bg-red-50 dark:hover:bg-red-500/10 text-red-600 rounded justify-self-end"
+                <button type="button" class="col-span-2 md:col-span-1 p-1 hover:bg-red-50 dark:hover:bg-red-500/10 text-red-600 rounded-lg justify-self-end"
                         data-action="remove-part" title="${t('split.remove-part')}">
                     <span class="material-symbols-outlined text-sm">close</span>
                 </button>

@@ -21,7 +21,7 @@ import {
 /** Els gràfics vius, per destruir-los abans de pintar-ne de nous. */
 let charts = [];
 
-const card = 'bg-white dark:bg-slate-800 rounded-xl p-4 shadow-sm border border-slate-200 dark:border-slate-700';
+const card = 'bg-white dark:bg-slate-800 rounded-3xl p-4 shadow-xs border border-slate-200 dark:border-slate-700';
 const TONE_CLASSES = {
     good: 'text-emerald-700 dark:text-emerald-300',
     bad: 'text-red-700 dark:text-red-300',
@@ -33,13 +33,13 @@ export async function initGeneral(container) {
         <div class="flex flex-wrap items-end gap-3 mb-4">
             <div>
                 <label class="block text-xs text-slate-500 dark:text-slate-400 mb-1" for="general-kind">${t('general.period')}</label>
-                <select id="general-kind" class="pl-3 pr-10 py-2 border rounded-lg">
+                <select id="general-kind" class="pl-3 pr-10 py-2 border rounded-2xl">
                     ${PERIOD_KINDS.map(kind => `<option value="${kind.id}">${t(kind.label)}</option>`).join('')}
                 </select>
             </div>
             <div id="general-value-wrapper">
                 <label class="block text-xs text-slate-500 dark:text-slate-400 mb-1" for="general-value">&nbsp;</label>
-                <select id="general-value" class="pl-3 pr-10 py-2 border rounded-lg"></select>
+                <select id="general-value" class="pl-3 pr-10 py-2 border rounded-2xl"></select>
             </div>
             <p class="text-sm text-slate-500 dark:text-slate-400 flex-1 min-w-0" id="general-range"></p>
         </div>
@@ -71,7 +71,7 @@ export async function initGeneral(container) {
                 : rangeLabel(result.des_de, result.fins_a);
             render(content, result);
         } catch (error) {
-            content.innerHTML = `<div class="p-3 rounded-lg text-sm bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-300">
+            content.innerHTML = `<div class="p-3 rounded-2xl text-sm bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-300">
                 ${escapeHtml(t('general.load-failed', { message: error.message }))}</div>`;
         }
     };
@@ -164,7 +164,7 @@ function unclassifiedNotice(unclassified) {
     if (!unclassifiedIsHigh(unclassified)) {
         return `<p class="text-xs text-slate-500 dark:text-slate-400" id="unclassified-notice">${escapeHtml(text)}</p>`;
     }
-    return `<div class="p-3 rounded-lg text-sm bg-amber-100 text-amber-800 dark:bg-amber-500/20 dark:text-amber-300" id="unclassified-notice">
+    return `<div class="p-3 rounded-2xl text-sm bg-amber-100 text-amber-800 dark:bg-amber-500/20 dark:text-amber-300" id="unclassified-notice">
         ${escapeHtml(text)} ${t('general.unclassified-high')}
         <a href="#transactions" class="underline">${t('general.unclassified-link')}</a>.
     </div>`;
