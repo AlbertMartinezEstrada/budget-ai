@@ -1,18 +1,25 @@
 package com.budgetai.backend.controller;
 
 import com.budgetai.backend.i18n.Messages;
+import com.budgetai.backend.model.AuthSession;
 import com.budgetai.backend.security.AuthCookies;
 import com.budgetai.backend.security.JwtService;
 import com.budgetai.backend.security.LocalCredentials;
 import com.budgetai.backend.security.LoginThrottle;
+import com.budgetai.backend.security.SessionService;
+import com.budgetai.backend.security.SessionUser;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.Instant;
+import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -23,24 +30,36 @@ public class AuthController {
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final LoginThrottle throttle;
+    private final SessionService sessions;
     private final boolean secureCookie;
 
     public AuthController(LocalCredentials credentials,
                           PasswordEncoder passwordEncoder,
                           JwtService jwtService,
                           LoginThrottle throttle,
+                          SessionService sessions,
                           @Value("${app.auth.secure-cookie:false}") boolean secureCookie) {
         this.credentials = credentials;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
         this.throttle = throttle;
+        this.sessions = sessions;
         this.secureCookie = secureCookie;
     }
 
     public record LoginRequest(String username, String password) {}
 
+    /** Una sessió oberta tal com la veu Configuració. L'id no hi surt: no cal per a res. */
+    public record SessionView(
+            @JsonProperty("navegador") String userAgent,
+            @JsonProperty("creada") Instant createdAt,
+            @JsonProperty("darrer_us") Instant lastUsedAt,
+            @JsonProperty("caduca") Instant expiresAt,
+            @JsonProperty("actual") boolean current) {}
+
     @PostMapping("/login")
-    public ResponseEntity<?> login(@RequestBody LoginRequest request) {
+    public ResponseEntity<?> login(@RequestBody LoginRequest request,
+                                   @RequestHeader(value = HttpHeaders.USER_AGENT, required = false) String userAgent) {
         if (throttle.isLocked()) {
             return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
                     .body(Map.of("error", Messages.get("auth.too-many-attempts",
@@ -64,7 +83,8 @@ public class AuthController {
         }
 
         throttle.recordSuccess();
-        String token = jwtService.issueToken(credentials.getUsername());
+        AuthSession session = sessions.open(userAgent);
+        String token = jwtService.issueToken(credentials.getUsername(), session.getId());
 
         return ResponseEntity.ok()
                 .header(HttpHeaders.SET_COOKIE,
@@ -72,8 +92,16 @@ public class AuthController {
                 .body(Map.of("username", credentials.getUsername()));
     }
 
+    /**
+     * Tanca la sessió al servidor, no només al navegador: abans s'esborrava la
+     * cookie i prou, i una còpia del token continuava servint fins que caducava.
+     *
+     * Respon igual sense sessió (ja tancada o caducada): sortir ha de deixar
+     * sempre el navegador sense cookie.
+     */
     @PostMapping("/logout")
-    public ResponseEntity<?> logout() {
+    public ResponseEntity<?> logout(@AuthenticationPrincipal SessionUser user) {
+        if (user != null) sessions.close(user.sessionId());
         return ResponseEntity.ok()
                 .header(HttpHeaders.SET_COOKIE, AuthCookies.expired(secureCookie))
                 .body(Map.of("message", Messages.get("auth.logged-out")));
@@ -87,5 +115,20 @@ public class AuthController {
     @GetMapping("/me")
     public ResponseEntity<?> me(Authentication authentication) {
         return ResponseEntity.ok(Map.of("username", authentication.getName()));
+    }
+
+    /** Les sessions obertes, per a Configuració, amb la d'aquesta petició marcada. */
+    @GetMapping("/sessions")
+    public List<SessionView> openSessions(@AuthenticationPrincipal SessionUser user) {
+        return sessions.openSessions().stream()
+                .map(session -> new SessionView(session.getUserAgent(), session.getCreatedAt(),
+                        session.getLastUsedAt(), session.getExpiresAt(), session.getId().equals(user.sessionId())))
+                .toList();
+    }
+
+    /** Tanca totes les sessions menys la d'aquesta petició: el que es fa si no se'n reconeix alguna. */
+    @DeleteMapping("/sessions/others")
+    public Map<String, Integer> closeOtherSessions(@AuthenticationPrincipal SessionUser user) {
+        return Map.of("tancades", sessions.closeAllExcept(user.sessionId()));
     }
 }

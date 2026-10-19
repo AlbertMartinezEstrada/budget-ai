@@ -102,8 +102,8 @@ entidades y falla al arrancar si no es así.
 ## Limitaciones conocidas
 
 - **Un solo usuario.** No hay tabla de usuarios ni aislamiento de datos.
-- **No se pueden revocar sesiones** una por una; cambiar `JWT_SECRET` las
-  invalida todas.
+- **Las sesiones no se cierran una a una desde otro navegador**: salir cierra
+  la propia y Configuración cierra todas las demás de golpe.
 - **Los datos no se traducen.** La interfaz y los mensajes del backend salen en
   el idioma elegido (catalán, castellano, portugués o inglés), pero los nombres
   que vienen de los datos se quedan como están: las categorías que crea

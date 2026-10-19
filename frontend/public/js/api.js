@@ -187,6 +187,17 @@ export async function logout() {
     await apiFetch('/auth/logout', { method: 'POST' });
 }
 
+/** Les sessions obertes, l'última que s'ha fet servir primer; la d'aquest navegador porta actual. */
+export async function getSessions() {
+    return handleResponse(await apiFetch('/auth/sessions'));
+}
+
+/** Tanca totes les sessions menys la d'aquest navegador. Torna quantes n'ha tancat. */
+export async function closeOtherSessions() {
+    const result = await handleResponse(await apiFetch('/auth/sessions/others', { method: 'DELETE' }));
+    return result.tancades;
+}
+
 /** Retorna l'usuari de la sessió, o null si no n'hi ha cap d'oberta. */
 export async function getCurrentUser() {
     const response = await apiFetch('/auth/me');

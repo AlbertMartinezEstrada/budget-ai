@@ -16,9 +16,11 @@ import java.util.Optional;
 /**
  * Emissió i validació dels tokens de sessió.
  *
- * El token és un JWT signat amb HMAC-SHA256 i no guarda res més que el nom
- * d'usuari i la caducitat: com que només hi ha un usuari, no cal desar cap
- * estat de sessió al servidor.
+ * El token és un JWT signat amb HMAC-SHA256 amb el nom d'usuari, la caducitat
+ * i l'id de la sessió (jti). La signatura i la caducitat es miren aquí; si la
+ * sessió encara és oberta, a SessionService. Abans no portava cap id ni hi
+ * havia res desat al servidor, i per això sortir no podia tancar la sessió de
+ * debò.
  */
 @Service
 public class JwtService {
@@ -44,10 +46,14 @@ public class JwtService {
         this.validity = validity;
     }
 
-    public String issueToken(String username) {
+    /** El que diu un token vàlid: de qui és i de quina sessió. */
+    public record SessionToken(String username, String sessionId) {}
+
+    public String issueToken(String username, String sessionId) {
         Date now = new Date();
         return Jwts.builder()
                 .subject(username)
+                .id(sessionId)
                 .issuedAt(now)
                 .expiration(new Date(now.getTime() + validity.toMillis()))
                 .signWith(signingKey)
@@ -55,11 +61,14 @@ public class JwtService {
     }
 
     /**
-     * Retorna el nom d'usuari si el token és vàlid i no ha caducat.
+     * Retorna l'usuari i la sessió si el token és vàlid i no ha caducat.
      * Un token manipulat, mal signat o caducat retorna un Optional buit: mai
      * una excepció cap amunt, perquè un token dolent és un cas normal.
+     *
+     * Un token sense sessió també: és dels d'abans, que no es podien tancar.
+     * Qui en tingui un ha de tornar a entrar una vegada.
      */
-    public Optional<String> resolveUsername(String token) {
+    public Optional<SessionToken> resolve(String token) {
         if (token == null || token.isBlank()) return Optional.empty();
 
         try {
@@ -69,7 +78,8 @@ public class JwtService {
                     .parseSignedClaims(token)
                     .getPayload();
 
-            return Optional.ofNullable(claims.getSubject());
+            if (claims.getSubject() == null || claims.getId() == null) return Optional.empty();
+            return Optional.of(new SessionToken(claims.getSubject(), claims.getId()));
         } catch (JwtException | IllegalArgumentException exception) {
             return Optional.empty();
         }

@@ -1001,13 +1001,19 @@ las llamadas normales. Como sí son orígenes distintos, CORS necesita
 `allowCredentials`, y eso obliga a una lista concreta de orígenes: con `*` el
 navegador lo rechazaría.
 
+El token lleva el identificador de una fila de `sessions`, y salir la borra: a
+partir de ahí el token no sirve aunque la firma y la caducidad sean buenas.
+`SessionService` lo comprueba en cada petición, con una memoria de un minuto
+que salir y «Cerrar las demás sesiones» vacían al momento.
+
 Todo requiere sesión salvo `/auth/login` y `/auth/logout`.
 
 ## El esquema
 
-Trece tablas. `accounts`, `transactions`, `transaction_parts`, `categories`,
+Quince tablas. `accounts`, `transactions`, `transaction_parts`, `categories`,
 `companies`, `budgets`, `financial_goals`, `recurring_transactions`,
-`transfers`, `settings`, `monthly_income`, `import_rules` y `debts`.
+`transfers`, `settings`, `monthly_income`, `import_rules`, `debts`,
+`debt_removed_receipts` y `sessions`.
 
 `ddl-auto` está en **`validate`**: Hibernate comprueba al arrancar que las
 tablas cuadren con las entidades y falla si no. No genera ni modifica nada.
