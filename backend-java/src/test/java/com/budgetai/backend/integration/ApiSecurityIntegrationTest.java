@@ -6,6 +6,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
@@ -139,6 +140,53 @@ class ApiSecurityIntegrationTest extends AbstractIntegrationTest {
                         .content("{\"username\":\"un-altre\",\"password\":\"test-password\"}"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.error").value("Usuari o contrasenya incorrectes"));
+    }
+
+    /** La contrasenya bona, la que AbstractIntegrationTest dona al backend. */
+    @Value("${app.auth.password}")
+    private String rightPassword;
+
+    /** Un login des de l'adreça {@code address}, amb una capçalera X-Forwarded-For si no és null. */
+    private MvcResult loginFrom(String address, String forwardedFor, String password) throws Exception {
+        var request = post("/auth/login")
+                .with(mockRequest -> { mockRequest.setRemoteAddr(address); return mockRequest; })
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(
+                        java.util.Map.of("username", "test-user", "password", password)));
+        if (forwardedFor != null) request.header("X-Forwarded-For", forwardedFor);
+        return mockMvc.perform(request).andReturn();
+    }
+
+    private int loginStatusFrom(String address, String forwardedFor, String password) throws Exception {
+        return loginFrom(address, forwardedFor, password).getResponse().getStatus();
+    }
+
+    @Test
+    @DisplayName("Els errors des d'una adreça la bloquegen a ella: des d'una altra es pot entrar")
+    void failuresLockOnlyTheirAddress() throws Exception {
+        // Adreces de documentació (RFC 5737): no les fa servir cap altre test.
+        for (int attempt = 0; attempt < 5; attempt++) {
+            assertThat(loginStatusFrom("203.0.113.10", null, "incorrecta")).isEqualTo(401);
+        }
+
+        // Bloquejada, ni amb la contrasenya bona: si no, es podria seguir provant.
+        MvcResult locked = loginFrom("203.0.113.10", null, rightPassword);
+        assertThat(locked.getResponse().getStatus()).isEqualTo(429);
+        assertThat(locked.getResponse().getContentAsString(java.nio.charset.StandardCharsets.UTF_8))
+                .contains("Massa intents");
+        assertThat(loginStatusFrom("203.0.113.20", null, rightPassword)).isEqualTo(200);
+    }
+
+    @Test
+    @DisplayName("Una capçalera X-Forwarded-For inventada no canvia l'adreça que es compta")
+    void forwardedForHeaderIsIgnored() throws Exception {
+        // Si es fes cas de la capçalera, cada intent amb una adreça inventada
+        // començaria de zero i el bloqueig per adreça no frenaria ningú.
+        for (int attempt = 0; attempt < 5; attempt++) {
+            assertThat(loginStatusFrom("198.51.100.10", "192.0.2." + attempt, "incorrecta")).isEqualTo(401);
+        }
+
+        assertThat(loginStatusFrom("198.51.100.10", "192.0.2.99", rightPassword)).isEqualTo(429);
     }
 
     @Test

@@ -240,8 +240,12 @@ memòria d'un minut de `SessionService` estalviï anar a la base de dades però
 oblidi a l'acte una sessió tancada, també les altres en «tancar les altres»; que la cookie porti sempre `HttpOnly` i `SameSite=Strict`;
 que la contrasenya no es desi mai en clar; que faltar una credencial faci
 fallar l'arrencada en comptes de deixar l'API oberta; i que el límit d'intents
-bloquegi al cinquè error i es desbloquegi sol. Cada bloqueig seguit dura el
-doble que l'anterior fins al màxim, i un login correcte torna al primer minut.
+bloquegi una adreça al cinquè error sense tocar les altres i es desbloquegi
+sol. Cada bloqueig seguit dura el doble que l'anterior fins al màxim, i un login
+correcte torna la seva adreça al primer minut. Molts errors des d'adreces
+diferents dins de la finestra bloquegen per a tothom (repartits en més estona,
+no); una IPv6 es compta pel seu bloc /64; i inventar adreces no omple la
+memòria. Amb un rellotge que avança el test, sense esperes.
 
 ### `DockerComposeEnvironmentTest`
 
@@ -470,7 +474,10 @@ nova.
 - `ApiSecurityIntegrationTest`: l'API sencera per HTTP amb la cadena de
   seguretat de debò. Que cap endpoint retorni dades sense cookie: es pregunten
   a Spring totes les rutes que existeixen, de manera que una de nova queda
-  comprovada sola. Abans era una llista feta a mà d'una dotzena.
+  comprovada sola. Abans era una llista feta a mà d'una dotzena. També que
+  cinc errors des d'una adreça la bloquegin (ni amb la contrasenya bona) mentre
+  des d'una altra es pot entrar, i que una capçalera `X-Forwarded-For`
+  inventada no canviï l'adreça que es compta.
 - `SessionsIntegrationTest`: que sortir tanqui la sessió de debò. Es guarda la
   cookie d'abans de sortir i es torna a fer servir: abans obria l'API set dies
   més, i ara és un 401 encara que el token sigui ben signat i no hagi caducat.

@@ -9,6 +9,7 @@ import com.budgetai.backend.security.LoginThrottle;
 import com.budgetai.backend.security.SessionService;
 import com.budgetai.backend.security.SessionUser;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -57,13 +58,20 @@ public class AuthController {
             @JsonProperty("caduca") Instant expiresAt,
             @JsonProperty("actual") boolean current) {}
 
+    /**
+     * Els intents es compten per l'adreça de la connexió (getRemoteAddr), no
+     * per la capçalera X-Forwarded-For: no hi ha cap proxy davant i qualsevol
+     * se la podria inventar per començar de zero a cada intent.
+     */
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody LoginRequest request,
-                                   @RequestHeader(value = HttpHeaders.USER_AGENT, required = false) String userAgent) {
-        if (throttle.isLocked()) {
+                                   @RequestHeader(value = HttpHeaders.USER_AGENT, required = false) String userAgent,
+                                   HttpServletRequest httpRequest) {
+        String address = httpRequest.getRemoteAddr();
+        if (throttle.isLocked(address)) {
             return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
                     .body(Map.of("error", Messages.get("auth.too-many-attempts",
-                            "seconds", Math.max(1, throttle.remainingLock().toSeconds()))));
+                            "seconds", Math.max(1, throttle.remainingLock(address).toSeconds()))));
         }
 
         boolean userMatches = credentials.getUsername().equals(request.username());
@@ -75,14 +83,14 @@ public class AuthController {
                 credentials.getPasswordHash());
 
         if (!userMatches || !passwordMatches) {
-            throttle.recordFailure();
+            throttle.recordFailure(address);
             // Un sol missatge per als dos casos: dir quin ha fallat és regalar
             // mitja credencial.
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                     .body(Map.of("error", Messages.get("auth.wrong-credentials")));
         }
 
-        throttle.recordSuccess();
+        throttle.recordSuccess(address);
         AuthSession session = sessions.open(userAgent);
         String token = jwtService.issueToken(credentials.getUsername(), session.getId());
 

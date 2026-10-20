@@ -10,11 +10,8 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
-import java.time.ZoneId;
-import java.time.ZoneOffset;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -134,18 +131,5 @@ class SessionServiceTest {
         when(repository.deleteExpired(clock.instant())).thenReturn(3);
 
         assertThat(sessions.deleteExpired()).isEqualTo(3);
-    }
-
-    /** Un rellotge que el test fa avançar. */
-    private static final class MovableClock extends Clock {
-        private Instant now;
-
-        MovableClock(Instant start) { this.now = start; }
-
-        void advance(Duration duration) { now = now.plus(duration); }
-
-        @Override public Instant instant() { return now; }
-        @Override public ZoneId getZone() { return ZoneOffset.UTC; }
-        @Override public Clock withZone(ZoneId zone) { return this; }
     }
 }
