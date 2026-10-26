@@ -5,6 +5,8 @@ import {
 import { categoryOptions, leafCategories } from '../../categoryOptions.js';
 import { counterpartOptions, transferCounts } from '../../transfers.js';
 import { setUpSplitEditor } from '../transactions/SplitEditor.js';
+import { setUpSharedExpenseEditor, setUpRepaymentPicker } from '../transactions/SharedExpenseEditor.js';
+import { canShare, repaymentCandidates, openSharedExpenseDebts } from '../../sharedExpense.js';
 import { t, formatDate } from '../../i18n.js';
 
 /**
@@ -138,6 +140,17 @@ export async function initUpload(container) {
         console.error('Error loading debts:', error);
     }
     const debtsById = new Map(debts.map(debt => [debt.id, debt]));
+    // Després d'importar, els deutes nous (les despeses compartides que s'hi
+    // han agrupat) han de poder rebre els Bizums del pròxim extracte.
+    async function reloadDebts() {
+        try {
+            debts = await getDebts();
+            debtsById.clear();
+            debts.forEach(debt => debtsById.set(debt.id, debt));
+        } catch (error) {
+            console.error('Error loading debts:', error);
+        }
+    }
     const leaves = leafCategories(categoriesList);
     const leafNameById = new Map(leaves.map(category => [category.id, category.nom]));
     const leafNames = new Set(leaves.map(category => category.nom));
@@ -158,6 +171,139 @@ export async function initUpload(container) {
         }
     });
     const isSplit = (transaction) => (transaction.parts || []).length > 0;
+
+    // ============ DESPESA COMPARTIDA ============
+    // El sopar de 40 € entre quatre i els Bizums que el tornen, agrupats abans
+    // d'importar. La fila del pagament porta despesa_compartida, la dels
+    // Bizums cobrament_de amb la mateixa clau, i el backend ho aplica a la
+    // mateixa confirmació: si alguna cosa no quadra, no s'importa res. Un Bizum
+    // que torna una despesa compartida d'abans va al seu deute (deute_id).
+    const isShared = (transaction) => Boolean(transaction.despesa_compartida);
+    const sharedPayment = (key) => currentReviewData.find(row => row.despesa_compartida?.clau === key);
+    const repaysSomething = (transaction) => Boolean(transaction.cobrament_de) || Number(transaction.deute_id) > 0;
+    const isRepayable = (transaction) => typeOf(transaction) === 'INCOME' && !isSplit(transaction)
+        && !(Number(transaction.compte_contrapart_id) > 0);
+    const sharedExpenseDebts = () => openSharedExpenseDebts(debts);
+
+    /** Treu el Bizum de la despesa compartida o del deute que tornava: torna a comptar. */
+    function unlinkRepayment(row) {
+        delete row.cobrament_de;
+        delete row.deute_id;
+        row.exclos_pressupost = false;
+    }
+
+    /** Desfà l'agrupació d'un pagament i deixa lliures els seus Bizums. */
+    function unshare(payment) {
+        const key = payment.despesa_compartida?.clau;
+        currentReviewData.filter(row => key && row.cobrament_de === key).forEach(unlinkRepayment);
+        delete payment.despesa_compartida;
+    }
+
+    const openSharer = setUpSharedExpenseEditor(container, {
+        save: async (payment, { nom, part_meva, cobraments }) => {
+            const key = payment.despesa_compartida?.clau || `fila-${currentReviewData.indexOf(payment)}`;
+            currentReviewData.filter(row => row.cobrament_de === key).forEach(unlinkRepayment);
+            payment.despesa_compartida = { clau: key, nom, part_meva };
+            payment.inclos = true;
+            // Els Bizums triats s'importen, vinculats i sense comptar.
+            cobraments.map(index => currentReviewData[Number.parseInt(index, 10)]).filter(Boolean).forEach(row => {
+                row.cobrament_de = key;
+                row.exclos_pressupost = true;
+                row.inclos = true;
+            });
+            renderReviewTable();
+        },
+        remove: async (payment) => {
+            unshare(payment);
+            renderReviewTable();
+        }
+    });
+
+    function openShare(index) {
+        const payment = currentReviewData[index];
+        const key = payment.despesa_compartida?.clau;
+        // Els ingressos de l'extracte que no tornen cap altra cosa, o ja aquesta.
+        const free = currentReviewData.filter(row => isRepayable(row)
+            && (row.cobrament_de ? row.cobrament_de === key : !(Number(row.deute_id) > 0)));
+        const candidates = repaymentCandidates(payment, free.map(row => ({ ...row, row })))
+            .map(candidate => ({
+                key: currentReviewData.indexOf(candidate.row),
+                data: candidate.data,
+                empresa: candidate.empresa,
+                cost: candidate.cost
+            }));
+        const current = payment.despesa_compartida
+            ? {
+                nom: payment.despesa_compartida.nom,
+                part_meva: payment.despesa_compartida.part_meva,
+                cobraments: currentReviewData
+                    .map((row, rowIndex) => (row.cobrament_de === key ? rowIndex : null))
+                    .filter(rowIndex => rowIndex !== null)
+            }
+            : null;
+        openSharer(payment, { candidates, current });
+    }
+
+    const openRepaymentPicker = setUpRepaymentPicker(container, {
+        save: async (income, choice) => {
+            unlinkRepayment(income);
+            const [kind, value] = String(choice).split(':');
+            if (kind === 'grup') income.cobrament_de = value;
+            else income.deute_id = Number.parseInt(value, 10);
+            income.exclos_pressupost = true;
+            income.inclos = true;
+            renderReviewTable();
+        },
+        remove: async (income) => {
+            unlinkRepayment(income);
+            renderReviewTable();
+        }
+    });
+
+    /** On pot anar un Bizum: les despeses compartides d'aquest extracte i els deutes oberts d'abans. */
+    function repaymentChoices() {
+        return [
+            ...currentReviewData.filter(isShared).map(payment => ({
+                value: `grup:${payment.despesa_compartida.clau}`,
+                label: t('shared.repay-option-new', {
+                    name: payment.despesa_compartida.nom || payment.empresa || t('common.unknown'),
+                    date: formatDate(payment.data)
+                })
+            })),
+            ...sharedExpenseDebts().map(debt => ({
+                value: `deute:${debt.id}`,
+                label: t('shared.repay-option-debt', { name: debt.nom, pending: formatCurrency(debt.pendent) })
+            }))
+        ];
+    }
+
+    function openRepayment(index) {
+        const income = currentReviewData[index];
+        const current = income.cobrament_de ? `grup:${income.cobrament_de}`
+            : Number(income.deute_id) > 0 ? `deute:${income.deute_id}` : null;
+        openRepaymentPicker(income, { choices: repaymentChoices(), current });
+    }
+
+    /** Sota l'empresa: què és de la despesa compartida aquesta fila. */
+    function sharedLine(transaction) {
+        if (isShared(transaction)) {
+            const shared = transaction.despesa_compartida;
+            const owed = (Number.parseFloat(transaction.cost) || 0) - (Number(shared.part_meva) || 0);
+            return `<div class="text-sm text-muted mt-1">
+                        ${escapeHtml(t('shared.review-payment', {
+                            name: shared.nom || transaction.empresa || t('common.unknown'),
+                            mine: formatCurrency(shared.part_meva),
+                            owed: formatCurrency(owed)
+                        }))}
+                    </div>`;
+        }
+        const repaid = transaction.cobrament_de
+            ? (sharedPayment(transaction.cobrament_de)?.despesa_compartida.nom || sharedPayment(transaction.cobrament_de)?.empresa)
+            : Number(transaction.deute_id) > 0 ? debtsById.get(transaction.deute_id)?.nom : null;
+        return repaid
+            ? `<div class="text-sm text-muted mt-1">${escapeHtml(t('shared.review-repays', { name: repaid }))}</div>`
+            : '';
+    }
 
     // Un extracte és d'un compte. Sense triar-lo, tot queia al principal i amb
     // tres comptes els saldos i el pressupost deixaven de voler dir res.
@@ -367,6 +513,7 @@ export async function initUpload(container) {
                 <td>
                     <input type="text" class="input input-sm w-full" value="${escapeHtml(transaction.empresa || '')}" name="empresa">
                     ${transferCell(transaction)}
+                    ${sharedLine(transaction)}
                 </td>
                 <td>
                     ${split
@@ -379,19 +526,36 @@ export async function initUpload(container) {
                     ${style.signe}${formatCurrency(transaction.cost)}
                 </td>
                 <td class="text-center">
-                    ${split
-                        ? `<span class="text-muted" title="${t('upload.split-excluded-title')}">—</span>`
+                    ${split || isShared(transaction)
+                        ? `<span class="text-muted" title="${t(split ? 'upload.split-excluded-title' : 'shared.review-excluded-title')}">—</span>`
+                        : repaysSomething(transaction)
+                            ? `<input type="checkbox" name="exclos" checked disabled
+                                      title="${t('shared.review-repays-title')}">`
                         : isNeutralTransfer(transaction)
                             ? `<input type="checkbox" name="exclos" checked disabled
                                       title="${t('upload.neutral-title')}">`
                             : `<input type="checkbox" name="exclos" ${transaction.exclos_pressupost ? 'checked' : ''}
                                       title="${t('upload.exclude-title')}">`}
                 </td>
-                <td class="text-right">
-                    <button type="button" class="btn btn-sm btn-outline" data-action="split-row" data-index="${index}"
-                            title="${t('transactions.split-title')}">
-                        <span class="material-symbols-outlined text-sm">call_split</span>
-                    </button>
+                <td class="text-right" style="white-space: nowrap;">
+                    ${canShare(transaction)
+                        ? `<button type="button" class="btn btn-sm btn-outline" data-action="share-row" data-index="${index}"
+                                   title="${t('shared.share-title')}">
+                               <span class="material-symbols-outlined text-sm">group</span>
+                           </button>`
+                        : ''}
+                    ${isRepayable(transaction) && (repaysSomething(transaction) || repaymentChoices().length > 0)
+                        ? `<button type="button" class="btn btn-sm btn-outline" data-action="repay-row" data-index="${index}"
+                                   title="${t('shared.repay-button-title')}">
+                               <span class="material-symbols-outlined text-sm">call_received</span>
+                           </button>`
+                        : ''}
+                    ${isShared(transaction)
+                        ? ''
+                        : `<button type="button" class="btn btn-sm btn-outline" data-action="split-row" data-index="${index}"
+                                   title="${t('transactions.split-title')}">
+                               <span class="material-symbols-outlined text-sm">call_split</span>
+                           </button>`}
                 </td>
             </tr>
             ${split ? transaction.parts.map(part => partRow(part, style)).join('') : ''}
@@ -449,10 +613,14 @@ export async function initUpload(container) {
     }
 
     reviewBody.addEventListener('click', (event) => {
-        const button = event.target.closest('button[data-action="split-row"]');
+        const button = event.target.closest('button[data-action]');
         if (!button) return;
-        const transaction = currentReviewData[Number.parseInt(button.dataset.index, 10)];
-        if (transaction) openSplitter(transaction);
+        const index = Number.parseInt(button.dataset.index, 10);
+        const transaction = currentReviewData[index];
+        if (!transaction) return;
+        if (button.dataset.action === 'split-row') openSplitter(transaction);
+        if (button.dataset.action === 'share-row') openShare(index);
+        if (button.dataset.action === 'repay-row') openRepayment(index);
     });
 
     function updateSummary() {
@@ -505,6 +673,10 @@ export async function initUpload(container) {
         }
 
         if (event.target.name === 'type') {
+            // Un pagament que passa a ingrés, o un Bizum que passa a despesa, ja
+            // no és el que s'havia agrupat.
+            if (isShared(record)) unshare(record);
+            if (record.cobrament_de || Number(record.deute_id) > 0) unlinkRepayment(record);
             record.type = event.target.value;
             // Canviar el tipus canvia el signe i el color de l'import, i també
             // de quin costat compta al resum: es repinta la fila sencera.
@@ -590,6 +762,19 @@ export async function initUpload(container) {
             return;
         }
 
+        // Un Bizum que torna una despesa compartida el pagament de la qual no
+        // s'importa: el backend no importaria res, millor dir-ho abans.
+        const orphan = confirmedData.find(row => row.cobrament_de
+            && !confirmedData.some(other => other.despesa_compartida?.clau === row.cobrament_de));
+        if (orphan) {
+            const payment = sharedPayment(orphan.cobrament_de);
+            statusDiv.textContent = t('shared.review-payment-unchecked', {
+                name: payment?.despesa_compartida.nom || payment?.empresa || t('common.unknown')
+            });
+            statusDiv.classList.remove('hidden');
+            return;
+        }
+
         // Només es valida el que s'importa: un moviment descartat pot quedar
         // sense categoria i no ha de bloquejar la resta. Un de dividit porta
         // la categoria a cada part.
@@ -612,6 +797,7 @@ export async function initUpload(container) {
         try {
             const discarded = currentReviewData.length - confirmedData.length;
             const result = await confirmTransactions(confirmedData);
+            await reloadDebts();
             // Els descartats es diuen explícitament: si no, veure menys
             // moviments dels que tenia el fitxer sembla que se n'hagin perdut.
             statusDiv.textContent = t('upload.saved', { message: result.message || t('upload.saved-default') })

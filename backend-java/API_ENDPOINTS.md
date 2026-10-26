@@ -292,6 +292,24 @@ Cada recibo de `calendari`: `data`, `import`, `pagat`, `eliminable` y `estat`
 recibo que paga con `deute_rebut` en `POST`/`PUT /gastos`; sin él, paga el
 primero sin pagar.
 
+### Gastos compartidos
+
+- `POST /despeses-compartides` - Comparte un pago ya guardado y le vincula los
+  Bizums que lo devuelven. Divide el pago en mi parte (cuenta) y la que me deben
+  (no cuenta), crea una deuda `EM_DEUEN` y excluye y vincula los Bizums. Devuelve
+  la deuda.
+  ```json
+  {"moviment_id": 120, "part_meva": 10.00, "nom": "Cena", "cobraments": [121, 122, 123]}
+  ```
+  `part_meva` va de 0 a menos del importe; `nom` vacío toma la empresa del pago;
+  `cobraments` puede ir vacío si los Bizums no han llegado. 400 si el pago ya
+  está dividido, tiene deuda o es un traspaso, o si los Bizums suman más de lo
+  que me deben.
+
+Al importar, en `POST /confirm-upload` el pago lleva
+`"despesa_compartida": {"clau": "fila-3", "nom": "Cena", "part_meva": 10.00}` y
+cada Bizum `"cobrament_de": "fila-3"`. Son solo de entrada: no se devuelven.
+
 ---
 
 ## 📈 **Analytics y Reportes** (`/analytics`)

@@ -389,21 +389,23 @@ class JsonContractTest {
     }
 
     @Test
-    @DisplayName("Debt: els moviments vinculats porten els noms d'un moviment, i diuen si són una part")
+    @DisplayName("Debt: els moviments vinculats porten els noms d'un moviment, i diuen si són una part i si compten")
     void debtMovementKeys() throws Exception {
         Debt debt = new Debt();
         debt.setMovements(java.util.List.of(new Debt.Movement(
                 10L, LocalDate.of(2026, 10, 5), "EXPENSE", new BigDecimal("100.00"),
-                "Trade Republic", "Autopréstec", true, LocalDate.of(2026, 10, 8), true)));
+                "Trade Republic", "Autopréstec", true, true, LocalDate.of(2026, 10, 8), true)));
 
         JsonNode movement = mapper.valueToTree(debt).get("moviments").get(0);
 
         for (String key : new String[] {"id", "data", "type", "cost", "empresa", "descripcio_curta", "es_part",
-                "rebut", "rebut_triat"}) {
+                "exclos_pressupost", "rebut", "rebut_triat"}) {
             assertThat(movement.has(key)).as(key).isTrue();
         }
         assertThat(movement.get("data").asText()).isEqualTo("2026-10-05");
         assertThat(movement.get("es_part").asBoolean()).isTrue();
+        // El Bizum que arriba tard només s'ofereix per als deutes que no compten.
+        assertThat(movement.get("exclos_pressupost").asBoolean()).isTrue();
         assertThat(movement.get("rebut").asText()).isEqualTo("2026-10-08");
         assertThat(movement.get("rebut_triat").asBoolean()).isTrue();
     }
@@ -523,6 +525,23 @@ class JsonContractTest {
         assertThat(json.has("notificationsExpenses")).isTrue();
         assertThat(json.has("user_name")).isFalse();
         assertThat(json.has("notifications_expenses")).isFalse();
+    }
+
+    @Test
+    @DisplayName("Despesa compartida a la importació: el pagament porta despesa_compartida i els Bizums cobrament_de")
+    void importRowsCarryTheSharedExpense() throws Exception {
+        Transaction payment = mapper.readValue(
+                "{\"despesa_compartida\":{\"clau\":\"sopar\",\"nom\":\"Sopar\",\"part_meva\":10}}", Transaction.class);
+        Transaction repayment = mapper.readValue("{\"cobrament_de\":\"sopar\"}", Transaction.class);
+
+        assertThat(payment.getSharedExpense().key()).isEqualTo("sopar");
+        assertThat(payment.getSharedExpense().name()).isEqualTo("Sopar");
+        assertThat(payment.getSharedExpense().myShare()).isEqualByComparingTo("10");
+        assertThat(repayment.getRepaysSharedExpense()).isEqualTo("sopar");
+        // Només a la petició: no surten mai cap al navegador.
+        JsonNode json = mapper.readTree(mapper.writeValueAsString(payment));
+        assertThat(json.has("despesa_compartida")).isFalse();
+        assertThat(json.has("cobrament_de")).isFalse();
     }
 
     @Test

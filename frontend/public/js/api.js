@@ -759,6 +759,19 @@ export async function updateDebt(id, data) {
     return handleResponse(response);
 }
 
+/**
+ * Comparteix un pagament desat amb els Bizums que el tornen: la meva part
+ * compta i la resta queda com un deute que em deuen. Torna el deute nou.
+ */
+export async function shareExpense(request) {
+    const response = await apiFetch('/despeses-compartides', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(request),
+    });
+    return handleResponse(response);
+}
+
 /** Els moviments vinculats no s'esborren: només perden el vincle. */
 export async function deleteDebt(id) {
     const response = await apiFetch(`/debts/${id}`, { method: 'DELETE' });

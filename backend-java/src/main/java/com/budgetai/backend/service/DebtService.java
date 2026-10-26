@@ -288,6 +288,7 @@ public class DebtService {
                     Integer index = paymentIndex.get(line);
                     return new Debt.Movement(line.transaction().getId(), line.date(), line.type(),
                             line.amount(), line.transaction().getEmpresa(), line.description(), line.isPart(),
+                            line.excludedFromBudget(),
                             index != null ? plan.receiptOfPayment().get(index) : null,
                             index != null && plan.chosen().get(index));
                 })

@@ -951,6 +951,39 @@ El alta manual acepta lo mismo. La edición, en cambio, rechaza `parts` con un
 400: para un movimiento ya guardado está `/gastos/{id}/parts`, y aceptarlas en
 silencio sin hacer nada sería peor que avisar.
 
+## Gastos compartidos
+
+Pago 40 € de una cena entre cuatro y me llegan tres Bizums de 10 €. Sin nada
+más, el presupuesto ve 40 € gastados en Bars i restaurants y 30 € de ingresos
+que no son ningún sueldo. Es un préstamo que hago yo (regla 11), con la opción
+de que **no cuente ni lo que adelanto ni lo que me devuelven**.
+`SharedExpenseService` lo junta sin inventar nada nuevo:
+
+| Movimiento | Queda | Cuenta |
+|---|---|---|
+| La cena, 40 € | dividida: 10 € mi parte y 30 € lo que me deben, en la misma categoría | solo los 10 € |
+| Los Bizums | excluidos y vinculados a la deuda | no |
+| — | una deuda «me deben» de 30 €, plan libre, con fecha la del pago | — |
+
+Lo devuelto sale de los Bizums vinculados, como en cualquier deuda: la deuda
+dice cuánto me deben todavía. **No se mueve ningún saldo**: el pago y los Bizums
+ya lo movieron al guardarse, y ni las partes ni el excluido mueven dinero. Si mi
+parte es cero (lo pagué entero por otros), el pago no se divide —una sola parte
+sería el movimiento entero—: va excluido y vinculado a la deuda.
+
+Se agrupa en dos sitios. En **Transacciones**, con el botón del pago:
+`POST /despeses-compartides` divide, crea la deuda y vincula en una sola
+transacción. El Bizum que llega más tarde se vincula a la deuda desde su fila,
+y queda excluido. Por eso solo se ofrecen las deudas «me deben» en las que lo
+adelantado no cuenta (`exclos_pressupost` en sus `moviments`): en un préstamo
+que sí cuenta, la devolución también tiene que contar, y se vincula desde la
+edición del movimiento. En
+la **revisión de un extracto**, antes de importar: el pago lleva
+`despesa_compartida` (`clau`, `nom`, `part_meva`) y cada Bizum `cobrament_de`
+con la misma clave, y `confirm-upload` crea las deudas dentro de la misma
+transacción que la importación. Un Bizum cuyo pago no se importa, o unos Bizums
+que devuelven más de lo que me deben, hacen que no se importe nada.
+
 ## Los errores
 
 Todos llegan al navegador con la misma forma:

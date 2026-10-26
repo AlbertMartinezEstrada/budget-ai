@@ -1,12 +1,15 @@
 import {
     getTransactions, getCategories, getCompanies, getAccounts, getDebts,
-    createTransaction, updateTransaction, deleteTransaction, saveTransactionParts, formatCurrency, escapeHtml
+    createTransaction, updateTransaction, deleteTransaction, saveTransactionParts, shareExpense,
+    formatCurrency, escapeHtml
 } from '../../api.js';
 import { categoryOptions, leafCategories, sectionOfCategory } from '../../categoryOptions.js';
 import { counterpartOptions, savingsCategoryHint, transferCounts, transferLabel } from '../../transfers.js';
 import { hasReceiptsToChoose, receiptOptions } from '../../debtReceipts.js';
 import { setUpUnmarkedTransfers } from './UnmarkedTransfers.js';
 import { setUpSplitEditor } from './SplitEditor.js';
+import { setUpSharedExpenseEditor, setUpRepaymentPicker } from './SharedExpenseEditor.js';
+import { canShare, canRepay, repaymentCandidates, openSharedExpenseDebts } from '../../sharedExpense.js';
 import { t, formatDate, formatMonth as monthAndYear } from '../../i18n.js';
 
 /**
@@ -47,6 +50,9 @@ let accountsById = new Map();
 let openEditor = () => {};
 // El mateix per al formulari de dividir.
 let openSplitter = () => {};
+// I per als de la despesa compartida: compartir un pagament i el Bizum que arriba tard.
+let openSharer = () => {};
+let openRepaymentPicker = () => {};
 // I per tornar a buscar els traspassos sense marcar després de desar.
 let refreshUnmarkedTransfers = async () => {};
 
@@ -300,6 +306,63 @@ export async function initTransactions(container) {
             await loadData();
         }
     });
+
+    // Compartir crea un deute: es tornen a carregar perquè la seva etiqueta i
+    // el desplegable de l'edició el coneguin.
+    openSharer = setUpSharedExpenseEditor(container, {
+        save: async (payment, { nom, part_meva, cobraments }) => {
+            await shareExpense({
+                moviment_id: payment.id,
+                part_meva,
+                nom,
+                cobraments: cobraments.map(key => Number.parseInt(key, 10))
+            });
+            await reloadDebts();
+            await loadData();
+        }
+    });
+    // El Bizum que arriba tard és un moviment més d'aquell deute, que no compta.
+    openRepaymentPicker = setUpRepaymentPicker(container, {
+        save: async (income, debtId) => {
+            await updateTransaction(income.id, { deute_id: Number.parseInt(debtId, 10), exclos_pressupost: true });
+            await reloadDebts();
+            await loadData();
+        }
+    });
+}
+
+async function reloadDebts() {
+    const debts = await getDebts();
+    debtsById = new Map(debts.map(debt => [debt.id, debt]));
+    fillDebtOptions(debts);
+}
+
+// Els saldats també hi són: un moviment antic pot ser d'un deute ja tornat, i
+// editar-lo no l'ha de desvincular.
+function fillDebtOptions(debts) {
+    document.getElementById('new-debt').innerHTML = [
+        `<option value="">${t('transactions.no-debt')}</option>`,
+        ...debts.map(debt => `<option value="${debt.id}">${escapeHtml(debtOptionLabel(debt))}</option>`)
+    ].join('');
+}
+
+/**
+ * Comparteix un pagament: els candidats a tornar-lo són els ingressos lliures
+ * d'una setmana abans a tres mesos després, també els que el filtre amaga.
+ */
+async function openShareFor(payment) {
+    const everything = await getTransactions();
+    const candidates = repaymentCandidates(payment, everything, { window: { before: 7, after: 90 } })
+        .map(movement => ({ key: movement.id, data: movement.data, empresa: movement.empresa, cost: movement.cost }));
+    openSharer(payment, { candidates });
+}
+
+function openRepaymentFor(income) {
+    const choices = openSharedExpenseDebts([...debtsById.values()]).map(debt => ({
+        value: debt.id,
+        label: t('shared.repay-option-debt', { name: debt.nom, pending: formatCurrency(debt.pendent) })
+    }));
+    openRepaymentPicker(income, { choices });
 }
 
 async function handleRowAction(event) {
@@ -316,11 +379,20 @@ async function handleRowAction(event) {
         return;
     }
 
-    if (button.dataset.action === 'edit-transaction' || button.dataset.action === 'split-transaction') {
+    const rowActions = {
+        'edit-transaction': openEditor,
+        'split-transaction': openSplitter,
+        'share-transaction': openShareFor,
+        'repay-shared': openRepaymentFor
+    };
+    if (rowActions[button.dataset.action]) {
         const transaction = currentTransactions.find(candidate => candidate.id === id);
         if (!transaction) return;
-        if (button.dataset.action === 'edit-transaction') openEditor(transaction);
-        else openSplitter(transaction);
+        try {
+            await rowActions[button.dataset.action](transaction);
+        } catch (error) {
+            alert(error.message);
+        }
         return;
     }
 
@@ -423,12 +495,7 @@ function setUpManualEntry(categories, companies, debts) {
     document.getElementById('new-category').innerHTML =
         categoryOptions(categories, { value: (category) => category.nom });
 
-    // Els saldats també hi són: un moviment antic pot ser d'un deute ja
-    // tornat, i editar-lo no l'ha de desvincular.
-    document.getElementById('new-debt').innerHTML = [
-        `<option value="">${t('transactions.no-debt')}</option>`,
-        ...debts.map(debt => `<option value="${debt.id}">${escapeHtml(debtOptionLabel(debt))}</option>`)
-    ].join('');
+    fillDebtOptions(debts);
 
     /**
      * El desplegable del rebut, només per als deutes a quotes: amb un sol
@@ -784,6 +851,18 @@ function buildTransactionRow(transaction) {
                 ${style.signe}${formatAmount(transaction.cost)}
             </td>
             <td class="text-right" style="white-space: nowrap;">
+                ${canShare(transaction)
+                    ? `<button class="btn btn-sm btn-outline" data-action="share-transaction"
+                               data-id="${transaction.id}" title="${t('shared.share-title')}">
+                           <span class="material-symbols-outlined text-sm">group</span>
+                       </button>`
+                    : ''}
+                ${canRepay(transaction) && openSharedExpenseDebts([...debtsById.values()]).length > 0
+                    ? `<button class="btn btn-sm btn-outline" data-action="repay-shared"
+                               data-id="${transaction.id}" title="${t('shared.repay-button-title')}">
+                           <span class="material-symbols-outlined text-sm">call_received</span>
+                       </button>`
+                    : ''}
                 <button class="btn btn-sm btn-outline" data-action="split-transaction"
                         data-id="${transaction.id}" title="${t('transactions.split-title')}">
                     <span class="material-symbols-outlined text-sm">call_split</span>

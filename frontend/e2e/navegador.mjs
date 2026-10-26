@@ -1,6 +1,7 @@
 // Prova de navegador: el que fins ara es comprovava a mà a cada PR.
 //
-// Entra, importa l'extracte d'exemple per la pantalla fins a desar-lo, i
+// Entra, importa l'extracte d'exemple per la pantalla fins a desar-lo (amb el
+// sopar compartit agrupat amb els seus Bizums a la revisió), i
 // recorre totes les vistes i els seus formularis en tema clar i fosc, i després
 // en cada idioma. Al final tanca les sessions i comprova que un token copiat
 // ja no entra. Falla si hi ha errors de JavaScript, peticions que fallen,
@@ -25,6 +26,9 @@ const USERNAME = process.env.E2E_USERNAME;
 const PASSWORD = process.env.E2E_PASSWORD;
 const RESULTS_DIR = path.join(HERE, 'resultats');
 const SAMPLE_STATEMENT = path.join(HERE, '..', '..', 'test_bank_statement.csv');
+// El sopar de l'extracte (REST. EL TRULL, 32 €), que es comparteix amb els seus dos Bizums.
+const DINNER_AMOUNT = /\b32[,.]00\b/;
+const DINNER_DEBT = 'Sopar a Girona';
 
 /** Els missatges del backend de cada idioma: han d'arribar en el de la pantalla. */
 const BACKEND_MESSAGES = Object.fromEntries(LANGUAGES.map(({ code }) => [code, parseProperties(fs.readFileSync(
@@ -314,11 +318,73 @@ async function uploadSampleStatement() {
     return 'ja hi era';
 }
 
+/**
+ * L'índex de la fila de la revisió amb aquest import. Sense la IA, l'empresa
+ * de totes és «Desconegut»: el sopar és l'únic moviment de 32 €.
+ */
+async function reviewRowOf(amount) {
+    return page.$$eval('#review-body tr[data-index]', (rows, pattern) => rows
+        .find(row => new RegExp(pattern).test(row.textContent))?.dataset.index, amount.source);
+}
+
+/**
+ * El sopar de l'extracte, 32 € entre quatre, i els dos Bizums de 8 € que ja
+ * han arribat: s'agrupen a la revisió, abans d'importar. El formulari es mira
+ * en clar i en fosc.
+ */
+async function shareDinnerWhileReviewing() {
+    const dinner = await reviewRowOf(DINNER_AMOUNT);
+    if (dinner === undefined) {
+        fail('a la revisió no hi ha el sopar de l\'extracte');
+        return;
+    }
+    await page.click(`button[data-action="share-row"][data-index="${dinner}"]`);
+    await page.waitForSelector('#shared-modal:not(.hidden)');
+    for (const theme of ['light', 'dark']) {
+        await setTheme(theme);
+        for (const problem of await page.evaluate(lowContrastTexts)) fail(`poc contrast (${theme}): ${problem}`);
+        await page.screenshot({ path: path.join(RESULTS_DIR, `upload-${theme}-despesa-compartida.png`) });
+    }
+    await setTheme('light');
+
+    await page.fill('#shared-name', DINNER_DEBT);
+    await page.fill('#shared-people', '4');
+    const mine = await page.inputValue('#shared-mine');
+    if (mine !== '8.00') fail(`32 € entre quatre: la meva part surt de ${mine}`);
+    const candidates = await page.$$('#shared-candidates input[data-candidate]');
+    if (candidates.length !== 2) fail(`el sopar té ${candidates.length} Bizums per triar i a l'extracte n'hi ha 2`);
+    for (const candidate of candidates) await candidate.check();
+    await page.click('#shared-save');
+    await page.waitForSelector('#shared-modal.hidden', { state: 'attached' });
+
+    const linked = await page.$$eval('#review-body input[name="exclos"][disabled]:checked', boxes => boxes.length);
+    if (linked !== 2) fail(`a la revisió, ${linked} Bizums surten vinculats al sopar en lloc de 2`);
+}
+
+/** Importat, el sopar surt dividit i el deute diu que en falta una part. */
+async function checkSharedDinner() {
+    const parts = await page.$$eval('#transactions-body tr', (rows, pattern) => rows
+        .find(row => new RegExp(pattern).test(row.textContent))?.querySelector('.parts-toggle')?.textContent.trim(),
+        DINNER_AMOUNT.source);
+    if (!parts) fail('a Transaccions, el sopar compartit no surt dividit');
+    const debts = await page.evaluate(async url => (await fetch(`${url}/debts`, { credentials: 'include' })).json(),
+        FRONTEND_URL.replace(/:\d+$/, ':8000'));
+    const dinnerDebt = debts.find(debt => debt.nom === DINNER_DEBT);
+    if (!dinnerDebt) fail('no hi ha el deute del sopar compartit');
+    else if (Number(dinnerDebt.import) !== 24 || Number(dinnerDebt.pendent) !== 8) {
+        fail(`el deute del sopar és de ${dinnerDebt.import} i en falten ${dinnerDebt.pendent}; havia de ser de 24 i en faltaven 8`);
+    }
+}
+
 currentStep = 'importar';
 // En una base de dades nova surt la revisió; si la prova ja s'ha fet abans, avisa que hi és.
-if (await uploadSampleStatement() === 'revisió') {
+const firstImport = await uploadSampleStatement() === 'revisió';
+if (firstImport) {
     const reviewRows = await page.$$eval('#review-body tr', rows => rows.length);
-    if (reviewRows !== 5) fail(`la revisió mostra ${reviewRows} moviments i l'extracte en té 5`);
+    if (reviewRows !== 7) fail(`la revisió mostra ${reviewRows} moviments i l'extracte en té 7`);
+    currentStep = 'importar · despesa compartida';
+    await shareDinnerWhileReviewing();
+    currentStep = 'importar';
     await page.click('#confirm-review');
     await page.waitForFunction(() => /✅/.test(document.getElementById('upload-status')?.textContent || ''), null, { timeout: 30000 })
         .catch(async () => fail(`desar la importació no ha acabat bé: «${await page.textContent('#upload-status')}»`));
@@ -331,7 +397,8 @@ if (await uploadSampleStatement() !== 'ja hi era') fail('el mateix extracte, puj
 currentStep = 'importar · comprovació';
 await openView('transactions', 'light');
 const savedCount = Number(await page.textContent('#transaction-count'));
-if (!(savedCount >= 5)) fail(`a Transaccions n'hi ha ${savedCount}; n'haurien de ser almenys els 5 importats`);
+if (!(savedCount >= 7)) fail(`a Transaccions n'hi ha ${savedCount}; n'haurien de ser almenys els 7 importats`);
+if (firstImport) await checkSharedDinner();
 
 // ---- Totes les vistes, en clar i en fosc ----
 for (const theme of ['light', 'dark']) {

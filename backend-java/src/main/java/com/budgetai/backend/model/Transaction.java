@@ -172,6 +172,26 @@ public class Transaction {
     @EqualsAndHashCode.Exclude
     private Long registeredTransferId;
 
+    /**
+     * En importar: aquest pagament és una despesa compartida (SharedExpense).
+     * Només es llegeix de la petició; el que en queda són les parts i el deute.
+     */
+    @Transient
+    @JsonProperty(value = "despesa_compartida", access = JsonProperty.Access.WRITE_ONLY)
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
+    private SharedExpense sharedExpense;
+
+    /**
+     * En importar: aquest ingrés torna la despesa compartida amb aquesta clau,
+     * la del pagament del mateix lot. Com l'anterior, només a la petició.
+     */
+    @Transient
+    @JsonProperty(value = "cobrament_de", access = JsonProperty.Access.WRITE_ONLY)
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
+    private String repaysSharedExpense;
+
     @Column(name = "compte_nom")
     private String accountName;
 
