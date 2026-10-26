@@ -19,6 +19,7 @@ import com.budgetai.backend.service.CategoryHierarchyService;
 import com.budgetai.backend.service.DebtService;
 import com.budgetai.backend.service.ImportRuleService;
 import com.budgetai.backend.service.InternalTransferService;
+import com.budgetai.backend.service.SharedExpenseService;
 import com.budgetai.backend.service.TransactionHasher;
 import com.budgetai.backend.service.TransactionPartService;
 import com.budgetai.backend.service.InvalidInputException;
@@ -91,6 +92,9 @@ public class TransactionController {
 
     @Autowired
     private InternalTransferService internalTransfers;
+
+    @Autowired
+    private SharedExpenseService sharedExpenseService;
 
     /** El compte on va un moviment que no en diu cap. */
     private Account defaultAccount() {
@@ -652,9 +656,10 @@ public class TransactionController {
             for (Transaction transaction : confirmedTransactions) {
                 transaction.setAccount(ownAccountOf(transaction, defaultAccount));
                 transaction.setVerificationHash(transactionHasher.hash(transaction));
-                // La pantalla de revisió no vincula deutes, però deute_id s'ha
-                // de llegir igual per les tres portes d'entrada: sense resoldre'l,
-                // un -1 arribaria a la base de dades com a clau forana.
+                // La revisió vincula a un deute el Bizum que torna una despesa
+                // compartida d'abans. deute_id es llegeix igual per les tres
+                // portes d'entrada: sense resoldre'l, un -1 arribaria a la base
+                // de dades com a clau forana.
                 transaction.setDebt(debtService.resolveForLink(transaction.getDebt()));
                 if (transaction.getDebt() == null) transaction.setDebtReceipt(null);
             }
@@ -689,6 +694,11 @@ public class TransactionController {
                         "skipped", skipped
                 ));
             }
+
+            // Les despeses compartides (el sopar i els Bizums que el tornen)
+            // creen el seu deute i posen les parts al pagament abans de validar
+            // les parts de totes les files: també es comproven com les altres.
+            sharedExpenseService.applyToImport(toPersist);
 
             // Les parts de totes les files es comproven abans de moure cap
             // saldo: si una no quadra, no s'ha d'importar res, i el missatge ha

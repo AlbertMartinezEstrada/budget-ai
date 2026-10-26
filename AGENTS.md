@@ -31,9 +31,9 @@ docker compose logs -f backend        # logs
 scripts\backup.bat                    # copia de la base de datos (backup.sh fuera de Windows)
 scripts/migrate.sh                    # aplica las migraciones pendientes (copia antes; --estat para ver cuáles)
 
-cd backend-java && ./gradlew test              # 290 unitarios, sin Docker
-cd backend-java && ./gradlew integrationTest   # 181, requieren Docker
-cd frontend && npm test                        # 119
+cd backend-java && ./gradlew test              # 291 unitarios, sin Docker
+cd backend-java && ./gradlew integrationTest   # 191, requieren Docker
+cd frontend && npm test                        # 125
 cd frontend && npm run test:navegador          # todas las vistas en un navegador (ver abajo)
 ```
 
@@ -400,6 +400,13 @@ en otro sitio.
 Las cuotas pactadas de lo que debo se reservan solas en el plan de la hoja que
 diga la deuda (`quotes_deutes`): lo que vale el recibo de ese mes. Lo que me deben no se reserva ni se prevé: un dinero que no ha
 llegado no ensancha el bote.
+
+**Un gasto compartido es la otra opción**: la cena de 40 € entre cuatro que
+pago yo y los Bizums que me devuelven la parte. No cuenta ni lo que adelanto ni
+lo que me devuelven: el pago se divide en mi parte (cuenta) y la que me deben
+(excluida, vinculada a una deuda «me deben»), y los Bizums van excluidos y
+vinculados a la misma deuda. Lo hace `SharedExpenseService`, desde Transacciones
+o en la revisión de un extracto; no lo montes a mano con otro criterio.
 
 ### 12. De un movimiento dividido mandan las partes: suma líneas, no movimientos
 

@@ -193,6 +193,8 @@ public class Debt {
      *
      * @param transactionId el moviment d'on surt, per poder-lo trobar
      * @param part si és només un tros del moviment
+     * @param excludedFromBudget si no compta al pressupost; d'un deute que no
+     *                compta (una despesa compartida), els cobraments tampoc
      * @param receipt el dia del rebut on compta; null si no en paga cap (el
      *                préstec mateix, o uns diners de més quan ja estava saldat)
      * @param receiptChosen si el rebut el va triar l'usuari; si no, és el que tocava
@@ -205,6 +207,7 @@ public class Debt {
             @JsonProperty("empresa") String company,
             @JsonProperty("descripcio_curta") String description,
             @JsonProperty("es_part") boolean part,
+            @JsonProperty("exclos_pressupost") boolean excludedFromBudget,
             @JsonProperty("rebut") @JsonFormat(pattern = "yyyy-MM-dd") LocalDate receipt,
             @JsonProperty("rebut_triat") boolean receiptChosen) {
     }

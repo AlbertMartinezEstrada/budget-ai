@@ -78,6 +78,10 @@ Si algú reanomena una propietat, aquests tests fallen. **Quan fallin, cal
 actualitzar també el codi del frontend que la llegeix**: no n'hi ha prou
 d'ajustar l'expectativa del test.
 
+També els dos camps que la revisió d'un extracte envia i el backend no torna
+mai: `despesa_compartida` al pagament i `cobrament_de` a cada Bizum. Un nom
+mal escrit no dona cap error: la fila s'importaria sense agrupar.
+
 ### `RepaymentScheduleTest` i `DebtServiceTest`
 
 El calendari de retorn d'un deute i què paga cada pagament. Fixen les dues
@@ -383,6 +387,19 @@ mesos abans s'hi arriba amb la simulació, que aplicar-la enviï només el que
 canvia (un percentatge com a percentatge), els recurrents per blocs i el text
 de les tendències.
 
+### `frontend/test/sharedExpense.test.js`
+
+Els càlculs del formulari de despesa compartida. Que a parts iguals el cèntim
+que no es reparteix sigui meu (40 € entre tres: em deuen 13,33 cadascú), que el
+que em deuen, el que m'han tornat i el que falta es comptin en cèntims (0,1 +
+0,2 no fa 0,3 en coma flotant), que la meva part hagi de ser de zero a menys del
+total, que només es comparteixi una despesa lliure (sense dividir, sense deute,
+que no sigui un traspàs) i només la torni un ingrés lliure, que els Bizums de
+l'import de cadascú surtin primer i un d'un any després no, i que el Bizum que
+arriba tard només pugui anar a un deute que em deuen, no saldat i on el que vaig
+avançar no compta: d'un préstec que compta, el cobrament també ha de comptar, i
+aquest Bizum s'excloria.
+
 ### `frontend/test/devices.test.js`
 
 De quin navegador i sistema és cada sessió de Configuració, amb User-Agents de
@@ -521,6 +538,18 @@ nova.
   seves parts, que si una no quadra no s'importi res i el missatge digui quina,
   que l'alta manual accepti parts i que l'edició les rebutgi en comptes
   d'ignorar-les.
+- `SharedExpenseIntegrationTest`: el sopar de 40 € entre quatre i els Bizums
+  que en tornen la part. Que, agrupat, compti 10 € a Bars i restaurants i els
+  Bizums cap ingrés; que el deute que em deuen sigui de 30 € amb el que han
+  tornat descomptat; i que no es mogui cap saldo. Que el nom surti de l'empresa
+  si no se'n diu cap i que un Bizum que arriba tard es pugui vincular després;
+  que amb la meva part a zero el pagament no es divideixi, sinó que vagi sencer
+  al deute; i que una part fora de rang, uns Bizums que tornen més del que em
+  deuen, una despesa ja dividida o un Bizum que no és un ingrés es rebutgin
+  sense canviar res. I en importar: que el sopar i els Bizums agrupats a la
+  revisió entrin agrupats, que un Bizum sense el seu pagament o uns que tornen
+  massa no deixin importar res, i que un Bizum de l'extracte es pugui vincular a
+  un deute que ja hi era.
 - `RecurringBudgetIntegrationTest`: que el que es posa a Recurrents surti al
   pressupost. Que un recurrent a la llum (una fulla variable) en sigui el pla i
   es compari amb el que s'hi gasta; que un import del mes continuï manant
@@ -578,7 +607,10 @@ nova.
 
 Entra, importa l'extracte d'exemple per la pantalla fins a desar-lo i el torna
 a pujar (ha de dir que ja hi és, no donar error), i recorre les 14 vistes i els
-seus formularis en clar i en fosc. Falla amb:
+seus formularis en clar i en fosc. A la revisió, abans de desar, comparteix el
+sopar de l'extracte (32 € entre quatre) amb els seus dos Bizums de 8 €, i un cop
+importat comprova que surt dividit i que el deute és de 24 € amb 8 € pendents.
+Falla amb:
 
 - errors de JavaScript o a la consola, i peticions que fallen;
 - violacions de la Content-Security-Policy;
