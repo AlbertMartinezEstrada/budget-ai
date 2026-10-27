@@ -6,11 +6,20 @@ import {
 } from '../../api.js';
 import { categoryOptions, sectionLabel, EXPENSE_SECTIONS } from '../../categoryOptions.js';
 import { t, formatPercent, formatMonth, formatMonthName } from '../../i18n.js';
+import { monthTotals } from '../../budgetTotals.js';
+import { formatDeviation } from '../../budgetReview.js';
 
 // Tailwind no pot generar classes construïdes en temps d'execució
 // (`bg-${color}-500`), així que s'enumeren senceres.
 const BAR_CLASSES = { low: 'bg-green-500', medium: 'bg-orange-500', high: 'bg-red-500' };
 const TEXT_CLASSES = { low: 'text-green-700', medium: 'text-orange-700', high: 'text-red-600' };
+// El color de la diferència: passar-se en una despesa, en vermell; arribar a
+// l'estalvi o als ingressos previstos, en verd.
+const TONE_CLASSES = {
+    bad: 'text-red-600 font-medium',
+    good: 'text-green-700 font-medium',
+    neutral: 'text-gray-600 dark:text-slate-300'
+};
 
 // Les tres seccions es pinten diferent a propòsit: la primera cosa que s'ha de
 // veure en obrir la pantalla és d'on venen els diners, on acaba el que està
@@ -404,7 +413,8 @@ function renderHeader(summary) {
                 <button data-action="edit-income" class="bg-primary text-white px-4 py-2 rounded-2xl hover:bg-primary/90">
                     ${t('budgets.set-salary')}
                 </button>
-            </div>`;
+            </div>
+            ${renderMonthTotals(summary)}`;
         return;
     }
 
@@ -449,6 +459,73 @@ function renderHeader(summary) {
                     ? `${t('budgets.unassigned-label')} <strong>${formatCurrency(free)}</strong>`
                     : `<strong class="text-red-600">${escapeHtml(t('budgets.over', { amount: formatCurrency(-free) }))}</strong>`}
             </span>
+        </div>
+        ${renderMonthTotals(summary)}
+    `;
+}
+
+/**
+ * El resum del mes, sota el total: una barra amb el que s'ha gastat (fixos i
+ * variables) i apartat dels ingressos, i una taula amb el pressupostat i el
+ * real de cada part. Els càlculs són a budgetTotals.js.
+ *
+ * Sense ingressos també surt: el que s'ha gastat es pot mirar igual, només
+ * falten els percentatges.
+ */
+function renderMonthTotals(summary) {
+    const totals = monthTotals(summary);
+    const spent = totals.rows.find(row => row.key === 'SPENT');
+    const saved = totals.rows.find(row => row.key === 'SAVINGS');
+    const labelOf = (key) => key === 'SPENT' ? t('budgets.totals-spent') : sectionLabel(key);
+    const spentLine = totals.available != null
+        ? t('budgets.totals-spent-of-income', { spent: formatCurrency(spent.real), income: formatCurrency(totals.available) })
+            + (spent.share != null ? ` (${formatPercent(spent.share)})` : '')
+        : null;
+
+    return `
+        <div class="mt-5 pt-4 border-t border-slate-200 dark:border-slate-700" id="budget-totals">
+            <div class="flex flex-wrap justify-between items-baseline gap-2 mb-2">
+                <h3 class="font-semibold">${t('budgets.totals-title')}</h3>
+                ${spentLine ? `
+                    <span class="text-sm text-gray-600 dark:text-slate-300">
+                        ${escapeHtml(spentLine)}${saved.real > 0 ? ` · ${escapeHtml(t('budgets.saved-amount', { amount: formatCurrency(saved.real) }))}` : ''}
+                    </span>` : ''}
+            </div>
+
+            ${totals.available != null ? `
+                <div class="h-3 bg-gray-200 dark:bg-slate-700 rounded-full overflow-hidden flex mb-1" role="img"
+                     aria-label="${escapeHtml(spentLine)}">
+                    ${totals.bar.map(part => `<div class="h-full ${SECTIONS[part.key].barra}" style="width: ${part.width}%"></div>`).join('')}
+                </div>
+                ${totals.overIncome > 0 ? `
+                    <p class="text-sm text-red-600 font-medium">${escapeHtml(t('budgets.totals-over-income', { amount: formatCurrency(totals.overIncome) }))}</p>` : ''}` : ''}
+
+            <div class="overflow-x-auto mt-3">
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="text-xs text-gray-500 dark:text-slate-400">
+                            <th class="text-left font-medium py-1 pr-2">${t('budgets.totals-part')}</th>
+                            <th class="text-right font-medium py-1 px-2">${t('budgets.totals-planned')}</th>
+                            <th class="text-right font-medium py-1 px-2">${t('budgets.totals-actual')}</th>
+                            <th class="text-right font-medium py-1 px-2">${t('budgets.totals-difference')}</th>
+                            <th class="text-right font-medium py-1 pl-2">${t('budgets.totals-share')}</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${totals.rows.map(row => `
+                            <tr data-total="${row.key}" class="${row.key === 'SPENT' ? 'font-semibold border-t border-slate-200 dark:border-slate-700' : ''}">
+                                <td class="py-1.5 pr-2">
+                                    <span class="inline-block w-2.5 h-2.5 rounded-full mr-1.5 ${SECTIONS[row.key] ? SECTIONS[row.key].barra : 'invisible'}"></span>${escapeHtml(labelOf(row.key))}
+                                </td>
+                                <td class="py-1.5 px-2 text-right whitespace-nowrap">${formatCurrency(row.plan)}</td>
+                                <td class="py-1.5 px-2 text-right whitespace-nowrap">${formatCurrency(row.real)}</td>
+                                <td class="py-1.5 px-2 text-right whitespace-nowrap ${TONE_CLASSES[row.tone]}">${formatDeviation(row.difference)}</td>
+                                <td class="py-1.5 pl-2 text-right whitespace-nowrap">${row.share != null ? formatPercent(row.share) : '—'}</td>
+                            </tr>`).join('')}
+                    </tbody>
+                </table>
+            </div>
+            <p class="text-xs text-gray-500 dark:text-slate-400 mt-2">${t('budgets.totals-hint')}</p>
         </div>
     `;
 }

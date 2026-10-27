@@ -33,7 +33,7 @@ scripts/migrate.sh                    # aplica las migraciones pendientes (copia
 
 cd backend-java && ./gradlew test              # 291 unitarios, sin Docker
 cd backend-java && ./gradlew integrationTest   # 191, requieren Docker
-cd frontend && npm test                        # 125
+cd frontend && npm test                        # 131
 cd frontend && npm run test:navegador          # todas las vistas en un navegador (ver abajo)
 ```
 
