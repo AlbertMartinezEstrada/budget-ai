@@ -369,6 +369,17 @@ més s'ha desviat primer. I les propostes: el perquè de cadascuna, l'efecte net
 de les marcades i que en aplicar-les un pla per percentatge s'enviï com a
 percentatge.
 
+### `frontend/test/budgetTotals.test.js`
+
+El resum de dalt de Pressupost. Que hi hagi una fila per part i que el total
+gastat sigui fixos més variables; que el real sigui el que ha passat
+(`caixa_real` dels blocs) i no el cost de vida de la secció, que diria «800 de
+800» d'un lloguer encara sense pagar; que passar-se en una despesa surti com a
+dolent, i arribar al pla a l'estalvi o als ingressos com a bo, i sense pla res;
+que els imports es comptin en cèntims; que la barra no surti dels ingressos si
+entre tot els passa (i digui de quant); i que sense ingressos la taula hi sigui
+igualment, sense percentatges.
+
 ### `frontend/test/generalAnalysis.test.js`
 
 La pestanya General de l'anàlisi: els períodes (mes, trimestre, any, els últims
@@ -610,7 +621,8 @@ a pujar (ha de dir que ja hi és, no donar error), i recorre les 14 vistes i els
 seus formularis en clar i en fosc. A la revisió, abans de desar, comparteix el
 sopar de l'extracte (32 € entre quatre) amb els seus dos Bizums de 8 €, i un cop
 importat comprova que surt dividit i que el deute és de 24 € amb 8 € pendents.
-Falla amb:
+A Pressupost, el resum del febrer ha de donar 246,79 € de total gastat: les
+quatre despeses i només la meva part del sopar. Falla amb:
 
 - errors de JavaScript o a la consola, i peticions que fallen;
 - violacions de la Content-Security-Policy;

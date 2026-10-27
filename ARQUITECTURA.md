@@ -767,6 +767,19 @@ fórmula propia):
   Un plan por porcentaje sigue siéndolo, y una categoría con un presupuesto de
   más de un mes no se toca (los importes que solapan un mes se suman).
 
+### El resumen de arriba de Presupuestos
+
+Presupuestos, bajo el total de ingresos, resume el mes con el mismo criterio:
+una tabla con lo presupuestado y lo real de los ingresos, los fijos, los
+variables, el total gastado (fijos más variables) y el ahorro, la diferencia y
+qué parte de los ingresos del mes (`total_disponible`) se ha llevado cada uno,
+y una barra con lo gastado y lo apartado sobre esos ingresos. Sale del mismo
+`GET /budgets/monthly-summary` que pinta la pantalla: el plan es el `assignat`
+de cada sección y el real, la suma de `caixa_real` de sus bloques. Lo calcula
+`budgetTotals.js`, sin DOM, para poder probarlo solo. Pasarse en un gasto sale
+en rojo, y llegar al plan en el ahorro o los ingresos, en verde. Sin plan no se
+marca nada, como `SENSE_PLA` en el semáforo.
+
 ## Deudas y préstamos
 
 Cuando me prestan 1.000 €, el saldo sube pero no soy más rico: los debo. Un

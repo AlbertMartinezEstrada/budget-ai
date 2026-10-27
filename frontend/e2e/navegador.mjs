@@ -376,6 +376,29 @@ async function checkSharedDinner() {
     }
 }
 
+/**
+ * El resum de dalt de Pressupost, el febrer de l'extracte: el total gastat són
+ * les quatre despeses i la meva part del sopar (8 €, no 32 €), 246,79 €.
+ */
+async function checkMonthTotals() {
+    await openView('budgets', 'light');
+    // Cada canvi del selector carrega el seu mes: si se'n fan dos de seguida,
+    // el que respon l'últim és el que es pinta. S'espera que acabi el primer.
+    await page.selectOption('#budget-year', '2026');
+    await waitForQuietNetwork();
+    await Promise.all([
+        page.waitForResponse(response => response.url().includes('/budgets/monthly-summary') && response.url().includes('month=2')),
+        page.selectOption('#budget-month', '2')
+    ]);
+    await waitForQuietNetwork();
+    const rows = await page.$$eval('#budget-totals tr[data-total]', found => found.map(row => row.dataset.total));
+    if (rows.join(' ') !== 'INCOME FIXED VARIABLE SPENT SAVINGS') fail(`el resum del mes té les files ${rows.join(', ')}`);
+    // La tercera columna és el real; els dígits no depenen de l'idioma.
+    const spent = await page.$eval('#budget-totals tr[data-total="SPENT"] td:nth-child(3)', cell => cell.textContent.replace(/\D/g, ''))
+        .catch(() => '');
+    if (spent !== '24679') fail(`al resum del febrer, el total gastat surt «${spent}» i havia de ser 246,79 €`);
+}
+
 currentStep = 'importar';
 // En una base de dades nova surt la revisió; si la prova ja s'ha fet abans, avisa que hi és.
 const firstImport = await uploadSampleStatement() === 'revisió';
@@ -398,7 +421,11 @@ currentStep = 'importar · comprovació';
 await openView('transactions', 'light');
 const savedCount = Number(await page.textContent('#transaction-count'));
 if (!(savedCount >= 7)) fail(`a Transaccions n'hi ha ${savedCount}; n'haurien de ser almenys els 7 importats`);
-if (firstImport) await checkSharedDinner();
+if (firstImport) {
+    await checkSharedDinner();
+    currentStep = 'pressupost · resum del mes';
+    await checkMonthTotals();
+}
 
 // ---- Totes les vistes, en clar i en fosc ----
 for (const theme of ['light', 'dark']) {
