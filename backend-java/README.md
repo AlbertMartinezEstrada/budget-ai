@@ -1,6 +1,6 @@
 # Backend Java (Spring Boot)
 
-This is the migrated backend for Budget AI, using Java 17 and Spring Boot 3.
+This is the migrated backend for Budget AI, using Java 21 and Spring Boot 3.
 
 ## Structure
 
@@ -20,7 +20,7 @@ docker-compose up --build
 
 ## Running Locally
 
-You need Java 17 and Gradle installed.
+You need Java 21 and Gradle installed.
 
 1.  Set environment variables (or rely on defaults in `application.properties`):
     - `DB_HOST`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`

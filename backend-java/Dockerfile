@@ -1,6 +1,6 @@
 # La mateixa versió de Gradle que el wrapper (gradle/wrapper): abans la
 # imatge en feia servir una altra, la 8.5.
-FROM gradle:8.10.2-jdk17 AS build
+FROM gradle:8.14.3-jdk21 AS build
 
 WORKDIR /app
 
@@ -17,7 +17,7 @@ COPY src src
 # Els tests s'executen a la integració contínua, no en construir la imatge.
 RUN gradle assemble --no-daemon
 
-FROM eclipse-temurin:17-jre-jammy
+FROM eclipse-temurin:21-jre-jammy
 
 WORKDIR /app
 
