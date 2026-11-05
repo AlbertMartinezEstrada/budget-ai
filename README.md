@@ -12,7 +12,7 @@ sesión, pero no hay separación de datos entre usuarios.
 | Capa | Tecnología |
 |---|---|
 | Frontend | JavaScript sin framework (módulos ES), servido por Express |
-| Backend | Java 21 + Spring Boot 3.5 |
+| Backend | Java 21 + Spring Boot 4.1 |
 | Base de datos | PostgreSQL 17 |
 | IA | Google Gemini 2.5 Flash |
 | Orquestación | Docker Compose |

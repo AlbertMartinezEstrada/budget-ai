@@ -6,13 +6,13 @@ import com.budgetai.backend.model.Transaction;
 import com.budgetai.backend.repository.AccountRepository;
 import com.budgetai.backend.repository.CategoryRepository;
 import com.budgetai.backend.repository.TransactionRepository;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.web.servlet.MockMvc;
@@ -145,7 +145,9 @@ class ApiErrorsIntegrationTest extends AbstractIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON).content("{\"cost\": dotze"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message", containsString("format")))
-                .andExpect(content().string(org.hamcrest.Matchers.not(containsString("com.fasterxml"))));
+                .andExpect(content().string(org.hamcrest.Matchers.not(containsString("com.fasterxml"))))
+                // Jackson 3 és a tools.jackson: tampoc s'han de veure les seves classes.
+                .andExpect(content().string(org.hamcrest.Matchers.not(containsString("tools.jackson"))));
     }
 
     @Test

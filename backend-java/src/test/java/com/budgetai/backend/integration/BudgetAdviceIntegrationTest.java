@@ -4,14 +4,14 @@ import com.budgetai.backend.model.Budget;
 import com.budgetai.backend.model.Category;
 import com.budgetai.backend.model.Transaction;
 import com.budgetai.backend.repository.*;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -127,7 +127,7 @@ class BudgetAdviceIntegrationTest extends AbstractIntegrationTest {
 
     private static JsonNode find(JsonNode array, String key, String value) {
         return StreamSupport.stream(array.spliterator(), false)
-                .filter(node -> value.equals(node.path(key).asText()))
+                .filter(node -> value.equals(node.path(key).asString("")))
                 .findFirst()
                 .orElse(null);
     }
@@ -181,10 +181,10 @@ class BudgetAdviceIntegrationTest extends AbstractIntegrationTest {
         JsonNode nextSummary = getJson("/budgets/monthly-summary?year=" + next.getYear() + "&month=" + next.getMonthValue());
         JsonNode variable = find(nextSummary.get("seccions"), "tipus", "VARIABLE");
         JsonNode monthlyBlock = StreamSupport.stream(variable.get("grups").spliterator(), false)
-                .filter(node -> "Gast mensual".equals(node.path("categoria").path("nom").asText()))
+                .filter(node -> "Gast mensual".equals(node.path("categoria").path("nom").asString("")))
                 .findFirst().orElseThrow();
         JsonNode restaurantsNode = StreamSupport.stream(monthlyBlock.get("subcategories").spliterator(), false)
-                .filter(node -> "Restaurants".equals(node.path("categoria").path("nom").asText()))
+                .filter(node -> "Restaurants".equals(node.path("categoria").path("nom").asString("")))
                 .findFirst().orElseThrow();
         assertThat(restaurantsNode.get("cost_vida_pla").decimalValue()).isEqualByComparingTo("125");
     }

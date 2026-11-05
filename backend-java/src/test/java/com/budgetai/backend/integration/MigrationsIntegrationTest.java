@@ -4,7 +4,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.testcontainers.containers.Container;
-import org.testcontainers.containers.PostgreSQLContainer;
+import org.testcontainers.postgresql.PostgreSQLContainer;
 import org.testcontainers.utility.MountableFile;
 
 import java.io.IOException;
@@ -39,7 +39,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 @Tag("integration")
 class MigrationsIntegrationTest {
 
-    private static final PostgreSQLContainer<?> POSTGRES = AbstractIntegrationTest.POSTGRES;
+    private static final PostgreSQLContainer POSTGRES = AbstractIntegrationTest.POSTGRES;
 
     private static final Path INIT_SQL = Path.of("init.sql");
     private static final Path MIGRATIONS_DIR = Path.of("migrations");

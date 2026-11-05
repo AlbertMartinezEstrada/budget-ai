@@ -2,9 +2,9 @@ package com.budgetai.backend.service;
 
 import com.budgetai.backend.model.Category;
 import com.budgetai.backend.model.Transaction;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.json.JsonMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -47,7 +47,7 @@ public class AiEngineService {
     private static final Duration READ_TIMEOUT = Duration.ofSeconds(120);
 
     private final RestTemplate restTemplate;
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final JsonMapper jsonMapper = JsonMapper.builder().build();
 
     private final CategoryHierarchyService hierarchyService;
 
@@ -187,7 +187,7 @@ public class AiEngineService {
                 if (candidate.has("content") && candidate.get("content").has("parts")) {
                     JsonNode parts = candidate.get("content").get("parts");
                     if (parts.isArray() && parts.size() > 0) {
-                        return parts.get(0).get("text").asText();
+                        return parts.get(0).get("text").asString();
                     }
                 }
             }
@@ -205,7 +205,7 @@ public class AiEngineService {
         try {
             // Clean markdown code blocks if present
             String cleanJson = jsonResponse.replace("```json", "").replace("```", "").strip();
-            JsonNode rootNode = objectMapper.readTree(cleanJson);
+            JsonNode rootNode = jsonMapper.readTree(cleanJson);
             
             if (rootNode.isArray()) {
                 // Si la IA no retorna exactament una fila per moviment, l'aparellament
@@ -230,16 +230,18 @@ public class AiEngineService {
                     // que la IA pot decidir: empresa, categoria i descripció.
                     // L'import, la data, el tipus i el hash no es toquen mai.
                     Transaction classified = original;
-                    classified.setCompanyName(node.has("companyName") ? node.get("companyName").asText() : "Desconegut");
-                    classified.setCategoryName(node.has("category") ? node.get("category").asText() : "Altres");
-                    classified.setShortDescription(node.has("description_curta") ? node.get("description_curta").asText() : "");
+                    classified.setCompanyName(node.has("companyName") ? node.get("companyName").asString() : "Desconegut");
+                    classified.setCategoryName(node.has("category") ? node.get("category").asString() : "Altres");
+                    classified.setShortDescription(node.has("description_curta") ? node.get("description_curta").asString() : "");
 
                     classifiedTransactions.add(classified);
                 }
 
                 return classifiedTransactions;
             }
-        } catch (JsonProcessingException exception) {
+        } catch (JacksonException exception) {
+            // A Jackson 3 és unchecked: el compilador ja no avisaria si faltés,
+            // i una resposta que no és JSON tombaria la importació.
             LOG.warn("La resposta de Gemini no és JSON vàlid; es descarta la classificació.", exception);
         }
         return originalTransactions;
