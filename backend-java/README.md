@@ -1,6 +1,6 @@
 # Backend Java (Spring Boot)
 
-This is the migrated backend for Budget AI, using Java 21 and Spring Boot 3.
+This is the migrated backend for Budget AI, using Java 21 and Spring Boot 4.
 
 ## Structure
 

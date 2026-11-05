@@ -2,7 +2,7 @@ package com.budgetai.backend.service;
 
 import com.budgetai.backend.model.Settings;
 import com.budgetai.backend.repository.SettingsRepository;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -44,7 +44,7 @@ class SettingsServiceTest {
 
     /** El cos d'un PUT tal com el construeix Jackson: el que no s'envia queda a null. */
     private static Settings changes(String json) throws Exception {
-        return new ObjectMapper().readValue(json, Settings.class);
+        return JsonMapper.builder().build().readValue(json, Settings.class);
     }
 
     @Test

@@ -27,7 +27,7 @@ El proyecto se basa en una arquitectura moderna y robusta, diseñada para escala
 - **Filosofía SPA**: Una Single Page Application fluida donde el contenido se inyecta dinámicamente sin recargar la página.
 
 ### ⚙️ Backend (El "Motor")
-- **Principal**: **Java con Spring Boot 3**. Una API REST profesional que gestiona toda la lógica de negocio, validaciones y cálculos.
+- **Principal**: **Java con Spring Boot 4**. Una API REST profesional que gestiona toda la lógica de negocio, validaciones y cálculos.
 - **Origen**: empezó como un backend en Python (FastAPI); el núcleo se migró a Java y el de Python se retiró en octubre de 2026 (sigue en el historial de git).
 - **Base de Datos**: PostgreSQL, con un esquema relacional optimizado para integridad y rendimiento.
 

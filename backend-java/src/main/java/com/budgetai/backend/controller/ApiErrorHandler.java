@@ -120,7 +120,7 @@ public class ApiErrorHandler {
     @ExceptionHandler(MaxUploadSizeExceededException.class)
     public ResponseEntity<Map<String, Object>> tooLarge(MaxUploadSizeExceededException exception,
                                                         HttpServletRequest request) {
-        return error(HttpStatus.PAYLOAD_TOO_LARGE, Messages.get("errors.file-too-large"), request);
+        return error(HttpStatus.CONTENT_TOO_LARGE, Messages.get("errors.file-too-large"), request);
     }
 
     /** Els llançats a mà amb un codi i un motiu, com el rang de dates del llistat. */

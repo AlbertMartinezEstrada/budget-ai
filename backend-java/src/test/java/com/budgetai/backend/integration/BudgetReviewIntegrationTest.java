@@ -5,14 +5,14 @@ import com.budgetai.backend.model.Category;
 import com.budgetai.backend.model.RecurringTransaction;
 import com.budgetai.backend.model.Transaction;
 import com.budgetai.backend.repository.*;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -151,7 +151,7 @@ class BudgetReviewIntegrationTest extends AbstractIntegrationTest {
 
     private static JsonNode find(JsonNode array, String key, String value) {
         return StreamSupport.stream(array.spliterator(), false)
-                .filter(node -> value.equals(node.path(key).asText()))
+                .filter(node -> value.equals(node.path(key).asString("")))
                 .findFirst()
                 .orElseThrow(() -> new AssertionError("No hi ha cap " + key + " = " + value + " a " + array));
     }

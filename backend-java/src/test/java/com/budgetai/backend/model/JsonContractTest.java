@@ -1,10 +1,8 @@
 package com.budgetai.backend.model;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.SerializationFeature;
-import com.fasterxml.jackson.databind.json.JsonMapper;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.json.JsonMapper;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -26,12 +24,9 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 class JsonContractTest {
 
-    // El mateix mapper que configura Spring Boot: cal el mòdul de java.time
-    // perquè les entitats porten LocalDate i LocalDateTime.
-    private final ObjectMapper mapper = JsonMapper.builder()
-            .addModule(new JavaTimeModule())
-            .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
-            .build();
+    // Les entitats porten LocalDate i LocalDateTime. Jackson 3 ja porta
+    // java.time i escriu les dates com a text (2026-10-05), com Spring Boot.
+    private final ObjectMapper mapper = JsonMapper.builder().build();
 
     @Test
     @DisplayName("Account: el frontend llegeix nom, tipus, saldo_actual, moneda, activa i color")

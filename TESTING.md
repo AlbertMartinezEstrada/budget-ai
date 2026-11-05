@@ -236,6 +236,19 @@ la clau vagi a la capçalera `x-goog-api-key` i no a l'adreça, i que si Gemini
 falla o respon amb una forma inesperada la importació continuï amb els
 moviments tal com eren, sense classificar.
 
+### `AssistantServiceTest` i `ChatModelWithoutKeyTest`
+
+L'assistent de Spring AI, amb un `ChatModel` fals que sempre respon el mateix:
+el CI no crida Google ni necessita cap clau. Que amb model torni la resposta i
+li faci la pregunta de comprovació, i que sense model torni buit en lloc de
+petar.
+
+El segon, que sense clau de Gemini (o amb la clau buida del `.env`) el model de
+xat quedi apagat (`spring.ai.model.chat=none`), i que amb clau, amb Vertex AI o
+amb un `spring.ai.model.chat` explícit no es toqui res. En afegir Spring AI, el
+backend sense clau no arrencava: l'autoconfiguració de Google GenAI llançava
+una excepció.
+
 ### `JwtServiceTest`, `SessionServiceTest`, `LoginThrottleTest`, `AuthCookiesTest`, `LocalCredentialsTest`
 
 La sessió. Que un token amb la signatura manipulada, signat amb una altra clau,
@@ -549,6 +562,10 @@ nova.
   seves parts, que si una no quadra no s'importi res i el missatge digui quina,
   que l'alta manual accepti parts i que l'edició les rebutgi en comptes
   d'ignorar-les.
+- `AssistantIntegrationTest`: l'assistent sense clau de Gemini, com al CI.
+  Que el context arrenqui sense cap model de xat, que `/ia/prova` sigui un 503
+  que diu que falta `GEMINI_API_KEY` en l'idioma de la pantalla (no un error
+  intern), i que sense sessió no respongui.
 - `SharedExpenseIntegrationTest`: el sopar de 40 € entre quatre i els Bizums
   que en tornen la part. Que, agrupat, compti 10 € a Bars i restaurants i els
   Bizums cap ingrés; que el deute que em deuen sigui de 30 € amb el que han
