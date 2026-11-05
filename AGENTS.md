@@ -17,7 +17,7 @@ presupuestos, metas, transferencias, gastos recurrentes y deudas.
 |---|---|---|
 | Frontend | JavaScript sin framework, módulos ES | `frontend/public/` |
 | Servidor estático | Express | `frontend/index.js` |
-| Backend | Java 17, Spring Boot 3.5 | `backend-java/` |
+| Backend | Java 21, Spring Boot 3.5 | `backend-java/` |
 | Base de datos | PostgreSQL 17 | `backend-java/init.sql` |
 
 Backend en el puerto **8000** (no 8080). Frontend en el 3000.

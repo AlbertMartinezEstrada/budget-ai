@@ -12,9 +12,10 @@ java {
 }
 
 // sourceCompatibility només mira la sintaxi: amb un JDK més nou en local, el
-// codi podia fer servir mètodes que a Java 17 no existeixen (Duration.isPositive
-// és de la 18), compilava a casa i petava al CI i a la imatge de Docker.
-// --release 17 compila contra l'API de la 17.
+// codi pot fer servir mètodes que la versió del CI no té. Ja va passar quan
+// era la 17: Duration.isPositive (de la 18) compilava a casa i petava al CI i
+// a la imatge de Docker. --release 21 compila contra l'API de la 21, la
+// mateixa que el CI i la imatge.
 tasks.withType(JavaCompile).configureEach {
     options.release = 21
 }
