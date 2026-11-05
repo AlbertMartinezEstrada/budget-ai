@@ -29,8 +29,8 @@ migrations/   cambios de esquema para instalaciones existentes
 ## Comandos
 
 ```bash
-./gradlew test              # 291 unitarios, rápidos, sin Docker
-./gradlew integrationTest   # 191, requieren Docker
+./gradlew test              # 296 unitarios, rápidos, sin Docker
+./gradlew integrationTest   # 194, requieren Docker
 ./gradlew check             # ambos
 ./gradlew assemble          # empaquetar sin verificar
 ```
@@ -87,6 +87,16 @@ return Map.of("error", Messages.forUser(exception));                      // un 
   `Messages.forUser`, que ya hacen `ApiErrorHandler` y `ClientErrors`.
 - No se usa `MessageSource` de Spring: su `MessageFormat` trata el apóstrofo
   como carácter especial y el catalán va lleno («L'import {0}» perdía el valor).
+
+**Sin `GEMINI_API_KEY` el backend arranca igual.** La autoconfiguración de
+Spring AI para Google GenAI se activa sola y, sin clave, lanza una excepción
+que impide arrancar todo. `config/ChatModelWithoutKey` (un
+`EnvironmentPostProcessor` en `META-INF/spring.factories`) pone
+`spring.ai.model.chat=none` cuando no hay clave ni Vertex AI, y quien use el
+modelo lo recibe con `ObjectProvider<ChatModel>` y responde que no está
+configurado si no hay. Al añadir otro modelo de Spring AI (los embeddings de la
+semana 4, por ejemplo), comprueba que sin clave sigue arrancando: tiene su
+propio `spring.ai.model.*`.
 
 **CORS está centralizado** en `config/CorsConfig`. No pongas `@CrossOrigin` en
 los controllers; los ocho lo tenían con `origins = "*"` y se quitó.

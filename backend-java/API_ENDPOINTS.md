@@ -528,6 +528,18 @@ cada Bizum `"cobrament_de": "fila-3"`. Son solo de entrada: no se devuelven.
 
 ---
 
+## 🤖 **Asistente** (Spring AI con Gemini)
+
+- `GET /ia/prova` - Comprueba que el modelo de chat responde
+  ```json
+  {"resposta": "funciona"}
+  ```
+  Sin `GEMINI_API_KEY`, **503** con el mensaje de que falta la clave (en el
+  idioma de `Accept-Language`). Una clave que Google rechaza es un 500 con
+  referencia: el motivo está en el log del backend.
+
+---
+
 ## 🎨 **Frontend Integration Notes**
 
 1. **Colores para cuentas**: Usar formato hex (#FF5722)

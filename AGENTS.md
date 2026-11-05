@@ -31,8 +31,8 @@ docker compose logs -f backend        # logs
 scripts\backup.bat                    # copia de la base de datos (backup.sh fuera de Windows)
 scripts/migrate.sh                    # aplica las migraciones pendientes (copia antes; --estat para ver cuáles)
 
-cd backend-java && ./gradlew test              # 291 unitarios, sin Docker
-cd backend-java && ./gradlew integrationTest   # 191, requieren Docker
+cd backend-java && ./gradlew test              # 296 unitarios, sin Docker
+cd backend-java && ./gradlew integrationTest   # 194, requieren Docker
 cd frontend && npm test                        # 131
 cd frontend && npm run test:navegador          # todas las vistas en un navegador (ver abajo)
 ```
@@ -369,7 +369,9 @@ fecha, el tipo y el hash de verificación se conservan siempre del CSV.**
 
 Si devuelve un número de filas distinto del enviado, se descarta la
 clasificación entera. Sin `GEMINI_API_KEY` la importación funciona igual, sin
-clasificar.
+clasificar, y el resto del backend también: sin clave, Spring AI se queda sin
+modelo de chat (`config/ChatModelWithoutKey`) y el asistente dice que no está
+configurado.
 
 ### 11. Un préstamo no es ni ingreso ni gasto, y cada euro cuenta una vez
 
