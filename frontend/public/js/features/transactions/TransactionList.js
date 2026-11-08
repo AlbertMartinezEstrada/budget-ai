@@ -6,6 +6,7 @@ import {
 import { categoryOptions, leafCategories, sectionOfCategory } from '../../categoryOptions.js';
 import { counterpartOptions, savingsCategoryHint, transferCounts, transferLabel } from '../../transfers.js';
 import { hasReceiptsToChoose, receiptOptions } from '../../debtReceipts.js';
+import { debtOptionLabel, suggestedDebtCategory } from '../../debtLinks.js';
 import { setUpUnmarkedTransfers } from './UnmarkedTransfers.js';
 import { setUpSplitEditor } from './SplitEditor.js';
 import { setUpSharedExpenseEditor, setUpRepaymentPicker } from './SharedExpenseEditor.js';
@@ -24,19 +25,6 @@ const TYPES = {
 };
 
 const typeOf = (transaction) => TYPES[transaction.type] ? transaction.type : 'EXPENSE';
-
-/**
- * La categoria que toca a un moviment d'un deute, segons el sentit.
- *
- * Un préstec compta al pressupost pels moviments: el que em deixen eixampla
- * el que es pot repartir, i el que torno n'és una despesa. Triar el deute
- * proposa la categoria perquè no s'hagi de recordar quina és; si el moviment
- * és una altra cosa (el sopar que un amic em va pagar), es pot canviar.
- */
-const DEBT_CATEGORIES = {
-    DEC: { INCOME: 'Préstecs rebuts', EXPENSE: 'Pagament de deutes' },
-    EM_DEUEN: { EXPENSE: 'Préstecs fets', INCOME: 'Cobrament de préstecs' }
-};
 
 let currentSortMode = 'month-desc';
 let currentTransactions = [];
@@ -517,7 +505,7 @@ function setUpManualEntry(categories, companies, debts) {
         refreshReceipts();
         const debt = debtsById.get(Number.parseInt(event.target.value, 10));
         if (!debt) return;
-        const suggested = DEBT_CATEGORIES[debt.direccio]?.[document.getElementById('new-type').value];
+        const suggested = suggestedDebtCategory(debt, document.getElementById('new-type').value);
         if (suggested && leafNames.has(suggested)) {
             document.getElementById('new-category').value = suggested;
         }
@@ -654,14 +642,6 @@ function setUpManualEntry(categories, companies, debts) {
             submitButton.disabled = false;
         }
     });
-}
-
-/** «Pares (dec)», «Steam Deck (dec, saldat)»: el deute i en quin sentit va. */
-function debtOptionLabel(debt) {
-    const key = debt.direccio === 'DEC'
-        ? (debt.saldat ? 'transactions.debt-option-owe-settled' : 'transactions.debt-option-owe')
-        : (debt.saldat ? 'transactions.debt-option-owed-settled' : 'transactions.debt-option-owed');
-    return t(key, { name: debt.nom });
 }
 
 /** Torna a llegir els deutes: el calendari de cadascun depèn dels pagaments. */

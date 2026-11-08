@@ -32,8 +32,8 @@ scripts\backup.bat                    # copia de la base de datos (backup.sh fue
 scripts/migrate.sh                    # aplica las migraciones pendientes (copia antes; --estat para ver cuáles)
 
 cd backend-java && ./gradlew test              # 298 unitarios, sin Docker
-cd backend-java && ./gradlew integrationTest   # 194, requieren Docker
-cd frontend && npm test                        # 131
+cd backend-java && ./gradlew integrationTest   # 195, requieren Docker
+cd frontend && npm test                        # 133
 cd frontend && npm run test:navegador          # todas las vistas en un navegador (ver abajo)
 ```
 

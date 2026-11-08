@@ -357,6 +357,14 @@ s'escapin. Abans cada pantalla muntava el seu, desendreçat, i algun oferia
 blocs on només hi poden anar fulles. També que Estalvi i inversió surti com a
 secció pròpia, amb el camí de les fulles d'Inversió, i dins de les de despesa.
 
+### `frontend/test/debtLinks.test.js`
+
+Vincular un moviment a un deute, el mateix a l'edició i a la revisió d'un
+extracte: que la categoria proposada depengui del sentit del deute i del
+moviment (la quota de la Steam Deck a «Pagament de deutes», l'entrada del
+préstec a «Préstecs rebuts»), i que el nom de cada deute digui en quin sentit va
+i si ja està saldat.
+
 ### `frontend/test/debtReceipts.test.js`
 
 Els rebuts d'un deute al navegador: que es diguin pel mes i no pel dia, que el
@@ -546,6 +554,8 @@ nova.
   que esborrar el deute deixi els moviments (i esborri els seus rebuts trets);
   que el pressupost reservi la quota del mes i deixi de fer-ho quan el deute ja
   està saldat; que un pagament pagui el rebut triat i, editant-lo, el que toca;
+  que una fila de l'extracte vinculada a la revisió pagui el deute i el rebut
+  triat (o, sense, el que toca);
   que desvincular el deute buidi el rebut; i que saltar, descomptar i desfer un
   rebut passin per HTTP, amb un 400 si un pagament l'havia triat.
 - `ApiErrorsIntegrationTest`: els errors per HTTP, amb la sessió de debò. Que
@@ -641,6 +651,9 @@ a pujar (ha de dir que ja hi és, no donar error), i recorre les 14 vistes i els
 seus formularis en clar i en fosc. A la revisió, abans de desar, comparteix el
 sopar de l'extracte (32 € entre quatre) amb els seus dos Bizums de 8 €, i un cop
 importat comprova que surt dividit i que el deute és de 24 € amb 8 € pendents.
+Abans de pujar-lo crea un deute a quotes, i a la revisió hi vincula la compra
+de 120,50 € amb el selector de deute (mirant-ne el contrast); importat, el
+primer rebut ha de sortir pagat.
 A Pressupost, el resum del febrer ha de donar 246,79 € de total gastat: les
 quatre despeses i només la meva part del sopar. Falla amb:
 

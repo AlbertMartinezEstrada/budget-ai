@@ -835,6 +835,13 @@ vez salda la deuda: el vínculo dice cuánto falta, la categoría cómo cuenta. 
 el formulario, elegir la deuda propone la categoría según el sentido, y se
 puede cambiar.
 
+**También al importar.** En la revisión de un extracto, cada fila tiene el mismo
+selector: la deuda y, si va a cuotas, el recibo que paga (por defecto, el que
+toca). Viaja en `deute_id` y `deute_rebut` con la confirmación, como en el alta
+manual, y la categoría se propone con el mismo criterio (`debtLinks.js`, que
+comparten las dos pantallas). Antes la cuota de la Steam Deck entraba suelta y
+había que editarla después.
+
 Borrar una deuda **no borra sus movimientos**: pasaron de verdad y el saldo
 depende de ellos. Solo pierden el vínculo. Para desvincular un movimiento se
 envía `deute_id: -1`, por la misma razón que el `parent_id` negativo.
