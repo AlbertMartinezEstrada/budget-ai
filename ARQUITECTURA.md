@@ -165,6 +165,16 @@ CSV ──► BankReaderService ──► filtro por hash ──► Gemini ─�
                          (+ ajuste de saldo)   (revalida hashes)     confirma
 ```
 
+### Qué bancos se leen
+
+El formato sale de la cabecera, sin preguntar: el clásico (`Fecha;Concepto;Importe`,
+con `;`, `,` o tabuladores), Revolut y Trade Republic. Revolut exporta los
+nombres de las columnas en el idioma de la app, y se leen en portugués («Data
+de Conclusão», «Montante»), inglés («Completed Date», «Amount») y castellano
+(«Fecha de finalización», «Importe»). La fecha que manda es la de finalización,
+la comisión se resta y lo que no está completado (`CONCLUÍDA`, `COMPLETED`,
+`COMPLETADO`) no se importa.
+
 ### El parser de importes
 
 Detecta el separador decimal mirando cuál de los dos (`.` o `,`) aparece más a

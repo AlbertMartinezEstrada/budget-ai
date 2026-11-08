@@ -139,8 +139,11 @@ multiplicava per 100 qualsevol import anglosaxó (`45.30` → `4530`). Es cobrei
 els cinc formats que pot enviar un banc, i que un import il·legible aturi la
 importació en comptes de desar-se com a zero.
 
-També l'extracte de Trade Republic (comes i cometes, import en format de
-màquina, compres de valors que no s'importen, dividends i comissions), i que un
+També l'extracte de Revolut en portuguès i en castellà: amb l'app en castellà
+no es reconeixia (es llegia com a clàssic i faltava «Fecha») i l'estat
+COMPLETADO no comptava com a fet. I el de Trade Republic (comes i cometes,
+import en format de màquina, compres de valors que no s'importen, dividends i
+comissions), i que un
 fitxer il·legible —unes cometes mal tancades, un format desconegut, una data
 dolenta— doni un missatge en català amb la línia i els formats coneguts, no
 l'excepció de commons-csv. I que el separador del format clàssic es dedueixi de
