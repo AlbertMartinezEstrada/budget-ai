@@ -229,6 +229,44 @@ class BankReaderServiceTest {
         assertThat(read).isEmpty();
     }
 
+    /** Revolut amb l'app en castellà: els noms de columna canvien, i "State" es queda en anglès. */
+    private List<Transaction> readSpanishRevolut(String... rows) throws Exception {
+        String content = "Tipo,Producto,Fecha de inicio,Fecha de finalización,Descripción,Importe,Comisión,Divisa,State,Saldo\n"
+                + String.join("\n", rows) + "\n";
+        return service.readBankCsv(new MockMultipartFile(
+                "file", "revolut.csv", "text/csv", content.getBytes(StandardCharsets.UTF_8)));
+    }
+
+    @Test
+    @DisplayName("Revolut en castellà també es reconeix, amb la data de finalització i COMPLETADO com a fet")
+    void spanishRevolutIsRead() throws Exception {
+        List<Transaction> read = readSpanishRevolut(
+                "Pago con tarjeta,Actual,2026-11-01 11:54:44,2026-11-02 09:01:56,Gasolinera Prova,-42.04,0.00,EUR,COMPLETADO,17.97",
+                "Recargas,Actual,2026-11-03 10:58:34,2026-11-03 10:58:35,Una recarga de Apple Pay con *1234,10.00,0.00,EUR,COMPLETADO,27.97");
+
+        // Abans es llegia com a clàssic i fallava per la columna «Fecha»; i
+        // encara que s'hagués reconegut, COMPLETADO no comptava com a fet.
+        assertThat(read).hasSize(2);
+        assertThat(read.get(0).getOriginalConcept()).isEqualTo("Gasolinera Prova");
+        assertThat(read.get(0).getType()).isEqualTo("EXPENSE");
+        assertThat(read.get(0).getAmount()).isEqualByComparingTo("42.04");
+        assertThat(read.get(0).getDate()).isEqualTo(LocalDate.of(2026, 11, 2));
+        assertThat(read.get(0).getBalance()).isEqualByComparingTo("17.97");
+        assertThat(read.get(1).getType()).isEqualTo("INCOME");
+    }
+
+    @Test
+    @DisplayName("Revolut en castellà: la comissió es resta i el que està pendent no s'importa")
+    void spanishRevolutFeesAndPending() throws Exception {
+        List<Transaction> read = readSpanishRevolut(
+                "Cargo,Actual,2026-11-01 01:00:00,2026-11-01 01:00:00,Cuota del plan,0.00,4.99,EUR,COMPLETADO,-4.99",
+                "Pago con tarjeta,Actual,2026-11-02 10:00:00,,Tienda Prova,-9.99,0.00,EUR,PENDIENTE,0.00");
+
+        assertThat(read).hasSize(1);
+        assertThat(read.get(0).getAmount()).isEqualByComparingTo("4.99");
+        assertThat(read.get(0).getType()).isEqualTo("EXPENSE");
+    }
+
     @Test
     @DisplayName("El format de sempre segueix funcionant")
     void theClassicFormatStillWorks() throws Exception {

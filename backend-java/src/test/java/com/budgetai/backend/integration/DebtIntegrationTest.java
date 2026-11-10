@@ -289,6 +289,43 @@ class DebtIntegrationTest extends AbstractIntegrationTest {
         assertThat(reassigned.getMovements().get(0).receiptChosen()).isFalse();
     }
 
+    /** Una fila de l'extracte tal com la confirma la revisió, vinculada a un deute. */
+    private Transaction importedPayment(String concept, LocalDate date, Long debtId, LocalDate receipt) {
+        Transaction row = new Transaction();
+        row.setOriginalConcept(concept);
+        row.setCompanyName(concept);
+        row.setCategoryName("Pagament de deutes");
+        row.setType("EXPENSE");
+        row.setAmount(new BigDecimal("100.00"));
+        row.setDate(date);
+        row.setDebtId(debtId);
+        row.setDebtReceipt(receipt);
+        return row;
+    }
+
+    @Test
+    @DisplayName("Una fila vinculada a la revisió de l'extracte paga el deute: el rebut triat o, sense, el que toca")
+    void importedRowsPayTheDebt() {
+        Debt debt = createPastDebt();
+
+        ResponseEntity<?> response = transactionController.confirmUpload(List.of(
+                importedPayment("QUOTA STEAM DECK FEBRER", LocalDate.of(2025, 2, 3), debt.getId(), FEBRUARY_5),
+                importedPayment("QUOTA STEAM DECK", LocalDate.of(2025, 2, 10), debt.getId(), null)));
+        assertThat(response.getStatusCode().is2xxSuccessful()).isTrue();
+
+        // Abans calia importar-les i editar-les després per vincular-les.
+        Debt paid = reload(debt.getId());
+        assertThat(paid.getRepaid()).isEqualByComparingTo("200.00");
+        assertThat(firstStatuses(paid, 2)).containsExactly("PAGAT", "PAGAT");
+        Debt.Movement chosen = paid.getMovements().stream()
+                .filter(movement -> FEBRUARY_5.equals(movement.receipt())).findFirst().orElseThrow();
+        assertThat(chosen.receiptChosen()).isTrue();
+        assertThat(paid.getMovements()).anySatisfy(movement -> {
+            assertThat(movement.receipt()).isEqualTo(JANUARY_5);
+            assertThat(movement.receiptChosen()).isFalse();
+        });
+    }
+
     @Test
     @DisplayName("Desvincular el deute buida el rebut: sense deute no en paga cap")
     void unlinkingClearsTheReceipt() {

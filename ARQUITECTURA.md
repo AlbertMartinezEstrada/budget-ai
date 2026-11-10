@@ -165,6 +165,16 @@ CSV ──► BankReaderService ──► filtro por hash ──► Gemini ─�
                          (+ ajuste de saldo)   (revalida hashes)     confirma
 ```
 
+### Qué bancos se leen
+
+El formato sale de la cabecera, sin preguntar: el clásico (`Fecha;Concepto;Importe`,
+con `;`, `,` o tabuladores), Revolut y Trade Republic. Revolut exporta los
+nombres de las columnas en el idioma de la app, y se leen en portugués («Data
+de Conclusão», «Montante»), inglés («Completed Date», «Amount») y castellano
+(«Fecha de finalización», «Importe»). La fecha que manda es la de finalización,
+la comisión se resta y lo que no está completado (`CONCLUÍDA`, `COMPLETED`,
+`COMPLETADO`) no se importa.
+
 ### El parser de importes
 
 Detecta el separador decimal mirando cuál de los dos (`.` o `,`) aparece más a
@@ -824,6 +834,13 @@ se la devuelvo por Bizum, ese Bizum es un gasto de «Bars i restaurants» y a la
 vez salda la deuda: el vínculo dice cuánto falta, la categoría cómo cuenta. En
 el formulario, elegir la deuda propone la categoría según el sentido, y se
 puede cambiar.
+
+**También al importar.** En la revisión de un extracto, cada fila tiene el mismo
+selector: la deuda y, si va a cuotas, el recibo que paga (por defecto, el que
+toca). Viaja en `deute_id` y `deute_rebut` con la confirmación, como en el alta
+manual, y la categoría se propone con el mismo criterio (`debtLinks.js`, que
+comparten las dos pantallas). Antes la cuota de la Steam Deck entraba suelta y
+había que editarla después.
 
 Borrar una deuda **no borra sus movimientos**: pasaron de verdad y el saldo
 depende de ellos. Solo pierden el vínculo. Para desvincular un movimiento se

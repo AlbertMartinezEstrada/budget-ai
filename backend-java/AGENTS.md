@@ -29,8 +29,8 @@ migrations/   cambios de esquema para instalaciones existentes
 ## Comandos
 
 ```bash
-./gradlew test              # 296 unitarios, rápidos, sin Docker
-./gradlew integrationTest   # 194, requieren Docker
+./gradlew test              # 298 unitarios, rápidos, sin Docker
+./gradlew integrationTest   # 195, requieren Docker
 ./gradlew check             # ambos
 ./gradlew assemble          # empaquetar sin verificar
 ```

@@ -83,8 +83,9 @@ public class BankReaderService {
         }
         if (isRevolut(header)) {
             return readRows(content, ',', Message.of("upload.format-revolut"), this::readRevolutRow,
-                    new String[] {"Data de Conclusão", "Data de Conclusao", "Completed Date"},
-                    new String[] {"Montante", "Amount"});
+                    new String[] {"Data de Conclusão", "Data de Conclusao", "Completed Date",
+                            "Fecha de finalización", "Fecha de finalizacion"},
+                    new String[] {"Montante", "Amount", "Importe"});
         }
         return readRows(content, delimiterOf(header), Message.of("upload.format-classic"), this::readClassicRow,
                 new String[] {"Fecha"}, new String[] {"Concepto"}, new String[] {"Importe"});
@@ -101,11 +102,14 @@ public class BankReaderService {
     }
 
     /**
-     * Revolut porta l'import a "Montante" i la comissió en una columna a part.
-     * Cap dels dos noms surt a l'altre format, així que n'hi ha prou de mirar-ho.
+     * Revolut porta dues dates, la d'inici i la de conclusió, i els noms de
+     * les columnes en l'idioma de l'app: "Data de Conclusão" en portuguès,
+     * "Completed Date" en anglès i "Fecha de finalización" en castellà. El
+     * format clàssic només en té una, "Fecha", així que n'hi ha prou de mirar-ho.
      */
     private boolean isRevolut(String header) {
-        return header.contains("Montante") || header.contains("Data de Conclus") || header.contains("Completed Date");
+        return header.contains("Montante") || header.contains("Data de Conclus") || header.contains("Completed Date")
+                || header.contains("Fecha de finaliz");
     }
 
     /**
@@ -328,7 +332,8 @@ public class BankReaderService {
      * dels dos.
      *
      * HI HA DUES DATES. Un pagament pot començar un dia i completar-se un
-     * altre —el saldo es mou el segon—, així que mana "Data de Conclusão".
+     * altre —el saldo es mou el segon—, així que mana la de conclusió ("Data
+     * de Conclusão", "Completed Date" o "Fecha de finalización").
      *
      * NO TOT ESTÀ FET. Revolut també exporta moviments pendents i revertits.
      * Importar-los mouria saldos de diners que no s'han mogut.
@@ -336,18 +341,18 @@ public class BankReaderService {
     private Transaction readRevolutRow(CSVRecord csvRecord) {
         if (!isCompleted(column(csvRecord, "Estado", "Estat", "State"))) return null;
 
-        BigDecimal amount = cleanNumber(column(csvRecord, "Montante", "Amount"));
-        BigDecimal fee = cleanNumber(column(csvRecord, "Comissão", "Comissao", "Fee"));
+        BigDecimal amount = cleanNumber(column(csvRecord, "Montante", "Amount", "Importe"));
+        BigDecimal fee = cleanNumber(column(csvRecord, "Comissão", "Comissao", "Fee", "Comisión", "Comision"));
         BigDecimal net = amount.subtract(fee);
 
         // Una fila sense moviment no és res que calgui desar.
         if (net.signum() == 0) return null;
 
         LocalDate date = parseDateTime(column(csvRecord, "Data de Conclusão",
-                "Data de Conclusao", "Completed Date"));
+                "Data de Conclusao", "Completed Date", "Fecha de finalización", "Fecha de finalizacion"));
         if (date == null) return null;
 
-        String concept = column(csvRecord, "Descrição", "Descricao", "Description");
+        String concept = column(csvRecord, "Descrição", "Descricao", "Description", "Descripción", "Descripcion");
         if (concept == null || concept.isBlank()) {
             concept = column(csvRecord, "Tipo", "Type");
         }
@@ -367,8 +372,9 @@ public class BankReaderService {
         // Sense columna d'estat, s'assumeix que el que hi ha està fet.
         if (state == null || state.isBlank()) return true;
 
-        String normalised = state.trim().toUpperCase();
-        return normalised.startsWith("CONCLU") || normalised.equals("COMPLETED");
+        // CONCLUÍDA en portuguès, COMPLETED en anglès, COMPLETADO en castellà.
+        String normalised = state.trim().toUpperCase(Locale.ROOT);
+        return normalised.startsWith("CONCLU") || normalised.startsWith("COMPLET");
     }
 
     /** "2026-08-04 09:13:10" -> 2026-08-04. */

@@ -29,6 +29,10 @@ const SAMPLE_STATEMENT = path.join(HERE, '..', '..', 'test_bank_statement.csv');
 // El sopar de l'extracte (REST. EL TRULL, 32 €), que es comparteix amb els seus dos Bizums.
 const DINNER_AMOUNT = /\b32[,.]00\b/;
 const DINNER_DEBT = 'Sopar a Girona';
+// Un deute a quotes inventat, i la compra de l'extracte (AMAZON, 120,50 €) que en paga la primera.
+const INSTALMENT_DEBT = 'Consola a terminis';
+const INSTALMENT_AMOUNT = /\b120[,.]50\b/;
+const BACKEND_URL = FRONTEND_URL.replace(/:\d+$/, ':8000');
 
 /** Els missatges del backend de cada idioma: han d'arribar en el de la pantalla. */
 const BACKEND_MESSAGES = Object.fromEntries(LANGUAGES.map(({ code }) => [code, parseProperties(fs.readFileSync(
@@ -361,14 +365,86 @@ async function shareDinnerWhileReviewing() {
     if (linked !== 2) fail(`a la revisió, ${linked} Bizums surten vinculats al sopar en lloc de 2`);
 }
 
+/** Els deutes, tal com els torna el backend. */
+async function currentDebts() {
+    return page.evaluate(async url => (await fetch(`${url}/debts`, { credentials: 'include' })).json(), BACKEND_URL);
+}
+
+/**
+ * Un deute a quotes perquè la revisió hi pugui vincular una fila: 361,50 € a
+ * 120,50 € al mes des del febrer de l'extracte. Només si encara no hi és.
+ */
+async function createInstalmentDebt() {
+    if ((await currentDebts()).some(debt => debt.nom === INSTALMENT_DEBT)) return;
+    const status = await page.evaluate(async ([url, debt]) => {
+        const response = await fetch(`${url}/debts`, {
+            method: 'POST', credentials: 'include',
+            headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(debt)
+        });
+        // Sense llegir el cos, Playwright no dona la petició per acabada i
+        // waitForQuietNetwork esperava els 15 s sencers a cada vista.
+        await response.text();
+        return response.status;
+    }, [BACKEND_URL, {
+        nom: INSTALMENT_DEBT, direccio: 'DEC', import: 361.50, data: '2026-01-20', forma_retorn: 'QUOTES',
+        quota: 120.50, frequencia: 'MENSUAL', data_primer_pagament: '2026-02-05'
+    }]);
+    if (status >= 300) fail(`crear el deute a quotes ha respost ${status}`);
+}
+
+/**
+ * A la revisió, la compra de 120,50 € va al deute a quotes, amb el rebut que
+ * toca: abans només es podia vincular editant el moviment després.
+ */
+async function linkDebtWhileReviewing() {
+    const row = await reviewRowOf(INSTALMENT_AMOUNT);
+    if (row === undefined) {
+        fail('a la revisió no hi ha la compra de 120,50 € de l\'extracte');
+        return;
+    }
+    await page.click(`button[data-action="link-debt"][data-index="${row}"]`);
+    await page.waitForSelector('#debt-link-modal:not(.hidden)');
+    const options = await page.$$eval('#debt-link-debt option', found => found.map(option => option.textContent));
+    const label = options.find(text => text.includes(INSTALMENT_DEBT));
+    if (!label) {
+        fail(`el deute «${INSTALMENT_DEBT}» no surt entre els deutes: ${options.join(', ')}`);
+        return;
+    }
+    await page.selectOption('#debt-link-debt', { label });
+    if (await page.isHidden('#debt-link-receipt-field')) fail('el deute va a quotes i no deixa triar el rebut');
+    for (const theme of ['light', 'dark']) {
+        await setTheme(theme);
+        for (const problem of await page.evaluate(lowContrastTexts)) fail(`poc contrast (${theme}): ${problem}`);
+        await page.screenshot({ path: path.join(RESULTS_DIR, `upload-${theme}-deute.png`) });
+    }
+    await setTheme('light');
+    await page.click('#debt-link-save');
+    await page.waitForSelector('#debt-link-modal.hidden', { state: 'attached' });
+
+    const linked = await page.$eval(`#review-body tr[data-index="${row}"]`, found => ({
+        text: found.textContent,
+        category: found.querySelector('select[name="categoria"]')?.value
+    }));
+    if (!linked.text.includes(INSTALMENT_DEBT)) fail('la fila vinculada no diu a quin deute va');
+    if (linked.category !== 'Pagament de deutes') fail(`la quota hauria d'anar a Pagament de deutes i va a «${linked.category}»`);
+}
+
+/** Importada, la compra ha pagat el primer rebut del deute. */
+async function checkInstalmentPaid() {
+    const debt = (await currentDebts()).find(candidate => candidate.nom === INSTALMENT_DEBT);
+    if (!debt) fail('no hi ha el deute a quotes');
+    else if (Number(debt.retornat) !== 120.5 || debt.calendari?.[0]?.estat !== 'PAGAT') {
+        fail(`del deute a quotes s'han tornat ${debt.retornat} i el primer rebut està ${debt.calendari?.[0]?.estat}; havia de ser 120,50 i PAGAT`);
+    }
+}
+
 /** Importat, el sopar surt dividit i el deute diu que en falta una part. */
 async function checkSharedDinner() {
     const parts = await page.$$eval('#transactions-body tr', (rows, pattern) => rows
         .find(row => new RegExp(pattern).test(row.textContent))?.querySelector('.parts-toggle')?.textContent.trim(),
         DINNER_AMOUNT.source);
     if (!parts) fail('a Transaccions, el sopar compartit no surt dividit');
-    const debts = await page.evaluate(async url => (await fetch(`${url}/debts`, { credentials: 'include' })).json(),
-        FRONTEND_URL.replace(/:\d+$/, ':8000'));
+    const debts = await currentDebts();
     const dinnerDebt = debts.find(debt => debt.nom === DINNER_DEBT);
     if (!dinnerDebt) fail('no hi ha el deute del sopar compartit');
     else if (Number(dinnerDebt.import) !== 24 || Number(dinnerDebt.pendent) !== 8) {
@@ -400,6 +476,7 @@ async function checkMonthTotals() {
 }
 
 currentStep = 'importar';
+await createInstalmentDebt();
 // En una base de dades nova surt la revisió; si la prova ja s'ha fet abans, avisa que hi és.
 const firstImport = await uploadSampleStatement() === 'revisió';
 if (firstImport) {
@@ -407,6 +484,8 @@ if (firstImport) {
     if (reviewRows !== 7) fail(`la revisió mostra ${reviewRows} moviments i l'extracte en té 7`);
     currentStep = 'importar · despesa compartida';
     await shareDinnerWhileReviewing();
+    currentStep = 'importar · deute';
+    await linkDebtWhileReviewing();
     currentStep = 'importar';
     await page.click('#confirm-review');
     await page.waitForFunction(() => /✅/.test(document.getElementById('upload-status')?.textContent || ''), null, { timeout: 30000 })
@@ -423,6 +502,7 @@ const savedCount = Number(await page.textContent('#transaction-count'));
 if (!(savedCount >= 7)) fail(`a Transaccions n'hi ha ${savedCount}; n'haurien de ser almenys els 7 importats`);
 if (firstImport) {
     await checkSharedDinner();
+    await checkInstalmentPaid();
     currentStep = 'pressupost · resum del mes';
     await checkMonthTotals();
 }
